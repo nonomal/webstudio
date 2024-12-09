@@ -15,7 +15,7 @@ import type {
   WsComponentPropsMeta,
   WsEmbedTemplate,
 } from "@webstudio-is/react-sdk";
-import { button, div, span } from "@webstudio-is/react-sdk/css-normalize";
+import { button, div, span } from "@webstudio-is/sdk/normalize.css";
 import * as tc from "./theme/tailwind-classes";
 import {
   propsSelect,
@@ -116,7 +116,6 @@ export const metaSelect: WsComponentMeta = {
       component: "Select",
       variables: {
         selectValue: { initialValue: "" },
-        selectOpen: { initialValue: false },
       },
       props: [
         {
@@ -129,18 +128,6 @@ export const metaSelect: WsComponentMeta = {
           type: "action",
           value: [
             { type: "execute", args: ["value"], code: `selectValue = value` },
-          ],
-        },
-        {
-          name: "open",
-          type: "expression",
-          code: "selectOpen",
-        },
-        {
-          name: "onOpenChange",
-          type: "action",
-          value: [
-            { type: "execute", args: ["open"], code: `selectOpen = open` },
           ],
         },
       ],
@@ -225,15 +212,21 @@ export const metaSelect: WsComponentMeta = {
               children: [
                 createSelectItem({
                   props: [{ name: "value", type: "string", value: "light" }],
-                  children: [{ type: "text", value: "Light" }],
+                  children: [
+                    { type: "text", value: "Light", placeholder: true },
+                  ],
                 }),
                 createSelectItem({
                   props: [{ name: "value", type: "string", value: "dark" }],
-                  children: [{ type: "text", value: "Dark" }],
+                  children: [
+                    { type: "text", value: "Dark", placeholder: true },
+                  ],
                 }),
                 createSelectItem({
                   props: [{ name: "value", type: "string", value: "system" }],
-                  children: [{ type: "text", value: "System" }],
+                  children: [
+                    { type: "text", value: "System", placeholder: true },
+                  ],
                 }),
               ],
             },
@@ -285,7 +278,10 @@ export const metaSelectItem: WsComponentMeta = {
   category: "hidden",
   type: "container",
   icon: ItemIcon,
-  requiredAncestors: ["SelectViewport"],
+  constraints: {
+    relation: "ancestor",
+    component: { $eq: "SelectViewport" },
+  },
   presetStyle,
 };
 
@@ -295,7 +291,10 @@ export const metaSelectItemIndicator: WsComponentMeta = {
   label: "Indicator",
   icon: CheckMarkIcon,
   detachable: false,
-  requiredAncestors: ["SelectItem"],
+  constraints: {
+    relation: "ancestor",
+    component: { $eq: "SelectItem" },
+  },
   presetStyle: {
     span,
   },
@@ -307,7 +306,10 @@ export const metaSelectItemText: WsComponentMeta = {
   label: "Item Text",
   icon: TextIcon,
   detachable: false,
-  requiredAncestors: ["SelectItem"],
+  constraints: {
+    relation: "ancestor",
+    component: { $eq: "SelectItem" },
+  },
   presetStyle: {
     span,
   },
@@ -315,7 +317,7 @@ export const metaSelectItemText: WsComponentMeta = {
 
 export const propsMetaSelect: WsComponentPropsMeta = {
   props: propsSelect,
-  initialProps: ["value", "open", "name", "required"],
+  initialProps: ["name", "value", "open", "required"],
 };
 
 export const propsMetaSelectTrigger: WsComponentPropsMeta = {

@@ -5,7 +5,7 @@ import {
   type WsComponentMeta,
   type WsComponentPropsMeta,
 } from "@webstudio-is/react-sdk";
-import { label } from "@webstudio-is/react-sdk/css-normalize";
+import { label } from "@webstudio-is/sdk/normalize.css";
 import { props } from "./__generated__/label.props";
 import * as tc from "./theme/tailwind-classes";
 
@@ -33,7 +33,7 @@ export const meta: WsComponentMeta = {
         tc.leading("none"),
         // We are not supporting peer like styles yet
       ].flat(),
-      children: [{ type: "text", value: "Form Label" }],
+      children: [{ type: "text", value: "Form Label", placeholder: true }],
     },
   ],
 };
@@ -46,5 +46,5 @@ export const propsMeta: WsComponentPropsMeta = {
       label: "For",
     },
   },
-  initialProps: ["id", "htmlFor"],
+  initialProps: ["id", "className", "htmlFor"],
 };

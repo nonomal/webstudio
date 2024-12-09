@@ -1,5 +1,22 @@
 import { PrismaClient, Prisma } from "./__generated__";
-const { PrismaClientKnownRequestError, Decimal } = Prisma;
+
+export type {
+  User,
+  Build,
+  Project,
+  Asset,
+  File,
+  DashboardProject,
+  AuthorizationToken,
+  DomainStatus,
+  Domain,
+  PublishStatus,
+  Product,
+  $Enums,
+} from "./__generated__";
+
+export { Prisma };
+export const { PrismaClientKnownRequestError, Decimal } = Prisma;
 
 declare global {
   // allow global `var` declarations
@@ -15,6 +32,26 @@ declare global {
 }
 
 const logPrisma = process.env.NODE_ENV === "production";
+
+type PrismaClientOptions = {
+  datasourceUrl: string;
+  timeout?: number;
+  maxWait?: number;
+};
+
+export const createPrisma = ({
+  datasourceUrl,
+  timeout = 5000,
+  maxWait = 2000,
+}: PrismaClientOptions) => {
+  return new PrismaClient({
+    datasourceUrl,
+    transactionOptions: {
+      timeout,
+      maxWait,
+    },
+  });
+};
 
 // this fixes the issue with `warn(prisma-client) There are already 10 instances of Prisma Client actively running.`
 // explanation here
@@ -41,15 +78,30 @@ export const prisma =
             },
           ],
         }
-      : {}),
+      : {
+          log: [
+            {
+              emit: "stdout",
+              level: "error",
+            },
+            {
+              emit: "stdout",
+              level: "info",
+            },
+            {
+              emit: "stdout",
+              level: "warn",
+            },
+          ],
+        }),
   });
 
-prisma.$on("query", (e) => {
+prisma.$on("query", (error) => {
   // Try to minify the query as vercel/new relic log size is limited
-  // eslint-disable-next-line no-console
-  console.log(
+
+  console.info(
     "Query: " +
-      e.query
+      error.query
         .replace(/"public"\./g, "")
         .replace(/"Project"\./g, "")
         .replace(/"Build"\./g, "")
@@ -57,14 +109,11 @@ prisma.$on("query", (e) => {
         .replace(/"Asset"\./g, "")
   );
 
-  // eslint-disable-next-line no-console
-  console.log("Params: " + e.params.slice(0, 200));
-  // eslint-disable-next-line no-console
-  console.log("Duration: " + e.duration + "ms");
+  console.info("Params: " + error.params.slice(0, 200));
+
+  console.info("Duration: " + error.duration + "ms");
 });
 
 if (process.env.NODE_ENV !== "production") {
   global.prisma = prisma;
 }
-
-export { Prisma, PrismaClientKnownRequestError, Decimal };

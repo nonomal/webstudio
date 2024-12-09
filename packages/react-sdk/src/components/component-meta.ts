@@ -1,6 +1,7 @@
 import { z } from "zod";
+import type { HtmlTags } from "html-tags";
+import { Matchers } from "@webstudio-is/sdk";
 import { PropMeta } from "../prop-meta";
-import type { htmlTags as HtmlTags } from "html-tags";
 import { EmbedTemplateStyleDecl, WsEmbedTemplate } from "../embed-template";
 
 export type PresetStyle<Tag extends HtmlTags = HtmlTags> = Partial<
@@ -24,7 +25,9 @@ export const componentCategories = [
   "media",
   "forms",
   "radix",
+  "xml",
   "hidden",
+  "internal",
 ] as const;
 
 export const stateCategories = ["states", "component-states"] as const;
@@ -57,8 +60,7 @@ export const WsComponentMeta = z.object({
   // embed - images, videos or other embeddable components, without children
   // rich-text-child - formatted text fragment, not listed in components list
   type: z.enum(["container", "control", "embed", "rich-text-child"]),
-  requiredAncestors: z.optional(z.array(z.string())),
-  invalidAncestors: z.optional(z.array(z.string())),
+  constraints: Matchers.optional(),
   // when this field is specified component receives
   // prop with index of same components withiin specified ancestor
   // important to automatically enumerate collections without

@@ -7,8 +7,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.61281794,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/en-US/docs/Web/CSS/font-smooth",
   },
   MozOsxFontSmoothing: {
     unitGroups: [],
@@ -17,8 +16,45 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/en-US/docs/Web/CSS/font-smooth",
+  },
+  "-webkit-box-orient": {
+    unitGroups: [],
+    inherited: false,
+    initial: {
+      type: "keyword",
+      value: "horizontal",
+    },
+    mdnUrl: "https://developer.mozilla.org/en-US/docs/Web/CSS/box-orient",
+  },
+  "-webkit-line-clamp": {
+    unitGroups: ["number"],
+    inherited: false,
+    initial: {
+      type: "keyword",
+      value: "none",
+    },
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/-webkit-line-clamp",
+  },
+  "-webkit-overflow-scrolling": {
+    unitGroups: [],
+    inherited: true,
+    initial: {
+      type: "keyword",
+      value: "auto",
+    },
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/-webkit-overflow-scrolling",
+  },
+  "-webkit-tap-highlight-color": {
+    unitGroups: [],
+    inherited: true,
+    initial: {
+      type: "keyword",
+      value: "black",
+    },
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/-webkit-tap-highlight-color",
   },
   accentColor: {
     unitGroups: [],
@@ -27,8 +63,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.00030097,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/accent-color",
   },
   alignContent: {
     unitGroups: [],
@@ -37,8 +72,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.2430101,
-    appliesTo: "multilineFlexContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/align-content",
   },
   alignItems: {
     unitGroups: [],
@@ -47,8 +81,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.71654912,
-    appliesTo: "flexContainersGridContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/align-items",
   },
   alignSelf: {
     unitGroups: [],
@@ -57,28 +90,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.43732689,
-    appliesTo: "flexItemsGridItemsAndAbsolutelyPositionedBoxes",
-  },
-  alignTracks: {
-    unitGroups: [],
-    inherited: false,
-    initial: {
-      type: "keyword",
-      value: "normal",
-    },
-    popularity: 0,
-    appliesTo: "gridContainersWithMasonryLayoutInTheirBlockAxis",
-  },
-  animationComposition: {
-    unitGroups: [],
-    inherited: false,
-    initial: {
-      type: "keyword",
-      value: "replace",
-    },
-    popularity: 0,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/align-self",
   },
   animationDelay: {
     unitGroups: ["time"],
@@ -88,8 +100,7 @@ export const properties = {
       unit: "s",
       value: 0,
     },
-    popularity: 0.27086537,
-    appliesTo: "allElementsAndPseudos",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/animation-delay",
   },
   animationDirection: {
     unitGroups: [],
@@ -98,8 +109,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.11739459,
-    appliesTo: "allElementsAndPseudos",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/animation-direction",
   },
   animationDuration: {
     unitGroups: ["time"],
@@ -109,8 +119,7 @@ export const properties = {
       unit: "s",
       value: 0,
     },
-    popularity: 0.4062731,
-    appliesTo: "allElementsAndPseudos",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/animation-duration",
   },
   animationFillMode: {
     unitGroups: [],
@@ -119,8 +128,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.2785038,
-    appliesTo: "allElementsAndPseudos",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/animation-fill-mode",
   },
   animationIterationCount: {
     unitGroups: ["number"],
@@ -130,8 +138,8 @@ export const properties = {
       unit: "number",
       value: 1,
     },
-    popularity: 0.21759716,
-    appliesTo: "allElementsAndPseudos",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/animation-iteration-count",
   },
   animationName: {
     unitGroups: [],
@@ -140,8 +148,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.40320939,
-    appliesTo: "allElementsAndPseudos",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/animation-name",
   },
   animationPlayState: {
     unitGroups: [],
@@ -150,8 +157,7 @@ export const properties = {
       type: "keyword",
       value: "running",
     },
-    popularity: 0.07996997,
-    appliesTo: "allElementsAndPseudos",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/animation-play-state",
   },
   animationTimingFunction: {
     unitGroups: [],
@@ -160,18 +166,8 @@ export const properties = {
       type: "keyword",
       value: "ease",
     },
-    popularity: 0.41317969,
-    appliesTo: "allElementsAndPseudos",
-  },
-  animationTimeline: {
-    unitGroups: [],
-    inherited: false,
-    initial: {
-      type: "keyword",
-      value: "auto",
-    },
-    popularity: 4e-8,
-    appliesTo: "allElements",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/animation-timing-function",
   },
   appearance: {
     unitGroups: [],
@@ -180,8 +176,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.24468974,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/appearance",
   },
   aspectRatio: {
     unitGroups: ["number"],
@@ -190,8 +185,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.07243677,
-    appliesTo: "allElementsExceptInlineBoxesAndInternalRubyOrTableBoxes",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/aspect-ratio",
   },
   backdropFilter: {
     unitGroups: [],
@@ -200,8 +194,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.0728427,
-    appliesTo: "allElementsSVGContainerElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/backdrop-filter",
   },
   backfaceVisibility: {
     unitGroups: [],
@@ -210,8 +203,7 @@ export const properties = {
       type: "keyword",
       value: "visible",
     },
-    popularity: 0.19792557,
-    appliesTo: "transformableElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/backface-visibility",
   },
   backgroundAttachment: {
     unitGroups: [],
@@ -220,8 +212,7 @@ export const properties = {
       type: "keyword",
       value: "scroll",
     },
-    popularity: 0.08164946,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/background-attachment",
   },
   backgroundBlendMode: {
     unitGroups: [],
@@ -230,8 +221,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.01578865,
-    appliesTo: "allElementsSVGContainerGraphicsAndGraphicsReferencingElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/background-blend-mode",
   },
   backgroundClip: {
     unitGroups: [],
@@ -240,8 +230,7 @@ export const properties = {
       type: "keyword",
       value: "border-box",
     },
-    popularity: 0.36203159,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/background-clip",
   },
   backgroundColor: {
     unitGroups: [],
@@ -250,8 +239,7 @@ export const properties = {
       type: "keyword",
       value: "transparent",
     },
-    popularity: 0.89693959,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/background-color",
   },
   backgroundImage: {
     unitGroups: [],
@@ -260,8 +248,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.78519153,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/background-image",
   },
   backgroundOrigin: {
     unitGroups: [],
@@ -270,29 +257,7 @@ export const properties = {
       type: "keyword",
       value: "padding-box",
     },
-    popularity: 0.0847006,
-    appliesTo: "allElements",
-  },
-  backgroundPosition: {
-    unitGroups: ["length", "percentage"],
-    inherited: false,
-    initial: {
-      type: "tuple",
-      value: [
-        {
-          type: "unit",
-          unit: "%",
-          value: 0,
-        },
-        {
-          type: "unit",
-          unit: "%",
-          value: 0,
-        },
-      ],
-    },
-    popularity: 0.76724967,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/background-origin",
   },
   backgroundPositionX: {
     unitGroups: ["length", "percentage"],
@@ -302,8 +267,7 @@ export const properties = {
       unit: "%",
       value: 0,
     },
-    popularity: 0.08951679,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/background-position-x",
   },
   backgroundPositionY: {
     unitGroups: ["length", "percentage"],
@@ -313,8 +277,7 @@ export const properties = {
       unit: "%",
       value: 0,
     },
-    popularity: 0.06759137,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/background-position-y",
   },
   backgroundRepeat: {
     unitGroups: [],
@@ -323,8 +286,7 @@ export const properties = {
       type: "keyword",
       value: "repeat",
     },
-    popularity: 0.72870191,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/background-repeat",
   },
   backgroundSize: {
     unitGroups: ["length", "percentage"],
@@ -333,18 +295,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.73157126,
-    appliesTo: "allElements",
-  },
-  blockOverflow: {
-    unitGroups: [],
-    inherited: true,
-    initial: {
-      type: "keyword",
-      value: "clip",
-    },
-    popularity: 0,
-    appliesTo: "blockContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/background-size",
   },
   blockSize: {
     unitGroups: ["length", "percentage"],
@@ -353,8 +304,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.00226404,
-    appliesTo: "sameAsWidthAndHeight",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/block-size",
   },
   borderBlockColor: {
     unitGroups: [],
@@ -363,8 +313,7 @@ export const properties = {
       type: "keyword",
       value: "currentColor",
     },
-    popularity: 0.00012849,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-block-color",
   },
   borderBlockStyle: {
     unitGroups: [],
@@ -373,8 +322,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.0003145,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-block-style",
   },
   borderBlockWidth: {
     unitGroups: ["length"],
@@ -383,8 +331,7 @@ export const properties = {
       type: "keyword",
       value: "medium",
     },
-    popularity: 0.0003078,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-block-width",
   },
   borderBlockEndColor: {
     unitGroups: [],
@@ -393,8 +340,7 @@ export const properties = {
       type: "keyword",
       value: "currentColor",
     },
-    popularity: 0.00172099,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-block-end-color",
   },
   borderBlockEndStyle: {
     unitGroups: [],
@@ -403,8 +349,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.00169793,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-block-end-style",
   },
   borderBlockEndWidth: {
     unitGroups: ["length"],
@@ -413,8 +358,7 @@ export const properties = {
       type: "keyword",
       value: "medium",
     },
-    popularity: 0.00170225,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-block-end-width",
   },
   borderBlockStartColor: {
     unitGroups: [],
@@ -423,8 +367,8 @@ export const properties = {
       type: "keyword",
       value: "currentColor",
     },
-    popularity: 0.00170188,
-    appliesTo: "allElements",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/border-block-start-color",
   },
   borderBlockStartStyle: {
     unitGroups: [],
@@ -433,8 +377,8 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.00168772,
-    appliesTo: "allElements",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/border-block-start-style",
   },
   borderBlockStartWidth: {
     unitGroups: ["length"],
@@ -443,8 +387,8 @@ export const properties = {
       type: "keyword",
       value: "medium",
     },
-    popularity: 0.00169412,
-    appliesTo: "allElements",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/border-block-start-width",
   },
   borderBottomColor: {
     unitGroups: [],
@@ -453,8 +397,7 @@ export const properties = {
       type: "keyword",
       value: "currentColor",
     },
-    popularity: 0.42283564,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-bottom-color",
   },
   borderBottomLeftRadius: {
     unitGroups: ["length", "percentage"],
@@ -464,8 +407,8 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.51220741,
-    appliesTo: "allElementsUAsNotRequiredWhenCollapse",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/border-bottom-left-radius",
   },
   borderBottomRightRadius: {
     unitGroups: ["length", "percentage"],
@@ -475,8 +418,8 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.49744373,
-    appliesTo: "allElementsUAsNotRequiredWhenCollapse",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/border-bottom-right-radius",
   },
   borderBottomStyle: {
     unitGroups: [],
@@ -485,8 +428,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.17956288,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-bottom-style",
   },
   borderBottomWidth: {
     unitGroups: ["length"],
@@ -495,8 +437,7 @@ export const properties = {
       type: "keyword",
       value: "medium",
     },
-    popularity: 0.24668981,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-bottom-width",
   },
   borderCollapse: {
     unitGroups: [],
@@ -505,8 +446,7 @@ export const properties = {
       type: "keyword",
       value: "separate",
     },
-    popularity: 0.47856821,
-    appliesTo: "tableElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-collapse",
   },
   borderEndEndRadius: {
     unitGroups: ["length", "percentage"],
@@ -516,8 +456,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.00029065,
-    appliesTo: "allElementsUAsNotRequiredWhenCollapse",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-end-end-radius",
   },
   borderEndStartRadius: {
     unitGroups: ["length", "percentage"],
@@ -527,8 +466,8 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.0003058,
-    appliesTo: "allElementsUAsNotRequiredWhenCollapse",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/border-end-start-radius",
   },
   borderImageOutset: {
     unitGroups: ["length", "number"],
@@ -538,8 +477,7 @@ export const properties = {
       unit: "number",
       value: 0,
     },
-    popularity: 0.00458637,
-    appliesTo: "allElementsExceptTableElementsWhenCollapse",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-image-outset",
   },
   borderImageRepeat: {
     unitGroups: [],
@@ -548,8 +486,7 @@ export const properties = {
       type: "keyword",
       value: "stretch",
     },
-    popularity: 0.00685817,
-    appliesTo: "allElementsExceptTableElementsWhenCollapse",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-image-repeat",
   },
   borderImageSlice: {
     unitGroups: ["number", "percentage"],
@@ -559,8 +496,7 @@ export const properties = {
       unit: "%",
       value: 100,
     },
-    popularity: 0.0093669,
-    appliesTo: "allElementsExceptTableElementsWhenCollapse",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-image-slice",
   },
   borderImageSource: {
     unitGroups: [],
@@ -569,8 +505,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.00991835,
-    appliesTo: "allElementsExceptTableElementsWhenCollapse",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-image-source",
   },
   borderImageWidth: {
     unitGroups: ["length", "percentage", "number"],
@@ -580,8 +515,7 @@ export const properties = {
       unit: "number",
       value: 1,
     },
-    popularity: 0.0072772,
-    appliesTo: "allElementsExceptTableElementsWhenCollapse",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-image-width",
   },
   borderInlineColor: {
     unitGroups: [],
@@ -590,8 +524,7 @@ export const properties = {
       type: "keyword",
       value: "currentColor",
     },
-    popularity: 0.00007844,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-inline-color",
   },
   borderInlineStyle: {
     unitGroups: [],
@@ -600,8 +533,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.00031147,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-inline-style",
   },
   borderInlineWidth: {
     unitGroups: ["length"],
@@ -610,8 +542,7 @@ export const properties = {
       type: "keyword",
       value: "medium",
     },
-    popularity: 0.0002956,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-inline-width",
   },
   borderInlineEndColor: {
     unitGroups: [],
@@ -620,8 +551,8 @@ export const properties = {
       type: "keyword",
       value: "currentColor",
     },
-    popularity: 0.00196849,
-    appliesTo: "allElements",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/border-inline-end-color",
   },
   borderInlineEndStyle: {
     unitGroups: [],
@@ -630,8 +561,8 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.00171907,
-    appliesTo: "allElements",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/border-inline-end-style",
   },
   borderInlineEndWidth: {
     unitGroups: ["length"],
@@ -640,8 +571,8 @@ export const properties = {
       type: "keyword",
       value: "medium",
     },
-    popularity: 0.0051498,
-    appliesTo: "allElements",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/border-inline-end-width",
   },
   borderInlineStartColor: {
     unitGroups: [],
@@ -650,8 +581,8 @@ export const properties = {
       type: "keyword",
       value: "currentColor",
     },
-    popularity: 0.00196928,
-    appliesTo: "allElements",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/border-inline-start-color",
   },
   borderInlineStartStyle: {
     unitGroups: [],
@@ -660,8 +591,8 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.00177637,
-    appliesTo: "allElements",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/border-inline-start-style",
   },
   borderInlineStartWidth: {
     unitGroups: ["length"],
@@ -670,8 +601,8 @@ export const properties = {
       type: "keyword",
       value: "medium",
     },
-    popularity: 0.00438625,
-    appliesTo: "allElements",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/border-inline-start-width",
   },
   borderLeftColor: {
     unitGroups: [],
@@ -680,8 +611,7 @@ export const properties = {
       type: "keyword",
       value: "currentColor",
     },
-    popularity: 0.30754028,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-left-color",
   },
   borderLeftStyle: {
     unitGroups: [],
@@ -690,8 +620,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.06120178,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-left-style",
   },
   borderLeftWidth: {
     unitGroups: ["length"],
@@ -700,8 +629,7 @@ export const properties = {
       type: "keyword",
       value: "medium",
     },
-    popularity: 0.17181793,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-left-width",
   },
   borderRightColor: {
     unitGroups: [],
@@ -710,8 +638,7 @@ export const properties = {
       type: "keyword",
       value: "currentColor",
     },
-    popularity: 0.29336595,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-right-color",
   },
   borderRightStyle: {
     unitGroups: [],
@@ -720,8 +647,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.06714237,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-right-style",
   },
   borderRightWidth: {
     unitGroups: ["length"],
@@ -730,8 +656,7 @@ export const properties = {
       type: "keyword",
       value: "medium",
     },
-    popularity: 0.17940634,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-right-width",
   },
   borderSpacing: {
     unitGroups: ["length"],
@@ -741,8 +666,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.37217618,
-    appliesTo: "tableElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-spacing",
   },
   borderStartEndRadius: {
     unitGroups: ["length", "percentage"],
@@ -752,8 +676,8 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.00029494,
-    appliesTo: "allElementsUAsNotRequiredWhenCollapse",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/border-start-end-radius",
   },
   borderStartStartRadius: {
     unitGroups: ["length", "percentage"],
@@ -763,8 +687,8 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.00028405,
-    appliesTo: "allElementsUAsNotRequiredWhenCollapse",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/border-start-start-radius",
   },
   borderTopColor: {
     unitGroups: [],
@@ -773,8 +697,7 @@ export const properties = {
       type: "keyword",
       value: "currentColor",
     },
-    popularity: 0.43342948,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-top-color",
   },
   borderTopLeftRadius: {
     unitGroups: ["length", "percentage"],
@@ -784,8 +707,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.50859807,
-    appliesTo: "allElementsUAsNotRequiredWhenCollapse",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-top-left-radius",
   },
   borderTopRightRadius: {
     unitGroups: ["length", "percentage"],
@@ -795,8 +717,8 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.50073217,
-    appliesTo: "allElementsUAsNotRequiredWhenCollapse",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/border-top-right-radius",
   },
   borderTopStyle: {
     unitGroups: [],
@@ -805,8 +727,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.16269446,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-top-style",
   },
   borderTopWidth: {
     unitGroups: ["length"],
@@ -815,8 +736,7 @@ export const properties = {
       type: "keyword",
       value: "medium",
     },
-    popularity: 0.21953437,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/border-top-width",
   },
   bottom: {
     unitGroups: ["length", "percentage"],
@@ -825,8 +745,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.8243869,
-    appliesTo: "positionedElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/bottom",
   },
   boxDecorationBreak: {
     unitGroups: [],
@@ -835,8 +754,7 @@ export const properties = {
       type: "keyword",
       value: "slice",
     },
-    popularity: 0,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/box-decoration-break",
   },
   boxShadow: {
     unitGroups: ["length"],
@@ -845,8 +763,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.81259285,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/box-shadow",
   },
   boxSizing: {
     unitGroups: [],
@@ -855,8 +772,7 @@ export const properties = {
       type: "keyword",
       value: "content-box",
     },
-    popularity: 0.86402206,
-    appliesTo: "allElementsAcceptingWidthOrHeight",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/box-sizing",
   },
   breakAfter: {
     unitGroups: [],
@@ -865,8 +781,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.00365105,
-    appliesTo: "blockLevelElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/break-after",
   },
   breakBefore: {
     unitGroups: [],
@@ -875,8 +790,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.00341796,
-    appliesTo: "blockLevelElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/break-before",
   },
   breakInside: {
     unitGroups: [],
@@ -885,8 +799,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.02782348,
-    appliesTo: "blockLevelElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/break-inside",
   },
   captionSide: {
     unitGroups: [],
@@ -895,8 +808,7 @@ export const properties = {
       type: "keyword",
       value: "top",
     },
-    popularity: 0.04083929,
-    appliesTo: "tableCaptionElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/caption-side",
   },
   caretColor: {
     unitGroups: [],
@@ -905,18 +817,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.05410129,
-    appliesTo: "allElements",
-  },
-  caretShape: {
-    unitGroups: [],
-    inherited: true,
-    initial: {
-      type: "keyword",
-      value: "auto",
-    },
-    popularity: 0,
-    appliesTo: "elementsThatAcceptInput",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/caret-color",
   },
   clear: {
     unitGroups: [],
@@ -925,8 +826,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.7016813,
-    appliesTo: "blockLevelElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/clear",
   },
   clip: {
     unitGroups: [],
@@ -935,8 +835,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.48810561,
-    appliesTo: "absolutelyPositionedElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/clip",
   },
   clipPath: {
     unitGroups: [],
@@ -945,8 +844,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.20754263,
-    appliesTo: "allElementsSVGContainerElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/clip-path",
   },
   color: {
     unitGroups: [],
@@ -955,8 +853,7 @@ export const properties = {
       type: "keyword",
       value: "black",
     },
-    popularity: 0.90791486,
-    appliesTo: "allElementsAndText",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/color",
   },
   colorScheme: {
     unitGroups: [],
@@ -965,8 +862,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.03358925,
-    appliesTo: "allElementsAndText",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/color-scheme",
   },
   columnCount: {
     unitGroups: ["number"],
@@ -975,8 +871,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.07098549,
-    appliesTo: "blockContainersExceptTableWrappers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/column-count",
   },
   columnFill: {
     unitGroups: [],
@@ -985,8 +880,7 @@ export const properties = {
       type: "keyword",
       value: "balance",
     },
-    popularity: 0.01738207,
-    appliesTo: "multicolElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/column-fill",
   },
   columnGap: {
     unitGroups: ["length", "percentage"],
@@ -996,8 +890,7 @@ export const properties = {
       value: 0,
       unit: "px",
     },
-    popularity: 0.09282422,
-    appliesTo: "multiColumnElementsFlexContainersGridContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/column-gap",
   },
   columnRuleColor: {
     unitGroups: [],
@@ -1006,8 +899,7 @@ export const properties = {
       type: "keyword",
       value: "currentColor",
     },
-    popularity: 0.01356616,
-    appliesTo: "multicolElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/column-rule-color",
   },
   columnRuleStyle: {
     unitGroups: [],
@@ -1016,8 +908,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.0131392,
-    appliesTo: "multicolElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/column-rule-style",
   },
   columnRuleWidth: {
     unitGroups: ["length"],
@@ -1026,8 +917,7 @@ export const properties = {
       type: "keyword",
       value: "medium",
     },
-    popularity: 0.00328701,
-    appliesTo: "multicolElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/column-rule-width",
   },
   columnSpan: {
     unitGroups: [],
@@ -1036,8 +926,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.00654278,
-    appliesTo: "inFlowBlockLevelElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/column-span",
   },
   columnWidth: {
     unitGroups: ["length"],
@@ -1046,8 +935,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.03188644,
-    appliesTo: "blockContainersExceptTableWrappers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/column-width",
   },
   contain: {
     unitGroups: [],
@@ -1056,8 +944,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.17189203,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/contain",
   },
   containIntrinsicBlockSize: {
     unitGroups: ["length"],
@@ -1066,8 +953,8 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0,
-    appliesTo: "elementsForWhichSizeContainmentCanApply",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/contain-intrinsic-block-size",
   },
   containIntrinsicHeight: {
     unitGroups: ["length"],
@@ -1076,8 +963,8 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0,
-    appliesTo: "elementsForWhichSizeContainmentCanApply",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/contain-intrinsic-height",
   },
   containIntrinsicInlineSize: {
     unitGroups: ["length"],
@@ -1086,8 +973,8 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0,
-    appliesTo: "elementsForWhichSizeContainmentCanApply",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/contain-intrinsic-inline-size",
   },
   containIntrinsicWidth: {
     unitGroups: ["length"],
@@ -1096,8 +983,8 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0,
-    appliesTo: "elementsForWhichSizeContainmentCanApply",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/contain-intrinsic-width",
   },
   containerName: {
     unitGroups: [],
@@ -1106,8 +993,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/container-name",
   },
   containerType: {
     unitGroups: [],
@@ -1116,8 +1002,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/container-type",
   },
   content: {
     unitGroups: [],
@@ -1126,8 +1011,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.81447258,
-    appliesTo: "allElementsTreeAbidingPseudoElementsPageMarginBoxes",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/content",
   },
   contentVisibility: {
     unitGroups: [],
@@ -1136,8 +1020,7 @@ export const properties = {
       type: "keyword",
       value: "visible",
     },
-    popularity: 0.04199404,
-    appliesTo: "elementsForWhichSizeContainmentCanApply",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/content-visibility",
   },
   counterIncrement: {
     unitGroups: ["number"],
@@ -1146,8 +1029,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.07472144,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/counter-increment",
   },
   counterReset: {
     unitGroups: ["number"],
@@ -1156,8 +1038,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.06641074,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/counter-reset",
   },
   counterSet: {
     unitGroups: ["number"],
@@ -1166,8 +1047,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.00016346,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/counter-set",
   },
   cursor: {
     unitGroups: [],
@@ -1176,8 +1056,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.85037255,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/cursor",
   },
   direction: {
     unitGroups: [],
@@ -1186,8 +1065,7 @@ export const properties = {
       type: "keyword",
       value: "ltr",
     },
-    popularity: 0.40017516,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/direction",
   },
   display: {
     unitGroups: [],
@@ -1196,8 +1074,7 @@ export const properties = {
       type: "keyword",
       value: "inline",
     },
-    popularity: 0.93157435,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/display",
   },
   emptyCells: {
     unitGroups: [],
@@ -1206,8 +1083,16 @@ export const properties = {
       type: "keyword",
       value: "show",
     },
-    popularity: 0.03153899,
-    appliesTo: "tableCellElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/empty-cells",
+  },
+  fieldSizing: {
+    unitGroups: [],
+    inherited: false,
+    initial: {
+      type: "keyword",
+      value: "fixed",
+    },
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/field-sizing",
   },
   filter: {
     unitGroups: [],
@@ -1216,8 +1101,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.32058162,
-    appliesTo: "allElementsSVGContainerElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/filter",
   },
   flexBasis: {
     unitGroups: ["length", "percentage"],
@@ -1226,8 +1110,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.3070072,
-    appliesTo: "flexItemsAndInFlowPseudos",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/flex-basis",
   },
   flexDirection: {
     unitGroups: [],
@@ -1236,8 +1119,7 @@ export const properties = {
       type: "keyword",
       value: "row",
     },
-    popularity: 0.65789154,
-    appliesTo: "flexContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/flex-direction",
   },
   flexGrow: {
     unitGroups: ["number"],
@@ -1247,8 +1129,7 @@ export const properties = {
       unit: "number",
       value: 0,
     },
-    popularity: 0.50511311,
-    appliesTo: "flexItemsAndInFlowPseudos",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/flex-grow",
   },
   flexShrink: {
     unitGroups: ["number"],
@@ -1258,8 +1139,7 @@ export const properties = {
       unit: "number",
       value: 1,
     },
-    popularity: 0.4809155,
-    appliesTo: "flexItemsAndInFlowPseudos",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/flex-shrink",
   },
   flexWrap: {
     unitGroups: [],
@@ -1268,8 +1148,7 @@ export const properties = {
       type: "keyword",
       value: "nowrap",
     },
-    popularity: 0.58959861,
-    appliesTo: "flexContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/flex-wrap",
   },
   float: {
     unitGroups: [],
@@ -1278,18 +1157,16 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.8383589,
-    appliesTo: "allElementsNoEffectIfDisplayNone",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/float",
   },
   fontFamily: {
     unitGroups: [],
     inherited: true,
     initial: {
-      type: "keyword",
-      value: "inherit",
+      type: "fontFamily",
+      value: ["serif"],
     },
-    popularity: 0.88101351,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/font-family",
   },
   fontFeatureSettings: {
     unitGroups: ["number"],
@@ -1298,8 +1175,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.12538368,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/font-feature-settings",
   },
   fontKerning: {
     unitGroups: [],
@@ -1308,8 +1184,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.01160796,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/font-kerning",
   },
   fontLanguageOverride: {
     unitGroups: [],
@@ -1318,8 +1193,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/font-language-override",
   },
   fontOpticalSizing: {
     unitGroups: [],
@@ -1328,18 +1202,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.0006232,
-    appliesTo: "allElements",
-  },
-  fontPalette: {
-    unitGroups: [],
-    inherited: true,
-    initial: {
-      type: "keyword",
-      value: "normal",
-    },
-    popularity: 0,
-    appliesTo: "allElementsAndText",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/font-optical-sizing",
   },
   fontVariationSettings: {
     unitGroups: ["number"],
@@ -1348,18 +1211,17 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.00471835,
-    appliesTo: "allElements",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/font-variation-settings",
   },
   fontSize: {
     unitGroups: ["length", "percentage"],
     inherited: true,
     initial: {
       type: "keyword",
-      value: "inherit",
+      value: "medium",
     },
-    popularity: 0.90325346,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/font-size",
   },
   fontSizeAdjust: {
     unitGroups: ["number"],
@@ -1368,8 +1230,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.000003,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/font-size-adjust",
   },
   fontStretch: {
     unitGroups: ["percentage"],
@@ -1378,8 +1239,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.12741738,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/font-stretch",
   },
   fontStyle: {
     unitGroups: ["angle"],
@@ -1388,37 +1248,35 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.7961795,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/font-style",
   },
-  fontSynthesis: {
-    unitGroups: [],
-    inherited: true,
-    initial: {
-      type: "tuple",
-      value: [
-        {
-          type: "keyword",
-          value: "weight",
-        },
-        {
-          type: "keyword",
-          value: "style",
-        },
-      ],
-    },
-    popularity: 0.00686166,
-    appliesTo: "allElements",
-  },
-  fontVariant: {
+  fontSynthesisSmallCaps: {
     unitGroups: [],
     inherited: true,
     initial: {
       type: "keyword",
-      value: "normal",
+      value: "auto",
     },
-    popularity: 0.30968418,
-    appliesTo: "allElements",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/font-synthesis-small-caps",
+  },
+  fontSynthesisStyle: {
+    unitGroups: [],
+    inherited: true,
+    initial: {
+      type: "keyword",
+      value: "auto",
+    },
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/font-synthesis-style",
+  },
+  fontSynthesisWeight: {
+    unitGroups: [],
+    inherited: true,
+    initial: {
+      type: "keyword",
+      value: "auto",
+    },
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/font-synthesis-weight",
   },
   fontVariantAlternates: {
     unitGroups: [],
@@ -1427,8 +1285,8 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0,
-    appliesTo: "allElements",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/font-variant-alternates",
   },
   fontVariantCaps: {
     unitGroups: [],
@@ -1437,8 +1295,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.00514777,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/font-variant-caps",
   },
   fontVariantEastAsian: {
     unitGroups: [],
@@ -1447,18 +1304,8 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.00328361,
-    appliesTo: "allElements",
-  },
-  fontVariantEmoji: {
-    unitGroups: [],
-    inherited: true,
-    initial: {
-      type: "keyword",
-      value: "normal",
-    },
-    popularity: 0,
-    appliesTo: "allElementsAndText",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/font-variant-east-asian",
   },
   fontVariantLigatures: {
     unitGroups: [],
@@ -1467,8 +1314,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.05055055,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/font-variant-ligatures",
   },
   fontVariantNumeric: {
     unitGroups: [],
@@ -1477,8 +1323,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.01816086,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/font-variant-numeric",
   },
   fontVariantPosition: {
     unitGroups: [],
@@ -1487,8 +1332,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/font-variant-position",
   },
   fontWeight: {
     unitGroups: ["number"],
@@ -1497,18 +1341,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.88598106,
-    appliesTo: "allElements",
-  },
-  forcedColorAdjust: {
-    unitGroups: [],
-    inherited: true,
-    initial: {
-      type: "keyword",
-      value: "auto",
-    },
-    popularity: 0.02245871,
-    appliesTo: "allElementsAndText",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/font-weight",
   },
   gridAutoColumns: {
     unitGroups: ["length", "percentage", "flex"],
@@ -1517,8 +1350,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.01226638,
-    appliesTo: "gridContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/grid-auto-columns",
   },
   gridAutoFlow: {
     unitGroups: [],
@@ -1527,8 +1359,7 @@ export const properties = {
       type: "keyword",
       value: "row",
     },
-    popularity: 0.03982344,
-    appliesTo: "gridContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/grid-auto-flow",
   },
   gridAutoRows: {
     unitGroups: ["length", "percentage", "flex"],
@@ -1537,8 +1368,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.02839547,
-    appliesTo: "gridContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/grid-auto-rows",
   },
   gridColumnEnd: {
     unitGroups: ["number"],
@@ -1547,8 +1377,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.01848874,
-    appliesTo: "gridItemsAndBoxesWithinGridContainer",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/grid-column-end",
   },
   gridColumnStart: {
     unitGroups: ["number"],
@@ -1557,8 +1386,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.02019688,
-    appliesTo: "gridItemsAndBoxesWithinGridContainer",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/grid-column-start",
   },
   gridRowEnd: {
     unitGroups: ["number"],
@@ -1567,8 +1395,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.00961681,
-    appliesTo: "gridItemsAndBoxesWithinGridContainer",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/grid-row-end",
   },
   gridRowStart: {
     unitGroups: ["number"],
@@ -1577,8 +1404,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.01281513,
-    appliesTo: "gridItemsAndBoxesWithinGridContainer",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/grid-row-start",
   },
   gridTemplateAreas: {
     unitGroups: [],
@@ -1587,8 +1413,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.05496001,
-    appliesTo: "gridContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/grid-template-areas",
   },
   gridTemplateColumns: {
     unitGroups: ["length", "percentage", "flex"],
@@ -1597,8 +1422,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.17745181,
-    appliesTo: "gridContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/grid-template-columns",
   },
   gridTemplateRows: {
     unitGroups: ["length", "percentage", "flex"],
@@ -1607,8 +1431,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.07489386,
-    appliesTo: "gridContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/grid-template-rows",
   },
   hangingPunctuation: {
     unitGroups: [],
@@ -1617,8 +1440,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/hanging-punctuation",
   },
   height: {
     unitGroups: ["length", "percentage"],
@@ -1627,8 +1449,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.93056784,
-    appliesTo: "allElementsButNonReplacedAndTableColumns",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/height",
   },
   hyphenateCharacter: {
     unitGroups: [],
@@ -1637,8 +1458,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/hyphenate-character",
   },
   hyphenateLimitChars: {
     unitGroups: ["number"],
@@ -1647,8 +1467,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/hyphenate-limit-chars",
   },
   hyphens: {
     unitGroups: [],
@@ -1657,8 +1476,7 @@ export const properties = {
       type: "keyword",
       value: "manual",
     },
-    popularity: 0.10122444,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/hyphens",
   },
   imageOrientation: {
     unitGroups: ["angle"],
@@ -1667,8 +1485,7 @@ export const properties = {
       type: "keyword",
       value: "from-image",
     },
-    popularity: 0.00207108,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/image-orientation",
   },
   imageRendering: {
     unitGroups: [],
@@ -1677,39 +1494,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.11112647,
-    appliesTo: "allElements",
-  },
-  imageResolution: {
-    unitGroups: ["resolution"],
-    inherited: true,
-    initial: {
-      type: "unit",
-      unit: "dppx",
-      value: 1,
-    },
-    popularity: 0,
-    appliesTo: "allElements",
-  },
-  initialLetter: {
-    unitGroups: ["number"],
-    inherited: false,
-    initial: {
-      type: "keyword",
-      value: "normal",
-    },
-    popularity: 0,
-    appliesTo: "firstLetterPseudoElementsAndInlineLevelFirstChildren",
-  },
-  initialLetterAlign: {
-    unitGroups: [],
-    inherited: false,
-    initial: {
-      type: "keyword",
-      value: "auto",
-    },
-    popularity: 0,
-    appliesTo: "firstLetterPseudoElementsAndInlineLevelFirstChildren",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/image-rendering",
   },
   inlineSize: {
     unitGroups: ["length", "percentage"],
@@ -1718,18 +1503,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.00381706,
-    appliesTo: "sameAsWidthAndHeight",
-  },
-  inputSecurity: {
-    unitGroups: [],
-    inherited: false,
-    initial: {
-      type: "keyword",
-      value: "auto",
-    },
-    popularity: 0,
-    appliesTo: "sensitiveTextInputs",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/inline-size",
   },
   insetBlockEnd: {
     unitGroups: ["length", "percentage"],
@@ -1738,8 +1512,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.00031067,
-    appliesTo: "positionedElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/inset-block-end",
   },
   insetBlockStart: {
     unitGroups: ["length", "percentage"],
@@ -1748,8 +1521,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.00036346,
-    appliesTo: "positionedElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/inset-block-start",
   },
   insetInlineEnd: {
     unitGroups: ["length", "percentage"],
@@ -1758,8 +1530,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.00419961,
-    appliesTo: "positionedElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/inset-inline-end",
   },
   insetInlineStart: {
     unitGroups: ["length", "percentage"],
@@ -1768,8 +1539,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.00379395,
-    appliesTo: "positionedElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/inset-inline-start",
   },
   isolation: {
     unitGroups: [],
@@ -1778,8 +1548,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.01962288,
-    appliesTo: "allElementsSVGContainerGraphicsAndGraphicsReferencingElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/isolation",
   },
   justifyContent: {
     unitGroups: [],
@@ -1788,8 +1557,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.72371,
-    appliesTo: "flexContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/justify-content",
   },
   justifyItems: {
     unitGroups: [],
@@ -1798,8 +1566,7 @@ export const properties = {
       type: "keyword",
       value: "legacy",
     },
-    popularity: 0.05716411,
-    appliesTo: "flexContainersGridContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/justify-items",
   },
   justifySelf: {
     unitGroups: [],
@@ -1808,18 +1575,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.06147513,
-    appliesTo: "blockLevelBoxesAndAbsolutelyPositionedBoxesAndGridItems",
-  },
-  justifyTracks: {
-    unitGroups: [],
-    inherited: false,
-    initial: {
-      type: "keyword",
-      value: "normal",
-    },
-    popularity: 0,
-    appliesTo: "gridContainersWithMasonryLayoutInTheirInlineAxis",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/justify-self",
   },
   left: {
     unitGroups: ["length", "percentage"],
@@ -1828,8 +1584,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.90948372,
-    appliesTo: "positionedElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/left",
   },
   letterSpacing: {
     unitGroups: ["length"],
@@ -1838,8 +1593,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.64325492,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/letter-spacing",
   },
   lineBreak: {
     unitGroups: [],
@@ -1848,39 +1602,16 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.03790035,
-    appliesTo: "allElements",
-  },
-  lineClamp: {
-    unitGroups: ["number"],
-    inherited: false,
-    initial: {
-      type: "keyword",
-      value: "none",
-    },
-    popularity: 0,
-    appliesTo: "blockContainersExceptMultiColumnContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/line-break",
   },
   lineHeight: {
     unitGroups: ["number", "length", "percentage"],
     inherited: true,
     initial: {
       type: "keyword",
-      value: "inherit",
+      value: "normal",
     },
-    popularity: 0.87354969,
-    appliesTo: "allElements",
-  },
-  lineHeightStep: {
-    unitGroups: ["length"],
-    inherited: true,
-    initial: {
-      type: "unit",
-      unit: "px",
-      value: 0,
-    },
-    popularity: 0,
-    appliesTo: "blockContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/line-height",
   },
   listStyleImage: {
     unitGroups: [],
@@ -1889,8 +1620,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.05896406,
-    appliesTo: "listItems",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/list-style-image",
   },
   listStylePosition: {
     unitGroups: [],
@@ -1899,8 +1629,7 @@ export const properties = {
       type: "keyword",
       value: "outside",
     },
-    popularity: 0.10836703,
-    appliesTo: "listItems",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/list-style-position",
   },
   listStyleType: {
     unitGroups: [],
@@ -1909,8 +1638,7 @@ export const properties = {
       type: "keyword",
       value: "disc",
     },
-    popularity: 0.50305363,
-    appliesTo: "listItems",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/list-style-type",
   },
   marginBlockEnd: {
     unitGroups: ["length", "percentage"],
@@ -1920,8 +1648,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.06678285,
-    appliesTo: "sameAsMargin",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/margin-block-end",
   },
   marginBlockStart: {
     unitGroups: ["length", "percentage"],
@@ -1931,8 +1658,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.06603158,
-    appliesTo: "sameAsMargin",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/margin-block-start",
   },
   marginBottom: {
     unitGroups: ["length", "percentage"],
@@ -1942,8 +1668,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.84497162,
-    appliesTo: "allElementsExceptTableDisplayTypes",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/margin-bottom",
   },
   marginInlineEnd: {
     unitGroups: ["length", "percentage"],
@@ -1953,8 +1678,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.02346878,
-    appliesTo: "sameAsMargin",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/margin-inline-end",
   },
   marginInlineStart: {
     unitGroups: ["length", "percentage"],
@@ -1964,8 +1688,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.03660688,
-    appliesTo: "sameAsMargin",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/margin-inline-start",
   },
   marginLeft: {
     unitGroups: ["length", "percentage"],
@@ -1975,8 +1698,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.84846503,
-    appliesTo: "allElementsExceptTableDisplayTypes",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/margin-left",
   },
   marginRight: {
     unitGroups: ["length", "percentage"],
@@ -1986,8 +1708,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.83485199,
-    appliesTo: "allElementsExceptTableDisplayTypes",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/margin-right",
   },
   marginTop: {
     unitGroups: ["length", "percentage"],
@@ -1997,18 +1718,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.90536837,
-    appliesTo: "allElementsExceptTableDisplayTypes",
-  },
-  marginTrim: {
-    unitGroups: [],
-    inherited: false,
-    initial: {
-      type: "keyword",
-      value: "none",
-    },
-    popularity: 0,
-    appliesTo: "blockContainersAndMultiColumnContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/margin-top",
   },
   maskBorderMode: {
     unitGroups: [],
@@ -2017,8 +1727,7 @@ export const properties = {
       type: "keyword",
       value: "alpha",
     },
-    popularity: 0,
-    appliesTo: "allElementsSVGContainerElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/mask-border-mode",
   },
   maskBorderOutset: {
     unitGroups: ["length", "number"],
@@ -2028,8 +1737,7 @@ export const properties = {
       unit: "number",
       value: 0,
     },
-    popularity: 0,
-    appliesTo: "allElementsSVGContainerElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/mask-border-outset",
   },
   maskBorderRepeat: {
     unitGroups: [],
@@ -2038,8 +1746,7 @@ export const properties = {
       type: "keyword",
       value: "stretch",
     },
-    popularity: 0,
-    appliesTo: "allElementsSVGContainerElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/mask-border-repeat",
   },
   maskBorderSlice: {
     unitGroups: ["number", "percentage"],
@@ -2049,8 +1756,7 @@ export const properties = {
       unit: "number",
       value: 0,
     },
-    popularity: 0,
-    appliesTo: "allElementsSVGContainerElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/mask-border-slice",
   },
   maskBorderSource: {
     unitGroups: [],
@@ -2059,8 +1765,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0,
-    appliesTo: "allElementsSVGContainerElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/mask-border-source",
   },
   maskBorderWidth: {
     unitGroups: ["length", "percentage", "number"],
@@ -2069,8 +1774,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0,
-    appliesTo: "allElementsSVGContainerElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/mask-border-width",
   },
   maskClip: {
     unitGroups: [],
@@ -2079,8 +1783,7 @@ export const properties = {
       type: "keyword",
       value: "border-box",
     },
-    popularity: 0,
-    appliesTo: "allElementsSVGContainerElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/mask-clip",
   },
   maskComposite: {
     unitGroups: [],
@@ -2089,8 +1792,7 @@ export const properties = {
       type: "keyword",
       value: "add",
     },
-    popularity: 0,
-    appliesTo: "allElementsSVGContainerElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/mask-composite",
   },
   maskImage: {
     unitGroups: [],
@@ -2099,8 +1801,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0,
-    appliesTo: "allElementsSVGContainerElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/mask-image",
   },
   maskMode: {
     unitGroups: [],
@@ -2109,8 +1810,7 @@ export const properties = {
       type: "keyword",
       value: "match-source",
     },
-    popularity: 0,
-    appliesTo: "allElementsSVGContainerElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/mask-mode",
   },
   maskOrigin: {
     unitGroups: [],
@@ -2119,18 +1819,27 @@ export const properties = {
       type: "keyword",
       value: "border-box",
     },
-    popularity: 0,
-    appliesTo: "allElementsSVGContainerElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/mask-origin",
   },
   maskPosition: {
     unitGroups: ["length", "percentage"],
     inherited: false,
     initial: {
-      type: "keyword",
-      value: "center",
+      type: "tuple",
+      value: [
+        {
+          type: "unit",
+          unit: "%",
+          value: 0,
+        },
+        {
+          type: "unit",
+          unit: "%",
+          value: 0,
+        },
+      ],
     },
-    popularity: 0,
-    appliesTo: "allElementsSVGContainerElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/mask-position",
   },
   maskRepeat: {
     unitGroups: [],
@@ -2139,8 +1848,7 @@ export const properties = {
       type: "keyword",
       value: "repeat",
     },
-    popularity: 0,
-    appliesTo: "allElementsSVGContainerElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/mask-repeat",
   },
   maskSize: {
     unitGroups: ["length", "percentage"],
@@ -2149,8 +1857,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0,
-    appliesTo: "allElementsSVGContainerElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/mask-size",
   },
   maskType: {
     unitGroups: [],
@@ -2159,18 +1866,7 @@ export const properties = {
       type: "keyword",
       value: "luminance",
     },
-    popularity: 0.00355107,
-    appliesTo: "maskElements",
-  },
-  masonryAutoFlow: {
-    unitGroups: [],
-    inherited: false,
-    initial: {
-      type: "keyword",
-      value: "pack",
-    },
-    popularity: 0,
-    appliesTo: "gridContainersWithMasonryLayout",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/mask-type",
   },
   mathDepth: {
     unitGroups: ["number"],
@@ -2180,8 +1876,7 @@ export const properties = {
       unit: "number",
       value: 0,
     },
-    popularity: 3e-8,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/math-depth",
   },
   mathShift: {
     unitGroups: [],
@@ -2190,8 +1885,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 3e-8,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/math-shift",
   },
   mathStyle: {
     unitGroups: [],
@@ -2200,8 +1894,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 3e-8,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/math-style",
   },
   maxBlockSize: {
     unitGroups: ["length", "percentage"],
@@ -2210,8 +1903,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.00064707,
-    appliesTo: "sameAsWidthAndHeight",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/max-block-size",
   },
   maxHeight: {
     unitGroups: ["length", "percentage"],
@@ -2220,8 +1912,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.72769912,
-    appliesTo: "allElementsButNonReplacedAndTableColumns",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/max-height",
   },
   maxInlineSize: {
     unitGroups: ["length", "percentage"],
@@ -2230,18 +1921,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.00062504,
-    appliesTo: "sameAsWidthAndHeight",
-  },
-  maxLines: {
-    unitGroups: ["number"],
-    inherited: false,
-    initial: {
-      type: "keyword",
-      value: "none",
-    },
-    popularity: 0,
-    appliesTo: "blockContainersExceptMultiColumnContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/max-inline-size",
   },
   maxWidth: {
     unitGroups: ["length", "percentage"],
@@ -2250,8 +1930,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.83290711,
-    appliesTo: "allElementsButNonReplacedAndTableRows",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/max-width",
   },
   minBlockSize: {
     unitGroups: ["length", "percentage"],
@@ -2261,8 +1940,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.00192722,
-    appliesTo: "sameAsWidthAndHeight",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/min-block-size",
   },
   minHeight: {
     unitGroups: ["length", "percentage"],
@@ -2271,8 +1949,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.80088013,
-    appliesTo: "allElementsButNonReplacedAndTableColumns",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/min-height",
   },
   minInlineSize: {
     unitGroups: ["length", "percentage"],
@@ -2282,8 +1959,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.00357429,
-    appliesTo: "sameAsWidthAndHeight",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/min-inline-size",
   },
   minWidth: {
     unitGroups: ["length", "percentage"],
@@ -2292,8 +1968,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.77790217,
-    appliesTo: "allElementsButNonReplacedAndTableRows",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/min-width",
   },
   mixBlendMode: {
     unitGroups: [],
@@ -2302,8 +1977,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.05430564,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/mix-blend-mode",
   },
   objectFit: {
     unitGroups: [],
@@ -2312,8 +1986,7 @@ export const properties = {
       type: "keyword",
       value: "fill",
     },
-    popularity: 0.38359477,
-    appliesTo: "replacedElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/object-fit",
   },
   objectPosition: {
     unitGroups: ["length", "percentage"],
@@ -2333,8 +2006,7 @@ export const properties = {
         },
       ],
     },
-    popularity: 0.08374319,
-    appliesTo: "replacedElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/object-position",
   },
   offsetAnchor: {
     unitGroups: ["length", "percentage"],
@@ -2343,8 +2015,6 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 6e-8,
-    appliesTo: "transformableElements",
   },
   offsetDistance: {
     unitGroups: ["length", "percentage"],
@@ -2354,8 +2024,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.0007637,
-    appliesTo: "transformableElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/offset-distance",
   },
   offsetPath: {
     unitGroups: [],
@@ -2364,18 +2033,15 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.0008741,
-    appliesTo: "transformableElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/offset-path",
   },
   offsetPosition: {
     unitGroups: ["length", "percentage"],
     inherited: false,
     initial: {
       type: "keyword",
-      value: "auto",
+      value: "normal",
     },
-    popularity: 3e-8,
-    appliesTo: "transformableElements",
   },
   offsetRotate: {
     unitGroups: ["angle"],
@@ -2384,8 +2050,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.00073039,
-    appliesTo: "transformableElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/offset-rotate",
   },
   opacity: {
     unitGroups: ["number", "percentage"],
@@ -2395,8 +2060,7 @@ export const properties = {
       unit: "number",
       value: 1,
     },
-    popularity: 0.87714344,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/opacity",
   },
   order: {
     unitGroups: ["number"],
@@ -2406,8 +2070,7 @@ export const properties = {
       unit: "number",
       value: 0,
     },
-    popularity: 0.28274872,
-    appliesTo: "flexItemsGridItemsAbsolutelyPositionedContainerChildren",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/order",
   },
   orphans: {
     unitGroups: ["number"],
@@ -2417,18 +2080,16 @@ export const properties = {
       unit: "number",
       value: 2,
     },
-    popularity: 0.03717837,
-    appliesTo: "blockContainerElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/orphans",
   },
   outlineColor: {
     unitGroups: [],
     inherited: false,
     initial: {
       type: "keyword",
-      value: "currentColor",
+      value: "auto",
     },
-    popularity: 0.09538741,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/outline-color",
   },
   outlineOffset: {
     unitGroups: ["length"],
@@ -2438,8 +2099,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.35495556,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/outline-offset",
   },
   outlineStyle: {
     unitGroups: [],
@@ -2448,8 +2108,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.22264732,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/outline-style",
   },
   outlineWidth: {
     unitGroups: ["length"],
@@ -2458,59 +2117,7 @@ export const properties = {
       type: "keyword",
       value: "medium",
     },
-    popularity: 0.23008945,
-    appliesTo: "allElements",
-  },
-  overflow: {
-    unitGroups: [],
-    inherited: false,
-    initial: {
-      type: "keyword",
-      value: "visible",
-    },
-    popularity: 0.87464713,
-    appliesTo: "blockContainersFlexContainersGridContainers",
-  },
-  overflowAnchor: {
-    unitGroups: [],
-    inherited: false,
-    initial: {
-      type: "keyword",
-      value: "auto",
-    },
-    popularity: 0.05039229,
-    appliesTo: "allElements",
-  },
-  overflowBlock: {
-    unitGroups: [],
-    inherited: false,
-    initial: {
-      type: "keyword",
-      value: "auto",
-    },
-    popularity: 0,
-    appliesTo: "blockContainersFlexContainersGridContainers",
-  },
-  overflowClipMargin: {
-    unitGroups: ["length"],
-    inherited: false,
-    initial: {
-      type: "unit",
-      unit: "px",
-      value: 0,
-    },
-    popularity: 0.0001932,
-    appliesTo: "allElements",
-  },
-  overflowInline: {
-    unitGroups: [],
-    inherited: false,
-    initial: {
-      type: "keyword",
-      value: "auto",
-    },
-    popularity: 0,
-    appliesTo: "blockContainersFlexContainersGridContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/outline-width",
   },
   overflowWrap: {
     unitGroups: [],
@@ -2519,8 +2126,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.2917187,
-    appliesTo: "nonReplacedInlineElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/overflow-wrap",
   },
   overflowX: {
     unitGroups: [],
@@ -2529,8 +2135,7 @@ export const properties = {
       type: "keyword",
       value: "visible",
     },
-    popularity: 0.6419296,
-    appliesTo: "blockContainersFlexContainersGridContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/overflow-x",
   },
   overflowY: {
     unitGroups: [],
@@ -2539,8 +2144,7 @@ export const properties = {
       type: "keyword",
       value: "visible",
     },
-    popularity: 0.66040666,
-    appliesTo: "blockContainersFlexContainersGridContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/overflow-y",
   },
   overscrollBehavior: {
     unitGroups: [],
@@ -2549,8 +2153,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0,
-    appliesTo: "nonReplacedBlockAndInlineBlockElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/overscroll-behavior",
   },
   overscrollBehaviorBlock: {
     unitGroups: [],
@@ -2559,8 +2162,8 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.0002038,
-    appliesTo: "nonReplacedBlockAndInlineBlockElements",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/overscroll-behavior-block",
   },
   overscrollBehaviorInline: {
     unitGroups: [],
@@ -2569,8 +2172,8 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.0003654,
-    appliesTo: "nonReplacedBlockAndInlineBlockElements",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/overscroll-behavior-inline",
   },
   overscrollBehaviorX: {
     unitGroups: [],
@@ -2579,8 +2182,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0,
-    appliesTo: "nonReplacedBlockAndInlineBlockElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/overscroll-behavior-x",
   },
   overscrollBehaviorY: {
     unitGroups: [],
@@ -2589,8 +2191,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0,
-    appliesTo: "nonReplacedBlockAndInlineBlockElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/overscroll-behavior-y",
   },
   paddingBlockEnd: {
     unitGroups: ["length", "percentage"],
@@ -2600,8 +2201,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.00269343,
-    appliesTo: "allElementsExceptInternalTableDisplayTypes",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/padding-block-end",
   },
   paddingBlockStart: {
     unitGroups: ["length", "percentage"],
@@ -2611,8 +2211,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.00281718,
-    appliesTo: "allElementsExceptInternalTableDisplayTypes",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/padding-block-start",
   },
   paddingBottom: {
     unitGroups: ["length", "percentage"],
@@ -2622,8 +2221,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.80249482,
-    appliesTo: "allElementsExceptInternalTableDisplayTypes",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/padding-bottom",
   },
   paddingInlineEnd: {
     unitGroups: ["length", "percentage"],
@@ -2633,8 +2231,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.02914235,
-    appliesTo: "allElementsExceptInternalTableDisplayTypes",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/padding-inline-end",
   },
   paddingInlineStart: {
     unitGroups: ["length", "percentage"],
@@ -2644,8 +2241,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.03734959,
-    appliesTo: "allElementsExceptInternalTableDisplayTypes",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/padding-inline-start",
   },
   paddingLeft: {
     unitGroups: ["length", "percentage"],
@@ -2655,8 +2251,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.81912414,
-    appliesTo: "allElementsExceptInternalTableDisplayTypes",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/padding-left",
   },
   paddingRight: {
     unitGroups: ["length", "percentage"],
@@ -2666,8 +2261,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.80336339,
-    appliesTo: "allElementsExceptInternalTableDisplayTypes",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/padding-right",
   },
   paddingTop: {
     unitGroups: ["length", "percentage"],
@@ -2677,8 +2271,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.82360295,
-    appliesTo: "allElementsExceptInternalTableDisplayTypes",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/padding-top",
   },
   page: {
     unitGroups: [],
@@ -2687,8 +2280,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.00131264,
-    appliesTo: "blockElementsInNormalFlow",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/page",
   },
   pageBreakAfter: {
     unitGroups: [],
@@ -2697,8 +2289,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.04793594,
-    appliesTo: "blockElementsInNormalFlow",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/page-break-after",
   },
   pageBreakBefore: {
     unitGroups: [],
@@ -2707,8 +2298,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.0173306,
-    appliesTo: "blockElementsInNormalFlow",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/page-break-before",
   },
   pageBreakInside: {
     unitGroups: [],
@@ -2717,8 +2307,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.0636772,
-    appliesTo: "blockElementsInNormalFlow",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/page-break-inside",
   },
   paintOrder: {
     unitGroups: [],
@@ -2727,8 +2316,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.0013931,
-    appliesTo: "textElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/paint-order",
   },
   perspective: {
     unitGroups: ["length"],
@@ -2737,8 +2325,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.11208199,
-    appliesTo: "transformableElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/perspective",
   },
   perspectiveOrigin: {
     unitGroups: ["length", "percentage"],
@@ -2758,8 +2345,7 @@ export const properties = {
         },
       ],
     },
-    popularity: 0.03597136,
-    appliesTo: "transformableElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/perspective-origin",
   },
   pointerEvents: {
     unitGroups: [],
@@ -2768,8 +2354,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.65656971,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/pointer-events",
   },
   position: {
     unitGroups: [],
@@ -2778,8 +2363,7 @@ export const properties = {
       type: "keyword",
       value: "static",
     },
-    popularity: 0.92435004,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/position",
   },
   printColorAdjust: {
     unitGroups: [],
@@ -2788,8 +2372,7 @@ export const properties = {
       type: "keyword",
       value: "economy",
     },
-    popularity: 0,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/print-color-adjust",
   },
   quotes: {
     unitGroups: [],
@@ -2798,8 +2381,7 @@ export const properties = {
       type: "keyword",
       value: "dependsOnUserAgent",
     },
-    popularity: 0.08095164,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/quotes",
   },
   resize: {
     unitGroups: [],
@@ -2808,8 +2390,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.20814477,
-    appliesTo: "elementsWithOverflowNotVisibleAndReplacedElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/resize",
   },
   right: {
     unitGroups: ["length", "percentage"],
@@ -2818,8 +2399,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.83840245,
-    appliesTo: "positionedElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/right",
   },
   rotate: {
     unitGroups: ["angle", "number"],
@@ -2828,8 +2408,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 4e-8,
-    appliesTo: "transformableElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/rotate",
   },
   rowGap: {
     unitGroups: ["length", "percentage"],
@@ -2839,38 +2418,7 @@ export const properties = {
       value: 0,
       unit: "px",
     },
-    popularity: 0.01955862,
-    appliesTo: "multiColumnElementsFlexContainersGridContainers",
-  },
-  rubyAlign: {
-    unitGroups: [],
-    inherited: true,
-    initial: {
-      type: "keyword",
-      value: "space-around",
-    },
-    popularity: 0,
-    appliesTo: "rubyBasesAnnotationsBaseAnnotationContainers",
-  },
-  rubyMerge: {
-    unitGroups: [],
-    inherited: true,
-    initial: {
-      type: "keyword",
-      value: "separate",
-    },
-    popularity: 0,
-    appliesTo: "rubyAnnotationsContainers",
-  },
-  rubyPosition: {
-    unitGroups: [],
-    inherited: true,
-    initial: {
-      type: "keyword",
-      value: "alternate",
-    },
-    popularity: 0.00156034,
-    appliesTo: "rubyAnnotationsContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/row-gap",
   },
   scale: {
     unitGroups: ["number"],
@@ -2879,8 +2427,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 2e-7,
-    appliesTo: "transformableElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/scale",
   },
   scrollbarColor: {
     unitGroups: [],
@@ -2889,8 +2436,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0,
-    appliesTo: "scrollingBoxes",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/scrollbar-color",
   },
   scrollbarGutter: {
     unitGroups: [],
@@ -2899,8 +2445,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.00128847,
-    appliesTo: "scrollingBoxes",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/scrollbar-gutter",
   },
   scrollbarWidth: {
     unitGroups: [],
@@ -2909,8 +2454,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.000001,
-    appliesTo: "scrollingBoxes",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/scrollbar-width",
   },
   scrollBehavior: {
     unitGroups: [],
@@ -2919,8 +2463,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.06855196,
-    appliesTo: "scrollingBoxes",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/scroll-behavior",
   },
   scrollMarginBlockStart: {
     unitGroups: ["length"],
@@ -2930,8 +2473,8 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0,
-    appliesTo: "allElements",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-block-start",
   },
   scrollMarginBlockEnd: {
     unitGroups: ["length"],
@@ -2941,8 +2484,8 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0,
-    appliesTo: "allElements",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-block-end",
   },
   scrollMarginBottom: {
     unitGroups: ["length"],
@@ -2952,8 +2495,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-bottom",
   },
   scrollMarginInlineStart: {
     unitGroups: ["length"],
@@ -2963,8 +2505,8 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0,
-    appliesTo: "allElements",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-inline-start",
   },
   scrollMarginInlineEnd: {
     unitGroups: ["length"],
@@ -2974,8 +2516,8 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0,
-    appliesTo: "allElements",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-inline-end",
   },
   scrollMarginLeft: {
     unitGroups: ["length"],
@@ -2985,8 +2527,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-left",
   },
   scrollMarginRight: {
     unitGroups: ["length"],
@@ -2996,8 +2537,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-right",
   },
   scrollMarginTop: {
     unitGroups: ["length"],
@@ -3007,8 +2547,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/scroll-margin-top",
   },
   scrollPaddingBlockStart: {
     unitGroups: ["length", "percentage"],
@@ -3017,8 +2556,8 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.0003318,
-    appliesTo: "scrollContainers",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-block-start",
   },
   scrollPaddingBlockEnd: {
     unitGroups: ["length", "percentage"],
@@ -3027,8 +2566,8 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.00033098,
-    appliesTo: "scrollContainers",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-block-end",
   },
   scrollPaddingBottom: {
     unitGroups: ["length", "percentage"],
@@ -3037,8 +2576,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.00046042,
-    appliesTo: "scrollContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-bottom",
   },
   scrollPaddingInlineStart: {
     unitGroups: ["length", "percentage"],
@@ -3047,8 +2585,8 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.00034054,
-    appliesTo: "scrollContainers",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-inline-start",
   },
   scrollPaddingInlineEnd: {
     unitGroups: ["length", "percentage"],
@@ -3057,8 +2595,8 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.00033178,
-    appliesTo: "scrollContainers",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-inline-end",
   },
   scrollPaddingLeft: {
     unitGroups: ["length", "percentage"],
@@ -3067,8 +2605,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.00318274,
-    appliesTo: "scrollContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-left",
   },
   scrollPaddingRight: {
     unitGroups: ["length", "percentage"],
@@ -3077,8 +2614,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.00046376,
-    appliesTo: "scrollContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-right",
   },
   scrollPaddingTop: {
     unitGroups: ["length", "percentage"],
@@ -3087,8 +2623,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.0199363,
-    appliesTo: "scrollContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/scroll-padding-top",
   },
   scrollSnapAlign: {
     unitGroups: [],
@@ -3097,8 +2632,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.05990673,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/scroll-snap-align",
   },
   scrollSnapStop: {
     unitGroups: [],
@@ -3107,8 +2641,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.0074871,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/scroll-snap-stop",
   },
   scrollSnapType: {
     unitGroups: [],
@@ -3117,28 +2650,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.05778112,
-    appliesTo: "allElements",
-  },
-  scrollTimelineAxis: {
-    unitGroups: [],
-    inherited: false,
-    initial: {
-      type: "keyword",
-      value: "block",
-    },
-    popularity: 0,
-    appliesTo: "scrollContainers",
-  },
-  scrollTimelineName: {
-    unitGroups: [],
-    inherited: false,
-    initial: {
-      type: "keyword",
-      value: "none",
-    },
-    popularity: 0,
-    appliesTo: "scrollContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/scroll-snap-type",
   },
   shapeImageThreshold: {
     unitGroups: ["number", "percentage"],
@@ -3148,8 +2660,7 @@ export const properties = {
       unit: "number",
       value: 0,
     },
-    popularity: 0.00579108,
-    appliesTo: "floats",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/shape-image-threshold",
   },
   shapeMargin: {
     unitGroups: ["length", "percentage"],
@@ -3159,8 +2670,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.00212267,
-    appliesTo: "floats",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/shape-margin",
   },
   shapeOutside: {
     unitGroups: [],
@@ -3169,8 +2679,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.00236383,
-    appliesTo: "floats",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/shape-outside",
   },
   tabSize: {
     unitGroups: ["number", "length"],
@@ -3180,8 +2689,7 @@ export const properties = {
       unit: "number",
       value: 8,
     },
-    popularity: 0.03065152,
-    appliesTo: "blockContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/tab-size",
   },
   tableLayout: {
     unitGroups: [],
@@ -3190,8 +2698,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.20669832,
-    appliesTo: "tableElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/table-layout",
   },
   textAlign: {
     unitGroups: [],
@@ -3200,8 +2707,7 @@ export const properties = {
       type: "keyword",
       value: "start",
     },
-    popularity: 0.89287477,
-    appliesTo: "blockContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/text-align",
   },
   textAlignLast: {
     unitGroups: [],
@@ -3210,8 +2716,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.02339794,
-    appliesTo: "blockContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/text-align-last",
   },
   textCombineUpright: {
     unitGroups: ["number"],
@@ -3220,8 +2725,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.00187072,
-    appliesTo: "nonReplacedInlineElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/text-combine-upright",
   },
   textDecorationColor: {
     unitGroups: [],
@@ -3230,8 +2734,7 @@ export const properties = {
       type: "keyword",
       value: "currentColor",
     },
-    popularity: 0.05079903,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/text-decoration-color",
   },
   textDecorationLine: {
     unitGroups: [],
@@ -3240,18 +2743,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.03656271,
-    appliesTo: "allElements",
-  },
-  textDecorationSkip: {
-    unitGroups: [],
-    inherited: true,
-    initial: {
-      type: "keyword",
-      value: "objects",
-    },
-    popularity: 0.054238,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/text-decoration-line",
   },
   textDecorationSkipInk: {
     unitGroups: [],
@@ -3260,8 +2752,8 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.01645826,
-    appliesTo: "allElements",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/text-decoration-skip-ink",
   },
   textDecorationStyle: {
     unitGroups: [],
@@ -3270,8 +2762,7 @@ export const properties = {
       type: "keyword",
       value: "solid",
     },
-    popularity: 0.02111189,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/text-decoration-style",
   },
   textDecorationThickness: {
     unitGroups: ["length", "percentage"],
@@ -3280,22 +2771,21 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.00728976,
-    appliesTo: "allElements",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/text-decoration-thickness",
   },
   textEmphasisColor: {
     unitGroups: [],
-    inherited: false,
+    inherited: true,
     initial: {
       type: "keyword",
       value: "currentColor",
     },
-    popularity: 0,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/text-emphasis-color",
   },
   textEmphasisPosition: {
     unitGroups: [],
-    inherited: false,
+    inherited: true,
     initial: {
       type: "tuple",
       value: [
@@ -3309,18 +2799,16 @@ export const properties = {
         },
       ],
     },
-    popularity: 0,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/text-emphasis-position",
   },
   textEmphasisStyle: {
     unitGroups: [],
-    inherited: false,
+    inherited: true,
     initial: {
       type: "keyword",
       value: "none",
     },
-    popularity: 0,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/text-emphasis-style",
   },
   textIndent: {
     unitGroups: ["length", "percentage"],
@@ -3330,8 +2818,7 @@ export const properties = {
       unit: "px",
       value: 0,
     },
-    popularity: 0.37633903,
-    appliesTo: "blockContainers",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/text-indent",
   },
   textJustify: {
     unitGroups: [],
@@ -3340,8 +2827,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 8e-7,
-    appliesTo: "inlineLevelAndTableCellElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/text-justify",
   },
   textOrientation: {
     unitGroups: [],
@@ -3350,8 +2836,7 @@ export const properties = {
       type: "keyword",
       value: "mixed",
     },
-    popularity: 0.00286298,
-    appliesTo: "allElementsExceptTableRowGroupsRowsColumnGroupsAndColumns",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/text-orientation",
   },
   textOverflow: {
     unitGroups: [],
@@ -3360,8 +2845,7 @@ export const properties = {
       type: "keyword",
       value: "clip",
     },
-    popularity: 0.65272517,
-    appliesTo: "blockContainerElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/text-overflow",
   },
   textRendering: {
     unitGroups: [],
@@ -3370,8 +2854,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.3619822,
-    appliesTo: "textElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/text-rendering",
   },
   textShadow: {
     unitGroups: ["length"],
@@ -3380,8 +2863,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.49899917,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/text-shadow",
   },
   textSizeAdjust: {
     unitGroups: ["percentage"],
@@ -3390,8 +2872,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.13611964,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/text-size-adjust",
   },
   textTransform: {
     unitGroups: [],
@@ -3400,8 +2881,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.73056963,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/text-transform",
   },
   textUnderlineOffset: {
     unitGroups: ["length", "percentage"],
@@ -3410,8 +2890,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.00558599,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/text-underline-offset",
   },
   textUnderlinePosition: {
     unitGroups: [],
@@ -3420,8 +2899,26 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.0070495,
-    appliesTo: "allElements",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/text-underline-position",
+  },
+  textWrapMode: {
+    unitGroups: [],
+    inherited: true,
+    initial: {
+      type: "keyword",
+      value: "wrap",
+    },
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/text-wrap-mode",
+  },
+  textWrapStyle: {
+    unitGroups: [],
+    inherited: true,
+    initial: {
+      type: "keyword",
+      value: "auto",
+    },
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/text-wrap-style",
   },
   top: {
     unitGroups: ["length", "percentage"],
@@ -3430,8 +2927,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.91426675,
-    appliesTo: "positionedElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/top",
   },
   touchAction: {
     unitGroups: [],
@@ -3440,9 +2936,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.37581741,
-    appliesTo:
-      "allElementsExceptNonReplacedInlineElementsTableRowsColumnsRowColumnGroups",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/touch-action",
   },
   transform: {
     unitGroups: [],
@@ -3451,8 +2945,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 0.82452786,
-    appliesTo: "transformableElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/transform",
   },
   transformBox: {
     unitGroups: [],
@@ -3461,8 +2954,7 @@ export const properties = {
       type: "keyword",
       value: "view-box",
     },
-    popularity: 0.00167776,
-    appliesTo: "transformableElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/transform-box",
   },
   transformOrigin: {
     unitGroups: ["length", "percentage"],
@@ -3487,8 +2979,7 @@ export const properties = {
         },
       ],
     },
-    popularity: 0.54179205,
-    appliesTo: "transformableElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/transform-origin",
   },
   transformStyle: {
     unitGroups: [],
@@ -3497,37 +2988,16 @@ export const properties = {
       type: "keyword",
       value: "flat",
     },
-    popularity: 0.11068509,
-    appliesTo: "transformableElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/transform-style",
   },
-  transition: {
-    unitGroups: ["time"],
+  transitionBehavior: {
+    unitGroups: [],
     inherited: false,
     initial: {
-      type: "tuple",
-      value: [
-        {
-          type: "keyword",
-          value: "all",
-        },
-        {
-          type: "unit",
-          unit: "s",
-          value: 0,
-        },
-        {
-          type: "keyword",
-          value: "ease",
-        },
-        {
-          type: "unit",
-          unit: "s",
-          value: 0,
-        },
-      ],
+      type: "keyword",
+      value: "normal",
     },
-    popularity: 0.78355592,
-    appliesTo: "allElementsAndPseudos",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/transition-behavior",
   },
   transitionDelay: {
     unitGroups: ["time"],
@@ -3537,8 +3007,7 @@ export const properties = {
       unit: "s",
       value: 0,
     },
-    popularity: 0.26633596,
-    appliesTo: "allElementsAndPseudos",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/transition-delay",
   },
   transitionDuration: {
     unitGroups: ["time"],
@@ -3548,8 +3017,7 @@ export const properties = {
       unit: "s",
       value: 0,
     },
-    popularity: 0.27645681,
-    appliesTo: "allElementsAndPseudos",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/transition-duration",
   },
   transitionProperty: {
     unitGroups: [],
@@ -3558,8 +3026,7 @@ export const properties = {
       type: "keyword",
       value: "all",
     },
-    popularity: 0.28626935,
-    appliesTo: "allElementsAndPseudos",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/transition-property",
   },
   transitionTimingFunction: {
     unitGroups: [],
@@ -3568,8 +3035,8 @@ export const properties = {
       type: "keyword",
       value: "ease",
     },
-    popularity: 0.28535681,
-    appliesTo: "allElementsAndPseudos",
+    mdnUrl:
+      "https://developer.mozilla.org/docs/Web/CSS/transition-timing-function",
   },
   translate: {
     unitGroups: ["length", "percentage"],
@@ -3578,8 +3045,7 @@ export const properties = {
       type: "keyword",
       value: "none",
     },
-    popularity: 9e-8,
-    appliesTo: "transformableElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/translate",
   },
   unicodeBidi: {
     unitGroups: [],
@@ -3588,8 +3054,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.13633243,
-    appliesTo: "allElementsSomeValuesNoEffectOnNonInlineElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/unicode-bidi",
   },
   userSelect: {
     unitGroups: [],
@@ -3598,8 +3063,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.55451382,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/user-select",
   },
   verticalAlign: {
     unitGroups: ["percentage", "length"],
@@ -3608,18 +3072,7 @@ export const properties = {
       type: "keyword",
       value: "baseline",
     },
-    popularity: 0.84531302,
-    appliesTo: "inlineLevelAndTableCellElements",
-  },
-  viewTransitionName: {
-    unitGroups: [],
-    inherited: false,
-    initial: {
-      type: "keyword",
-      value: "none",
-    },
-    popularity: 0,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/vertical-align",
   },
   visibility: {
     unitGroups: [],
@@ -3628,18 +3081,16 @@ export const properties = {
       type: "keyword",
       value: "visible",
     },
-    popularity: 0.76715746,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/visibility",
   },
-  whiteSpace: {
+  whiteSpaceCollapse: {
     unitGroups: [],
     inherited: true,
     initial: {
       type: "keyword",
-      value: "normal",
+      value: "collapse",
     },
-    popularity: 0.80711821,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/white-space-collapse",
   },
   widows: {
     unitGroups: ["number"],
@@ -3649,8 +3100,7 @@ export const properties = {
       unit: "number",
       value: 2,
     },
-    popularity: 0.03635817,
-    appliesTo: "blockContainerElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/widows",
   },
   width: {
     unitGroups: ["length", "percentage"],
@@ -3659,8 +3109,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.93671487,
-    appliesTo: "allElementsButNonReplacedAndTableRows",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/width",
   },
   willChange: {
     unitGroups: [],
@@ -3669,8 +3118,7 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.28251419,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/will-change",
   },
   wordBreak: {
     unitGroups: [],
@@ -3679,8 +3127,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.51074263,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/word-break",
   },
   wordSpacing: {
     unitGroups: ["length"],
@@ -3689,8 +3136,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.15650671,
-    appliesTo: "allElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/word-spacing",
   },
   wordWrap: {
     unitGroups: [],
@@ -3699,8 +3145,7 @@ export const properties = {
       type: "keyword",
       value: "normal",
     },
-    popularity: 0.55291577,
-    appliesTo: "nonReplacedInlineElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/overflow-wrap",
   },
   writingMode: {
     unitGroups: [],
@@ -3709,8 +3154,7 @@ export const properties = {
       type: "keyword",
       value: "horizontal-tb",
     },
-    popularity: 0.00947773,
-    appliesTo: "allElementsExceptTableRowColumnGroupsTableRowsColumns",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/writing-mode",
   },
   zIndex: {
     unitGroups: ["number"],
@@ -3719,7 +3163,15 @@ export const properties = {
       type: "keyword",
       value: "auto",
     },
-    popularity: 0.85875694,
-    appliesTo: "positionedElements",
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/z-index",
+  },
+  zoom: {
+    unitGroups: ["number", "percentage"],
+    inherited: false,
+    initial: {
+      type: "keyword",
+      value: "normal",
+    },
+    mdnUrl: "https://developer.mozilla.org/docs/Web/CSS/zoom",
   },
 } as const;

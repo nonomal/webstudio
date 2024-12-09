@@ -95,7 +95,7 @@ function UiComponent() {
             signal: abort.current.signal,
             onChunk: (id, { completion, done }) => {
               // Log the completion.
-              console.log(completion)
+              console.info(completion)
               if (done) {
                 doSomething(completion);
               }
@@ -151,7 +151,7 @@ const [json, setJson] = useState([]);
 useEffect(() => {
   try {
     const jsonResponse = z
-      .array(copywriter.TextInstanceSchema)
+      .array(copywriter.TextInstance)
       .parse(JSON.parse(untruncateJson(completion)));
 
     const currenTextInstance = jsonResponse.pop();
@@ -161,7 +161,7 @@ useEffect(() => {
     }
 
     console.clear();
-    console.log(currenTextInstance);
+    console.info(currenTextInstance);
     // patchTextInstance(currenTextInstance);
   } catch (error) {
     /**/

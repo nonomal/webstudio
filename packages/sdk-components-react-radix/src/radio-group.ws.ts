@@ -10,7 +10,7 @@ import {
   type WsComponentMeta,
   type WsComponentPropsMeta,
 } from "@webstudio-is/react-sdk";
-import { button, div, span } from "@webstudio-is/react-sdk/css-normalize";
+import { button, div, span } from "@webstudio-is/sdk/normalize.css";
 import * as tc from "./theme/tailwind-classes";
 import { buttonReset } from "./theme/styles";
 import {
@@ -77,7 +77,7 @@ const createRadioGroupItem = ({
     {
       type: "instance",
       component: "Text",
-      children: [{ type: "text", value: label }],
+      children: [{ type: "text", value: label, placeholder: true }],
     },
   ],
 });
@@ -144,7 +144,10 @@ export const metaRadioGroup: WsComponentMeta = {
 export const metaRadioGroupItem: WsComponentMeta = {
   category: "hidden",
   type: "container",
-  requiredAncestors: ["RadioGroup"],
+  constraints: {
+    relation: "ancestor",
+    component: { $eq: "RadioGroup" },
+  },
   icon: ItemIcon,
   states: defaultStates,
   presetStyle: {
@@ -165,7 +168,7 @@ export const metaRadioGroupIndicator: WsComponentMeta = {
 
 export const propsMetaRadioGroup: WsComponentPropsMeta = {
   props: propsRadioGroup,
-  initialProps: ["id", "value", "name", "required"],
+  initialProps: ["id", "className", "name", "value", "required"],
 };
 
 export const propsMetaRadioGroupItem: WsComponentPropsMeta = {

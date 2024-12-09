@@ -1,15 +1,11 @@
 import type { CSSProperties } from "react";
-import {
-  Box,
-  Flex,
-  Grid,
-  DeprecatedIconButton,
-} from "@webstudio-is/design-system";
+import { Box, Flex, Grid, IconButton } from "@webstudio-is/design-system";
 import { toValue } from "@webstudio-is/css-engine";
 import { DotIcon } from "@webstudio-is/icons";
-import type { CreateBatchUpdate } from "../../../shared/use-style-data";
-import { getStyleSource, type StyleInfo } from "../../../shared/style-info";
 import { theme } from "@webstudio-is/design-system";
+import { useComputedStyles } from "../../../shared/model";
+import { getPriorityStyleValueSource } from "../../../property-label";
+import { createBatchUpdate } from "../../../shared/use-style-data";
 
 // Sometimes we need to hide a dot that ends up at an end
 // of a line and visually extends it
@@ -36,37 +32,36 @@ const shouldHideDot = ({
   return false;
 };
 
-export const FlexGrid = ({
-  currentStyle,
-  batchUpdate,
-}: {
-  currentStyle: StyleInfo;
-  batchUpdate: ReturnType<CreateBatchUpdate>;
-}) => {
-  const styleSource = getStyleSource(
-    currentStyle.flexDirection,
-    currentStyle.justifyContent,
-    currentStyle.alignItems
-  );
-  const flexDirection = toValue(currentStyle.flexDirection?.value);
-  const justifyContent = toValue(currentStyle.justifyContent?.value);
-  const alignItems = toValue(currentStyle.alignItems?.value);
-  const setAlignItems = batchUpdate.setProperty("alignItems");
-  const setJustifyContent = batchUpdate.setProperty("justifyContent");
+export const FlexGrid = () => {
+  const styles = useComputedStyles([
+    "flexDirection",
+    "justifyContent",
+    "alignItems",
+  ]);
+  const styleValueSourceColor = getPriorityStyleValueSource(styles);
+  const [flexDirection, justifyContent, alignItems] = styles;
+  const flexDirectionValue = toValue(flexDirection.cascadedValue);
+  const justifyContentValue = toValue(justifyContent.cascadedValue);
+  const alignItemsValue = toValue(alignItems.cascadedValue);
   const alignment = ["start", "center", "end"];
   const gridSize = alignment.length;
   const isFlexDirectionColumn =
-    flexDirection === "column" || flexDirection === "column-reverse";
+    flexDirectionValue === "column" || flexDirectionValue === "column-reverse";
 
   let color = theme.colors.foregroundFlexUiMain;
-  if (styleSource === "local") {
-    color = theme.colors.borderLocalFlexUi;
+  let borderColor = theme.colors.foregroundFlexUiMain;
+
+  if (styleValueSourceColor === "local") {
+    borderColor = theme.colors.borderLocalMain;
+    color = theme.colors.foregroundLocalFlexUi;
   }
-  if (styleSource === "overwritten") {
-    color = theme.colors.borderOverwrittenFlexUi;
+  if (styleValueSourceColor === "overwritten") {
+    borderColor = theme.colors.borderOverwrittenFlexUi;
+    color = theme.colors.foregroundOverwrittenFlexUi;
   }
-  if (styleSource === "remote") {
-    color = theme.colors.borderRemoteFlexUi;
+  if (styleValueSourceColor === "remote") {
+    borderColor = theme.colors.borderRemoteFlexUi;
+    color = theme.colors.foregroundRemoteFlexUi;
   }
 
   const addjustLinesPadding = (padding: number | undefined) => {
@@ -82,23 +77,16 @@ export const FlexGrid = ({
     <Grid
       tabIndex={0}
       css={{
-        width: 72,
-        height: 72,
-        padding: theme.spacing[4],
+        padding: theme.spacing[2],
         borderRadius: theme.borderRadius[4],
+        outline: `1px solid ${borderColor}`,
         background: theme.colors.backgroundControls,
         alignItems: "center",
         gap: 0,
         gridTemplateColumns: "repeat(3, 1fr)",
         gridTemplateRows: "repeat(3, 1fr)",
         color,
-        outlineStyle: "solid",
-        outlineWidth: styleSource === "default" ? 1 : 2,
-        outlineOffset: styleSource === "default" ? -1 : -2,
-        outlineColor: color,
         "&:focus-within": {
-          outlineWidth: 2,
-          outlineOffset: -2,
           outlineColor: theme.colors.borderLocalFlexUi,
         },
       }}
@@ -124,15 +112,15 @@ export const FlexGrid = ({
               gridRow,
             }}
           >
-            <DeprecatedIconButton
+            <IconButton
               tabIndex={-1}
               css={{
-                width: "100%",
-                height: "100%",
+                width: "90%",
+                height: "90%",
                 color: theme.colors.foregroundFlexUiMain,
                 "&:hover": {
                   // @todo not clear which token to use here
-                  background: theme.colors.slate4,
+                  background: theme.colors.backgroundHover,
                 },
                 "&:focus": {
                   background: "none",
@@ -143,14 +131,25 @@ export const FlexGrid = ({
               onClick={() => {
                 const justifyContent = alignment[x];
                 const alignItems = alignment[y];
-                setAlignItems({ type: "keyword", value: alignItems });
-                setJustifyContent({ type: "keyword", value: justifyContent });
-                batchUpdate.publish();
+                const batch = createBatchUpdate();
+                batch.setProperty("alignItems")({
+                  type: "keyword",
+                  value: alignItems,
+                });
+                batch.setProperty("justifyContent")({
+                  type: "keyword",
+                  value: justifyContent,
+                });
+                batch.publish();
               }}
             >
-              {shouldHideDot({ x, y, justifyContent, alignItems }) ===
-                false && <DotIcon />}
-            </DeprecatedIconButton>
+              {shouldHideDot({
+                x,
+                y,
+                justifyContent: justifyContentValue,
+                alignItems: alignItemsValue,
+              }) === false && <DotIcon />}
+            </IconButton>
           </Flex>
         );
       })}
@@ -165,27 +164,27 @@ export const FlexGrid = ({
           pointerEvents: "none",
         }}
         style={{
-          flexDirection: flexDirection as CSSProperties["flexDirection"],
-          justifyContent,
-          alignItems,
+          flexDirection: flexDirectionValue as CSSProperties["flexDirection"],
+          justifyContent: justifyContentValue,
+          alignItems: alignItemsValue,
           ...addjustLinesPadding(
-            justifyContent === "space-between"
+            justifyContentValue === "space-between"
               ? 8
-              : justifyContent === "space-around"
-              ? 14.5
-              : undefined
+              : justifyContentValue === "space-around"
+                ? 14.5
+                : undefined
           ),
         }}
       >
-        {[11, 16, 9].map((size) => (
+        {[7, 12, 5].map((size) => (
           <Box
             key={size}
             css={{
               borderRadius: theme.borderRadius[1],
               backgroundColor: "currentColor",
               ...(isFlexDirectionColumn
-                ? { minWidth: size, minHeight: 4 }
-                : { minWidth: 4, minHeight: size }),
+                ? { minWidth: size, minHeight: 3 }
+                : { minWidth: 3, minHeight: size }),
             }}
           />
         ))}

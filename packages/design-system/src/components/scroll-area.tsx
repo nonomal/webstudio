@@ -6,6 +6,8 @@ const ScrollAreaRoot = styled(Root, {
   boxSizing: "border-box",
   overflow: "hidden",
   display: "grid",
+  // We had a case where some Windows 10 + Chrome 129 users couldn't scroll style panel.
+  willChange: "transform",
 });
 
 const ScrollAreaThumb = styled(Thumb, {
@@ -97,15 +99,22 @@ const viewPortStyle = css({
 type ScrollAreaProps = {
   css?: CSS;
   direction?: "vertical" | "horizontal" | "both";
+  className?: string;
 } & Pick<ComponentProps<"div">, "onScroll" | "children">;
 
 export const ScrollArea = forwardRef(
   (
-    { children, css, onScroll, direction = "vertical" }: ScrollAreaProps,
+    {
+      children,
+      css,
+      className,
+      onScroll,
+      direction = "vertical",
+    }: ScrollAreaProps,
     ref: Ref<HTMLDivElement>
   ) => {
     return (
-      <ScrollAreaRoot scrollHideDelay={0} css={css}>
+      <ScrollAreaRoot scrollHideDelay={0} css={css} className={className}>
         <Viewport
           ref={ref}
           className={viewPortStyle({ direction })}

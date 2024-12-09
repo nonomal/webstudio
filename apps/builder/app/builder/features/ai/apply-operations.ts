@@ -1,10 +1,13 @@
-import { serverSyncStore } from "~/shared/sync";
+import { nanoid } from "nanoid";
+import { getStyleDeclKey, Instance, type StyleSource } from "@webstudio-is/sdk";
 import { generateDataFromEmbedTemplate } from "@webstudio-is/react-sdk";
-import { copywriter, type operations } from "@webstudio-is/ai";
+import type { copywriter, operations } from "@webstudio-is/ai";
+import { serverSyncStore } from "~/shared/sync";
 import { isBaseBreakpoint } from "~/shared/breakpoints";
 import {
   deleteInstanceMutable,
   insertTemplateData,
+  isInstanceDetachable,
   updateWebstudioData,
 } from "~/shared/instance-utils";
 import {
@@ -12,14 +15,12 @@ import {
   $instances,
   $registeredComponentMetas,
   $selectedInstanceSelector,
-  $selectedInstance,
   $styleSourceSelections,
   $styleSources,
   $styles,
 } from "~/shared/nano-states";
 import type { DroppableTarget, InstanceSelector } from "~/shared/tree-utils";
-import { getStyleDeclKey, Instance, type StyleSource } from "@webstudio-is/sdk";
-import { nanoid } from "nanoid";
+import { $selectedInstance } from "~/shared/awareness";
 
 export const applyOperations = (operations: operations.WsOperations) => {
   for (const operation of operations) {
@@ -35,7 +36,6 @@ export const applyOperations = (operations: operations.WsOperations) => {
         break;
       default:
         if (process.env.NODE_ENV === "development") {
-          // eslint-disable-next-line no-console
           console.warn(`Not supported operation: ${operation}`);
         }
     }
@@ -102,7 +102,14 @@ const deleteInstanceByOp = (
 ) => {
   const instanceSelector = computeSelectorForInstanceId(operation.wsId);
   if (instanceSelector) {
+    // @todo tell user they can't delete root
+    if (instanceSelector.length === 1) {
+      return;
+    }
     updateWebstudioData((data) => {
+      if (isInstanceDetachable(data.instances, instanceSelector) === false) {
+        return;
+      }
       deleteInstanceMutable(data, instanceSelector);
     });
   }

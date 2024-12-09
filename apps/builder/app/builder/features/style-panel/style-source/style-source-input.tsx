@@ -9,19 +9,17 @@
  * - Click to toggle select/unselect
  * - Double click to edit name
  * - Local source can only be disabled, nothing else should be possible
- * - Hit Backspace to delete the last Source item when you are in the input
  */
 
 import { nanoid } from "nanoid";
+import { useFocusWithin } from "@react-aria/interactions";
 import {
   Box,
   ComboboxListbox,
   ComboboxListboxItem,
-  Combobox,
+  ComboboxRoot,
   ComboboxAnchor,
   ComboboxContent,
-  DeprecatedTextFieldInput,
-  useDeprecatedTextFieldFocus,
   useCombobox,
   type CSS,
   ComboboxLabel,
@@ -32,8 +30,11 @@ import {
   rawTheme,
   theme,
   styled,
+  Flex,
+  ComboboxScrollArea,
+  InputField,
 } from "@webstudio-is/design-system";
-import { CheckMarkIcon, DotIcon } from "@webstudio-is/icons";
+import { CheckMarkIcon, DotIcon, LocalStyleIcon } from "@webstudio-is/icons";
 import {
   forwardRef,
   useState,
@@ -42,10 +43,17 @@ import {
   type ForwardRefRenderFunction,
   type RefObject,
   type ReactNode,
+  useRef,
+  useCallback,
 } from "react";
 import { mergeRefs } from "@react-aria/utils";
 import { type ComponentState, stateCategories } from "@webstudio-is/react-sdk";
-import { type ItemSource, menuCssVars, StyleSource } from "./style-source";
+import {
+  type ItemSource,
+  type StyleSourceError,
+  menuCssVars,
+  StyleSourceControl,
+} from "./style-source-control";
 import { useSortable } from "./use-sortable";
 import { matchSorter } from "match-sorter";
 import { StyleSourceBadge } from "./style-source-badge";
@@ -71,19 +79,18 @@ const TextFieldContainer = styled("div", {
   flexWrap: "wrap",
   alignItems: "center",
   backgroundColor: theme.colors.backgroundControls,
-  gap: theme.spacing[3],
-  p: theme.spacing[3],
+  gap: theme.spacing[2],
+  p: theme.spacing[2],
   borderRadius: theme.borderRadius[4],
   minWidth: 0,
   border: `1px solid ${theme.colors.borderMain}`,
   "&:focus-within": {
-    outline: `2px solid ${theme.colors.borderFocus}`,
-    outlineOffset: -1,
+    borderColor: theme.colors.borderFocus,
   },
 });
 
 type TextFieldBaseWrapperProps<Item extends IntermediateItem> = Omit<
-  ComponentProps<"input">,
+  ComponentProps<typeof InputField>,
   "value"
 > &
   Pick<ComponentProps<typeof TextFieldContainer>, "css"> & {
@@ -99,6 +106,7 @@ type TextFieldBaseWrapperProps<Item extends IntermediateItem> = Omit<
     onEditItem?: (id?: Item["id"]) => void;
     editingItemId?: Item["id"];
     states: { label: string; selector: string }[];
+    error?: StyleSourceError;
   };
 
 const TextFieldBase: ForwardRefRenderFunction<
@@ -112,7 +120,6 @@ const TextFieldBase: ForwardRefRenderFunction<
     onFocus,
     onBlur,
     onClick,
-    type,
     onKeyDown,
     label,
     value,
@@ -124,20 +131,33 @@ const TextFieldBase: ForwardRefRenderFunction<
     onEditItem,
     editingItemId,
     states,
+    error,
     ...textFieldProps
   } = props;
-  const [internalInputRef, focusProps] = useDeprecatedTextFieldFocus({
-    onFocus,
-    onBlur,
-  });
   const { sortableRefCallback, dragItemId, placementIndicator } = useSortable({
     items: value,
     onSort,
   });
+  const internalInputRef = useRef<HTMLInputElement>(null);
+
+  const { focusWithinProps } = useFocusWithin({
+    onFocusWithin: onFocus,
+    onBlurWithin: onBlur,
+  });
+
+  const onClickCapture = useCallback(() => {
+    internalInputRef.current?.focus();
+  }, [internalInputRef]);
 
   return (
     <TextFieldContainer
-      {...focusProps}
+      {...focusWithinProps}
+      onClickCapture={onClickCapture}
+      // Setting tabIndex to -1 to allow this element to be focused via JavaScript.
+      // This is used when we need to hide the caret but want to:
+      //   1. keep the visual focused state of the component
+      //   2. keep focus somewhere insisde the component to not trigger some focus-trap logic
+      tabIndex={-1}
       ref={mergeRefs(forwardedRef, containerRef ?? null, sortableRefCallback)}
       css={css}
       style={
@@ -145,10 +165,32 @@ const TextFieldBase: ForwardRefRenderFunction<
       }
       onKeyDown={onKeyDown}
     >
+      {/* We want input to be the first element in DOM so it receives the focus first */}
+      {editingItemId === undefined && (
+        <InputField
+          {...textFieldProps}
+          variant="chromeless"
+          css={{
+            fontVariantNumeric: "tabular-nums",
+            lineHeight: 1,
+            order: 1,
+            flex: 1,
+            "&:focus-within, &:hover": {
+              borderColor: "transparent",
+            },
+          }}
+          size="1"
+          value={label}
+          onClick={onClick}
+          ref={inputRef}
+          inputRef={internalInputRef}
+          spellCheck={false}
+          aria-label="New Style Source Input"
+        />
+      )}
       {value.map((item) => (
-        <StyleSource
+        <StyleSourceControl
           key={item.id}
-          label={item.label}
           menuItems={renderStyleSourceMenuItems(item)}
           id={item.id}
           selected={item.id === selectedItemSelector?.styleSourceId}
@@ -159,10 +201,12 @@ const TextFieldBase: ForwardRefRenderFunction<
           }
           stateLabel={
             item.id === selectedItemSelector?.styleSourceId
-              ? states.find((s) => s.selector === selectedItemSelector.state)
-                  ?.label
+              ? states.find(
+                  (state) => state.selector === selectedItemSelector.state
+                )?.label
               : undefined
           }
+          error={item.id === error?.id ? error : undefined}
           disabled={item.disabled}
           isDragging={item.id === dragItemId}
           isEditing={item.id === editingItemId}
@@ -175,28 +219,17 @@ const TextFieldBase: ForwardRefRenderFunction<
             onEditItem?.();
             onChangeItem?.({ ...item, label });
           }}
-        />
+        >
+          {item.source === "local" ? (
+            <Flex align="center" justify="center">
+              <LocalStyleIcon />
+            </Flex>
+          ) : (
+            item.label
+          )}
+        </StyleSourceControl>
       ))}
       {placementIndicator}
-      {/* We want input to be the first element in DOM so it receives the focus first */}
-      {editingItemId === undefined && (
-        <DeprecatedTextFieldInput
-          {...textFieldProps}
-          css={{
-            color: theme.colors.hiContrast,
-            fontVariantNumeric: "tabular-nums",
-            fontFamily: theme.fonts.sans,
-            fontSize: theme.deprecatedFontSize[3],
-            lineHeight: 1,
-          }}
-          value={label}
-          type={type}
-          onClick={onClick}
-          ref={mergeRefs(internalInputRef, inputRef ?? null)}
-          spellCheck={false}
-          aria-label="New Style Source Input"
-        />
-      )}
     </TextFieldContainer>
   );
 };
@@ -205,6 +238,7 @@ const TextField = forwardRef(TextFieldBase);
 TextField.displayName = "TextField";
 
 type StyleSourceInputProps<Item extends IntermediateItem> = {
+  error?: StyleSourceError;
   items?: Array<Item>;
   value?: Array<Item>;
   selectedItemSelector: undefined | ItemSelector;
@@ -227,6 +261,9 @@ type StyleSourceInputProps<Item extends IntermediateItem> = {
 };
 
 const newItemId = "__NEW__";
+
+// Maximum amount of tokens we show in the combobox
+const maxSuggestedTokens = 50;
 
 const matchOrSuggestToCreate = (
   search: string,
@@ -255,7 +292,9 @@ const matchOrSuggestToCreate = (
     });
   }
   // skip already added values
-  return matched.filter((item) => item.isAdded === false).slice(0, 5);
+  return matched
+    .filter((item) => item.isAdded === false)
+    .slice(0, maxSuggestedTokens);
 };
 
 const markAddedValues = <Item extends IntermediateItem>(
@@ -285,9 +324,10 @@ const renderMenuItems = (props: {
 }) => {
   return (
     <>
+      <DropdownMenuLabel>{props.item.label}</DropdownMenuLabel>
       {props.item.source !== "local" && (
         <DropdownMenuItem onSelect={() => props.onEdit?.(props.item.id)}>
-          Edit Name
+          Rename
         </DropdownMenuItem>
       )}
       {props.item.source !== "local" && (
@@ -384,6 +424,18 @@ const renderMenuItems = (props: {
           </Fragment>
         );
       })}
+
+      <DropdownMenuSeparator />
+      {props.item.source === "local" && (
+        <DropdownMenuItem hint>
+          Style instances without creating a token or override a token locally.
+        </DropdownMenuItem>
+      )}
+      {props.item.source === "token" && (
+        <DropdownMenuItem hint>
+          Reuse styles across multiple instances by creating a token.
+        </DropdownMenuItem>
+      )}
     </>
   );
 };
@@ -402,7 +454,7 @@ export const StyleSourceInput = (
     getItemProps,
     isOpen,
   } = useCombobox<IntermediateItem>({
-    items: markAddedValues(props.items ?? [], value),
+    getItems: () => markAddedValues(props.items ?? [], value),
     value: {
       label,
       disabled: false,
@@ -424,12 +476,25 @@ export const StyleSourceInput = (
         props.onSelectAutocompleteItem?.(item);
       }
     },
-    onInputChange(label) {
+    onChange(label) {
       setLabel(label ?? "");
     },
   });
 
-  const inputProps = getInputProps();
+  const inputProps = getInputProps({
+    onKeyDown(event) {
+      if (
+        event.key === "Backspace" &&
+        label === "" &&
+        props.editingItemId === undefined
+      ) {
+        const item = value[value.length - 2];
+        if (item) {
+          props.onRemoveItem?.(item.id);
+        }
+      }
+    },
+  });
 
   let hasNewTokenItem = false;
   let hasGlobalTokenItem = false;
@@ -438,12 +503,13 @@ export const StyleSourceInput = (
   const states = props.componentStates ?? [];
 
   return (
-    <Combobox>
+    <ComboboxRoot open={isOpen}>
       <Box {...getComboboxProps()}>
         <ComboboxAnchor>
           <TextField
             // @todo inputProps is any which breaks all types passed to TextField
             {...inputProps}
+            error={props.error}
             renderStyleSourceMenuItems={(item) =>
               renderMenuItems({
                 selectedItemSelector: props.selectedItemSelector,
@@ -474,74 +540,80 @@ export const StyleSourceInput = (
         </ComboboxAnchor>
         <ComboboxContent align="start" sideOffset={5}>
           <ComboboxListbox {...getMenuProps()}>
-            {isOpen &&
-              items.map((item, index) => {
-                if (item.source === "local") {
-                  return;
-                }
+            <ComboboxScrollArea>
+              {isOpen &&
+                items.map((item, index) => {
+                  if (item.source === "local") {
+                    return;
+                  }
 
-                if (item.id === newItemId) {
-                  hasNewTokenItem = true;
+                  if (item.id === newItemId) {
+                    hasNewTokenItem = true;
+                    const { key, ...itemProps } = getItemProps({ item, index });
+                    return (
+                      <Fragment key={index}>
+                        <ComboboxLabel>New Token</ComboboxLabel>
+                        <ComboboxListboxItem
+                          {...itemProps}
+                          key={key}
+                          selectable={false}
+                        >
+                          <div>
+                            Create{" "}
+                            <StyleSourceBadge source="token">
+                              {item.label}
+                            </StyleSourceBadge>
+                          </div>
+                        </ComboboxListboxItem>
+                      </Fragment>
+                    );
+                  }
+
+                  let label = null;
+                  if (item.source === "token" && hasGlobalTokenItem === false) {
+                    hasGlobalTokenItem = true;
+                    label = (
+                      <>
+                        {hasNewTokenItem && <ComboboxSeparator />}
+                        <ComboboxLabel>Global Tokens</ComboboxLabel>
+                      </>
+                    );
+                  }
+
+                  if (
+                    item.source === "componentToken" &&
+                    hasComponentTokenItem === false
+                  ) {
+                    hasComponentTokenItem = true;
+                    label = (
+                      <>
+                        {(hasNewTokenItem || hasGlobalTokenItem) && (
+                          <ComboboxSeparator />
+                        )}
+                        <ComboboxLabel>Component Tokens</ComboboxLabel>
+                      </>
+                    );
+                  }
+                  const { key, ...itemProps } = getItemProps({ item, index });
                   return (
                     <Fragment key={index}>
-                      <ComboboxLabel>New Token</ComboboxLabel>
+                      {label}
                       <ComboboxListboxItem
-                        {...getItemProps({ item, index })}
+                        {...itemProps}
+                        key={key}
                         selectable={false}
                       >
-                        <div>
-                          Create{" "}
-                          <StyleSourceBadge source="token">
-                            {item.label}
-                          </StyleSourceBadge>
-                        </div>
+                        <StyleSourceBadge source={item.source}>
+                          {item.label}
+                        </StyleSourceBadge>
                       </ComboboxListboxItem>
                     </Fragment>
                   );
-                }
-
-                let label = null;
-                if (item.source === "token" && hasGlobalTokenItem === false) {
-                  hasGlobalTokenItem = true;
-                  label = (
-                    <>
-                      {hasNewTokenItem && <ComboboxSeparator />}
-                      <ComboboxLabel>Global Tokens</ComboboxLabel>
-                    </>
-                  );
-                }
-
-                if (
-                  item.source === "componentToken" &&
-                  hasComponentTokenItem === false
-                ) {
-                  hasComponentTokenItem = true;
-                  label = (
-                    <>
-                      {(hasNewTokenItem || hasGlobalTokenItem) && (
-                        <ComboboxSeparator />
-                      )}
-                      <ComboboxLabel>Component Tokens</ComboboxLabel>
-                    </>
-                  );
-                }
-                return (
-                  <Fragment key={index}>
-                    {label}
-                    <ComboboxListboxItem
-                      {...getItemProps({ item, index })}
-                      selectable={false}
-                    >
-                      <StyleSourceBadge source={item.source}>
-                        {item.label}
-                      </StyleSourceBadge>
-                    </ComboboxListboxItem>
-                  </Fragment>
-                );
-              })}
+                })}
+            </ComboboxScrollArea>
           </ComboboxListbox>
         </ComboboxContent>
       </Box>
-    </Combobox>
+    </ComboboxRoot>
   );
 };

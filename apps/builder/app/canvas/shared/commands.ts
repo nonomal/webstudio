@@ -7,7 +7,6 @@ import {
   $instances,
   $registeredComponentMetas,
   $selectedInstanceSelector,
-  $selectedStyleSourceSelector,
   $textEditingInstanceSelector,
 } from "~/shared/nano-states";
 import {
@@ -16,6 +15,7 @@ import {
   getActiveEditor,
   hasSelectionFormat,
 } from "../features/text-editor/toolbar-connector";
+import { selectInstance } from "~/shared/awareness";
 
 export const { emitCommand, subscribeCommands } = createCommandsEmitter({
   source: "canvas",
@@ -23,6 +23,7 @@ export const { emitCommand, subscribeCommands } = createCommandsEmitter({
   commands: [
     {
       name: "editInstanceText",
+      hidden: true,
       defaultHotkeys: ["enter"],
       // builder invokes command with custom hotkey setup
       disableHotkeyOutsideApp: true,
@@ -46,13 +47,17 @@ export const { emitCommand, subscribeCommands } = createCommandsEmitter({
         // When an event is triggered from the Builder,
         // the canvas element may be unfocused, so it's important to focus the element on the canvas.
         element.focus();
-        $selectedInstanceSelector.set(editableInstanceSelector);
-        $textEditingInstanceSelector.set(editableInstanceSelector);
+        selectInstance(editableInstanceSelector);
+        $textEditingInstanceSelector.set({
+          selector: editableInstanceSelector,
+          reason: "enter",
+        });
       },
     },
 
     {
       name: "escapeSelection",
+      hidden: true,
       defaultHotkeys: ["escape"],
       // reset selection for canvas, but not for the builder
       disableHotkeyOutsideApp: true,
@@ -68,8 +73,7 @@ export const { emitCommand, subscribeCommands } = createCommandsEmitter({
           return;
         }
         // unselect both instance and style source
-        $selectedInstanceSelector.set(undefined);
-        $selectedStyleSourceSelector.set(undefined);
+        selectInstance(undefined);
       },
     },
 
@@ -78,6 +82,9 @@ export const { emitCommand, subscribeCommands } = createCommandsEmitter({
       handler: () => {
         const editor = getActiveEditor();
         editor?.dispatchCommand(FORMAT_TEXT_COMMAND, "bold");
+        // refocus editor on the next frame
+        // otherwise it sometimes is left on toolbar button
+        requestAnimationFrame(() => editor?.focus());
       },
     },
     {
@@ -85,6 +92,7 @@ export const { emitCommand, subscribeCommands } = createCommandsEmitter({
       handler: () => {
         const editor = getActiveEditor();
         editor?.dispatchCommand(FORMAT_TEXT_COMMAND, "italic");
+        requestAnimationFrame(() => editor?.focus());
       },
     },
     {
@@ -96,6 +104,7 @@ export const { emitCommand, subscribeCommands } = createCommandsEmitter({
         if (hasSelectionFormat("subscript")) {
           editor?.dispatchCommand(FORMAT_TEXT_COMMAND, "subscript");
         }
+        requestAnimationFrame(() => editor?.focus());
       },
     },
     {
@@ -107,6 +116,7 @@ export const { emitCommand, subscribeCommands } = createCommandsEmitter({
         if (hasSelectionFormat("superscript")) {
           editor?.dispatchCommand(FORMAT_TEXT_COMMAND, "superscript");
         }
+        requestAnimationFrame(() => editor?.focus());
       },
     },
     {
@@ -118,6 +128,7 @@ export const { emitCommand, subscribeCommands } = createCommandsEmitter({
         } else {
           editor?.dispatchCommand(TOGGLE_LINK_COMMAND, "https://");
         }
+        requestAnimationFrame(() => editor?.focus());
       },
     },
     {
@@ -125,6 +136,7 @@ export const { emitCommand, subscribeCommands } = createCommandsEmitter({
       handler: () => {
         const editor = getActiveEditor();
         editor?.dispatchCommand(TOGGLE_SPAN_COMMAND, undefined);
+        requestAnimationFrame(() => editor?.focus());
       },
     },
     {
@@ -132,6 +144,7 @@ export const { emitCommand, subscribeCommands } = createCommandsEmitter({
       handler: () => {
         const editor = getActiveEditor();
         editor?.dispatchCommand(CLEAR_FORMAT_COMMAND, undefined);
+        requestAnimationFrame(() => editor?.focus());
       },
     },
   ],

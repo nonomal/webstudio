@@ -1,13 +1,8 @@
-import {
-  Button,
-  Flex,
-  DeprecatedTextField,
-  theme,
-} from "@webstudio-is/design-system";
+import { Button, Flex, InputField, theme } from "@webstudio-is/design-system";
 import { CommitIcon } from "@webstudio-is/icons";
 import { useState } from "react";
 import { authPath } from "~/shared/router-utils";
-import { LoginButton } from "./login-button";
+import { BrandButton } from "./brand-button";
 
 export const SecretLogin = () => {
   const [isSecretLoginOpen, setIsSecretLoginOpen] = useState(false);
@@ -23,7 +18,7 @@ export const SecretLogin = () => {
           gap: theme.spacing[5],
         }}
       >
-        <DeprecatedTextField
+        <InputField
           name="secret"
           type="text"
           minLength={2}
@@ -38,12 +33,11 @@ export const SecretLogin = () => {
   }
 
   return (
-    <LoginButton
-      isSecretLogin
+    <BrandButton
       onClick={() => setIsSecretLoginOpen(true)}
       icon={<CommitIcon size={22} />}
     >
       Login with Secret
-    </LoginButton>
+    </BrandButton>
   );
 };

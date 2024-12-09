@@ -12,47 +12,10 @@ export const removeByMutable = <Item>(
   }
 };
 
-export const getMapValuesByKeysSet = <Key, Value>(
-  map: Map<Key, Value>,
-  keys: Set<Key>
-) => {
-  const values: NonNullable<Value>[] = [];
-  for (const key of keys) {
-    const value = map.get(key);
-    if (value != null) {
-      values.push(value);
-    }
+export const repeatUntil = <Item>(array: Item[], count: number) => {
+  const repeatedArray: Item[] = [];
+  for (let index = 0; index < Math.max(count, array.length); index += 1) {
+    repeatedArray.push(array[index % array.length]);
   }
-  return values;
-};
-
-export const getMapValuesBy = <Key, Value>(
-  map: Map<Key, Value>,
-  predicate: Predicate<Value>
-) => {
-  const values: Value[] = [];
-  for (const value of map.values()) {
-    if (predicate(value)) {
-      values.push(value);
-    }
-  }
-  return values;
-};
-
-// @todo replace with builtin Map.groupBy when support
-export const groupBy = <Item, Key>(
-  array: Item[] | IterableIterator<Item>,
-  getKey: (item: Item) => Key
-) => {
-  const groups = new Map<Key, Item[]>();
-  for (const item of array) {
-    const key = getKey(item);
-    let group = groups.get(key);
-    if (group === undefined) {
-      group = [];
-      groups.set(key, group);
-    }
-    group.push(item);
-  }
-  return groups;
+  return repeatedArray;
 };

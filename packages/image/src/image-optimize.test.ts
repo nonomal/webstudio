@@ -1,4 +1,4 @@
-import { describe, test, expect } from "@jest/globals";
+import { describe, test, expect } from "vitest";
 import { getImageAttributes } from "./image-optimize";
 import { createImageLoader } from "./image-loaders";
 
@@ -19,6 +19,26 @@ describe("Image optimizations applied", () => {
         "sizes": "100vw",
         "src": "/asset/image/logo.webp?width=256&quality=100&format=auto",
         "srcSet": "/asset/image/logo.webp?width=16&quality=100&format=auto 16w, /asset/image/logo.webp?width=32&quality=100&format=auto 32w, /asset/image/logo.webp?width=48&quality=100&format=auto 48w, /asset/image/logo.webp?width=64&quality=100&format=auto 64w, /asset/image/logo.webp?width=96&quality=100&format=auto 96w, /asset/image/logo.webp?width=128&quality=100&format=auto 128w, /asset/image/logo.webp?width=256&quality=100&format=auto 256w",
+      }
+    `);
+  });
+
+  test("width is number, url is absolute, create pixel density descriptor 'x'", () => {
+    const imgAttr = getImageAttributes({
+      optimize: true,
+      width: 100,
+      src: "https://webstudio.is/logo.webp",
+      srcSet: undefined,
+      sizes: undefined,
+      quality: 100,
+      loader: createImageLoader({ imageBaseUrl: "/asset/image/" }),
+    });
+
+    expect(imgAttr).toMatchInlineSnapshot(`
+      {
+        "sizes": "100vw",
+        "src": "/asset/image/https%3A//webstudio.is/logo.webp?width=256&quality=100&format=auto",
+        "srcSet": "/asset/image/https%3A//webstudio.is/logo.webp?width=16&quality=100&format=auto 16w, /asset/image/https%3A//webstudio.is/logo.webp?width=32&quality=100&format=auto 32w, /asset/image/https%3A//webstudio.is/logo.webp?width=48&quality=100&format=auto 48w, /asset/image/https%3A//webstudio.is/logo.webp?width=64&quality=100&format=auto 64w, /asset/image/https%3A//webstudio.is/logo.webp?width=96&quality=100&format=auto 96w, /asset/image/https%3A//webstudio.is/logo.webp?width=128&quality=100&format=auto 128w, /asset/image/https%3A//webstudio.is/logo.webp?width=256&quality=100&format=auto 256w",
       }
     `);
   });
@@ -114,6 +134,24 @@ describe("Image optimizations not applied", () => {
     const imgAttr = getImageAttributes({
       optimize: false,
       width: 100,
+      src: "logo.webp",
+      srcSet: undefined,
+      sizes: undefined,
+      quality: 100,
+      loader: createImageLoader({ imageBaseUrl: "/asset/image/" }),
+    });
+
+    expect(imgAttr).toMatchInlineSnapshot(`
+      {
+        "src": "/asset/image/logo.webp?format=raw",
+      }
+    `);
+  });
+
+  test("optimize is false and url absolute", () => {
+    const imgAttr = getImageAttributes({
+      optimize: false,
+      width: 100,
       src: "https://webstudio.is/logo.webp",
       srcSet: undefined,
       sizes: undefined,
@@ -158,7 +196,7 @@ describe("Image optimizations not applied", () => {
       loader: createImageLoader({ imageBaseUrl: "/asset/image/" }),
     });
 
-    expect(imgAttr).toMatchInlineSnapshot(`null`);
+    expect(imgAttr).toMatchInlineSnapshot(`undefined`);
   });
 
   test("src is undefined", () => {
@@ -172,6 +210,6 @@ describe("Image optimizations not applied", () => {
       loader: createImageLoader({ imageBaseUrl: "/asset/image/" }),
     });
 
-    expect(imgAttr).toMatchInlineSnapshot(`null`);
+    expect(imgAttr).toMatchInlineSnapshot(`undefined`);
   });
 });

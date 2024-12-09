@@ -13,7 +13,7 @@ import type {
   WsComponentMeta,
   WsComponentPropsMeta,
 } from "@webstudio-is/react-sdk";
-import { div } from "@webstudio-is/react-sdk/css-normalize";
+import { div } from "@webstudio-is/sdk/normalize.css";
 import * as tc from "./theme/tailwind-classes";
 import { getButtonStyles } from "./theme/styles";
 import {
@@ -135,6 +135,7 @@ const navItem = (
               {
                 type: "text",
                 value: props.title,
+                placeholder: true,
               },
             ],
           },
@@ -154,6 +155,7 @@ const navItem = (
               {
                 type: "text",
                 value: props.description,
+                placeholder: true,
               },
             ],
           },
@@ -197,7 +199,7 @@ const menuItemLink = (props: {
               tc.noUnderline(),
               tc.text("current"),
             ].flat(),
-            children: [{ type: "text", value: props.title }],
+            children: [{ type: "text", value: props.title, placeholder: true }],
           },
         ],
       },
@@ -238,7 +240,9 @@ const menuItem = (props: {
               {
                 type: "instance",
                 component: "Text",
-                children: [{ type: "text", value: props.title }],
+                children: [
+                  { type: "text", value: props.title, placeholder: true },
+                ],
               },
               {
                 type: "instance",
@@ -314,23 +318,7 @@ export const metaNavigationMenu: WsComponentMeta = {
     {
       type: "instance",
       component: "NavigationMenu",
-      variables: {
-        menuValue: { initialValue: "" },
-      },
-      props: [
-        { type: "expression", name: "value", code: "menuValue" },
-        {
-          name: "onValueChange",
-          type: "action",
-          value: [
-            {
-              type: "execute",
-              args: ["value"],
-              code: `menuValue = value`,
-            },
-          ],
-        },
-      ],
+      props: [],
       // relative
       // Omiting this: z-10 flex max-w-max flex-1 items-center justify-center
       styles: [tc.relative(), tc.maxW("max")].flat(),
@@ -368,6 +356,7 @@ export const metaNavigationMenu: WsComponentMeta = {
                     {
                       type: "text",
                       value: "",
+                      placeholder: true,
                     },
                   ],
                 },
@@ -442,7 +431,10 @@ export const metaNavigationMenuList: WsComponentMeta = {
   detachable: false,
   type: "container",
   icon: ListIcon,
-  requiredAncestors: ["NavigationMenu"],
+  constraints: {
+    relation: "ancestor",
+    component: { $eq: "NavigationMenu" },
+  },
   presetStyle,
   label: "Menu List",
 };
@@ -451,7 +443,10 @@ export const metaNavigationMenuItem: WsComponentMeta = {
   category: "hidden",
   type: "container",
   icon: ListItemIcon,
-  requiredAncestors: ["NavigationMenu"],
+  constraints: {
+    relation: "ancestor",
+    component: { $eq: "NavigationMenu" },
+  },
   presetStyle,
   indexWithinAncestor: "NavigationMenu",
   label: "Menu Item",
@@ -462,7 +457,10 @@ export const metaNavigationMenuTrigger: WsComponentMeta = {
   stylable: false,
   type: "container",
   icon: TriggerIcon,
-  requiredAncestors: ["NavigationMenuItem"],
+  constraints: {
+    relation: "ancestor",
+    component: { $eq: "NavigationMenuItem" },
+  },
   presetStyle,
   label: "Menu Trigger",
 };
@@ -471,7 +469,10 @@ export const metaNavigationMenuContent: WsComponentMeta = {
   detachable: false,
   type: "container",
   icon: ContentIcon,
-  requiredAncestors: ["NavigationMenuItem"],
+  constraints: {
+    relation: "ancestor",
+    component: { $eq: "NavigationMenuItem" },
+  },
   indexWithinAncestor: "NavigationMenu",
   presetStyle,
   label: "Menu Content",
@@ -483,10 +484,16 @@ export const metaNavigationMenuLink: WsComponentMeta = {
   type: "container",
   stylable: false,
   icon: BoxIcon,
-  // https://github.com/webstudio-is/webstudio/issues/2193
-  // requiredAncestors: ["NavigationMenuContent", "NavigationMenuItem"],
-  // Temporary restrict to NavigationMenu
-  requiredAncestors: ["NavigationMenu"],
+  constraints: [
+    {
+      relation: "ancestor",
+      component: { $eq: "NavigationMenu" },
+    },
+    {
+      relation: "ancestor",
+      component: { $in: ["NavigationMenuContent", "NavigationMenuItem"] },
+    },
+  ],
   presetStyle,
   label: "Accessible Link Wrapper",
 };
@@ -496,7 +503,10 @@ export const metaNavigationMenuViewport: WsComponentMeta = {
   detachable: true,
   type: "container",
   icon: ViewportIcon,
-  requiredAncestors: ["NavigationMenu"],
+  constraints: {
+    relation: "ancestor",
+    component: { $eq: "NavigationMenu" },
+  },
   presetStyle,
   label: "Menu Viewport",
 };

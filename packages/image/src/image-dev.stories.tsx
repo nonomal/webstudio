@@ -7,11 +7,12 @@ import { Image as ImagePrimitive, createImageLoader } from "./";
 // to not allow include local assets everywhere, just enable it for this file
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-import localLogoImage from "../storybook-assets/logo.webp"; // eslint-disable-line
+import localLogoImage from "../storybook-assets/logo.webp";
 
-export default {
+const meta: Meta<typeof ImagePrimitive> = {
   title: "Components/ImageDev",
-} satisfies Meta<typeof ImagePrimitive>;
+};
+export default meta;
 
 type ImageProps = React.ComponentProps<typeof ImagePrimitive>;
 

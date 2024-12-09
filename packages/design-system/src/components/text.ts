@@ -53,17 +53,19 @@ export const textStyle = css({
         pb: "0.5em",
         mt: "-0.5em",
         mb: "-0.5em",
-
-        flexBasis: 0,
-        flexGrow: 1,
       },
     },
     userSelect: {
-      auto: {
-        userSelect: "auto",
+      text: {
+        userSelect: "text",
       },
       none: {
         userSelect: "none",
+      },
+    },
+    inline: {
+      true: {
+        display: "inline",
       },
     },
   },

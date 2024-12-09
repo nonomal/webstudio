@@ -2,6 +2,7 @@ import { z } from "zod";
 import { nanoid } from "nanoid";
 import { titleCase } from "title-case";
 import { noCase } from "change-case";
+import type { Simplify } from "type-fest";
 import type {
   Instance,
   Prop,
@@ -11,15 +12,19 @@ import type {
   Breakpoint,
   DataSource,
   WebstudioFragment,
+  Matcher,
+} from "@webstudio-is/sdk";
+import {
+  encodeDataSourceVariable,
+  transpileExpression,
 } from "@webstudio-is/sdk";
 import { StyleValue, type StyleProperty } from "@webstudio-is/css-engine";
-import type { Simplify } from "type-fest";
-import { encodeDataSourceVariable, validateExpression } from "./expression";
 import type { WsComponentMeta } from "./components/component-meta";
 
 const EmbedTemplateText = z.object({
   type: z.literal("text"),
   value: z.string(),
+  placeholder: z.boolean().optional(),
 });
 
 type EmbedTemplateText = z.infer<typeof EmbedTemplateText>;
@@ -203,8 +208,9 @@ const createInstancesFromTemplate = (
               name: prop.name,
               type: "expression",
               // replace all references with variable names
-              value: validateExpression(prop.code, {
-                transformIdentifier: (ref) => {
+              value: transpileExpression({
+                expression: prop.code,
+                replaceVariable: (ref) => {
                   const id = dataSourceByRef.get(ref)?.id ?? ref;
                   return encodeDataSourceVariable(id);
                 },
@@ -226,12 +232,12 @@ const createInstancesFromTemplate = (
                   type: "execute",
                   args,
                   // replace all references with variable names
-                  code: validateExpression(value.code, {
-                    effectful: true,
-                    transformIdentifier: (ref) => {
+                  code: transpileExpression({
+                    expression: value.code,
+                    replaceVariable: (ref) => {
                       // bypass arguments without changes
                       if (args.includes(ref)) {
-                        return ref;
+                        return;
                       }
                       const id = dataSourceByRef.get(ref)?.id ?? ref;
                       return encodeDataSourceVariable(id);
@@ -356,6 +362,7 @@ const createInstancesFromTemplate = (
       parentChildren.push({
         type: "text",
         value: item.value,
+        placeholder: item.placeholder,
       });
     }
 
@@ -363,8 +370,9 @@ const createInstancesFromTemplate = (
       parentChildren.push({
         type: "expression",
         // replace all references with variable names
-        value: validateExpression(item.value, {
-          transformIdentifier: (ref) => {
+        value: transpileExpression({
+          expression: item.value,
+          replaceVariable: (ref) => {
             const id = dataSourceByRef.get(ref)?.id ?? ref;
             return encodeDataSourceVariable(id);
           },
@@ -444,21 +452,41 @@ const namespaceEmbedTemplateComponents = (
   });
 };
 
+const namespaceMatcher = (namespace: string, matcher: Matcher) => {
+  const newMatcher = structuredClone(matcher);
+  if (newMatcher.component?.$eq) {
+    newMatcher.component.$eq = `${namespace}:${newMatcher.component.$eq}`;
+  }
+  if (newMatcher.component?.$neq) {
+    newMatcher.component.$neq = `${namespace}:${newMatcher.component.$neq}`;
+  }
+  if (newMatcher.component?.$in) {
+    newMatcher.component.$in = newMatcher.component.$in.map(
+      (component) => `${namespace}:${component}`
+    );
+  }
+  if (newMatcher.component?.$nin) {
+    newMatcher.component.$nin = newMatcher.component.$nin.map(
+      (component) => `${namespace}:${component}`
+    );
+  }
+  return newMatcher;
+};
+
 export const namespaceMeta = (
   meta: WsComponentMeta,
   namespace: string,
   components: Set<EmbedTemplateInstance["component"]>
 ) => {
   const newMeta = { ...meta };
-  if (newMeta.requiredAncestors) {
-    newMeta.requiredAncestors = newMeta.requiredAncestors.map((component) =>
-      components.has(component) ? `${namespace}:${component}` : component
-    );
-  }
-  if (newMeta.invalidAncestors) {
-    newMeta.invalidAncestors = newMeta.invalidAncestors.map((component) =>
-      components.has(component) ? `${namespace}:${component}` : component
-    );
+  if (newMeta.constraints) {
+    if (Array.isArray(newMeta.constraints)) {
+      newMeta.constraints = newMeta.constraints.map((matcher) =>
+        namespaceMatcher(namespace, matcher)
+      );
+    } else {
+      newMeta.constraints = namespaceMatcher(namespace, newMeta.constraints);
+    }
   }
   if (newMeta.indexWithinAncestor) {
     newMeta.indexWithinAncestor = components.has(newMeta.indexWithinAncestor)

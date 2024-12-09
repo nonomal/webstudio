@@ -1,19 +1,18 @@
 import { useId } from "react";
 import { useStore } from "@nanostores/react";
 import { Select } from "@webstudio-is/design-system";
-import { humanizeString } from "~/shared/string-utils";
 import {
   BindingControl,
   BindingPopover,
 } from "~/builder/shared/binding-popover";
 import {
   type ControlProps,
-  getLabel,
   VerticalLayout,
   Label,
   $selectedInstanceScope,
   updateExpressionValue,
   useBindingState,
+  humanizeAttribute,
 } from "../shared";
 
 export const SelectControl = ({
@@ -34,7 +33,7 @@ export const SelectControl = ({
       ? meta.options
       : [value, ...meta.options];
 
-  const label = getLabel(meta, propName);
+  const label = humanizeAttribute(meta.label || propName);
   const { scope, aliases } = useStore($selectedInstanceScope);
   const expression =
     prop?.type === "expression" ? prop.value : JSON.stringify(computedValue);
@@ -63,7 +62,6 @@ export const SelectControl = ({
           disabled={overwritable === false}
           value={value}
           options={options}
-          getLabel={humanizeString}
           onChange={(value) => {
             if (prop?.type === "expression") {
               updateExpressionValue(prop.value, value);

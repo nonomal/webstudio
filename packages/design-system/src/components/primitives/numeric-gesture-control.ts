@@ -14,21 +14,28 @@
  * });
  */
 
+import { clamp } from "@react-aria/utils";
+
 export type NumericScrubDirection = "horizontal" | "vertical";
 
 export type NumericScrubValue = number;
 
-export type NumericScrubCallback = (event: {
+export type NumericScrubEvent = {
+  type: "scrubend" | "scrubbing";
   target: HTMLElement | SVGElement;
   value: NumericScrubValue;
   preventDefault: () => void;
-}) => void;
+};
+
+type NumericScrubCallback = (event: NumericScrubEvent) => void;
 
 export type NumericScrubOptions = {
   inverse?: boolean;
+  getAcceleration?: () => number | undefined;
   minValue?: NumericScrubValue;
   maxValue?: NumericScrubValue;
-  getInitialValue: () => number | undefined;
+  distanceThreshold?: number;
+  getInitialValue: () => number;
   onStart?: () => void;
   getValue?: (
     state: NumericScrubState,
@@ -45,7 +52,7 @@ export type NumericScrubOptions = {
 type NumericScrubState = {
   value: number;
   cursor?: SVGElement;
-  direction: string;
+  direction: NumericScrubDirection;
   timerId?: ReturnType<typeof window.setTimeout>;
   status: "idle" | "scrubbing";
 };
@@ -56,17 +63,23 @@ const getValueDefault = (
   {
     minValue = Number.MIN_SAFE_INTEGER,
     maxValue = Number.MAX_SAFE_INTEGER,
+    getAcceleration = () => 1,
   }: NumericScrubOptions
 ) => {
   // toFixed is needed to fix `1.3 - 1 = 0.30000000000000004`
-  const value = Number((state.value + movement).toFixed(2));
-  if (value < minValue) {
-    return minValue;
-  }
-  if (state.value > maxValue) {
-    return maxValue;
-  }
-  return value;
+  const acceleration = getAcceleration() ?? 1;
+  const value = Number((state.value + movement * acceleration).toFixed(2));
+  return clamp(value, minValue, maxValue);
+};
+
+const preventContextMenu = () => {
+  const handler = (event: MouseEvent) => {
+    event.preventDefault();
+  };
+  window.addEventListener("contextmenu", handler);
+  return () => {
+    window.removeEventListener("contextmenu", handler);
+  };
 };
 
 export const numericScrubControl = (
@@ -78,6 +91,7 @@ export const numericScrubControl = (
     onStart,
     getValue = getValueDefault,
     direction = "horizontal",
+    distanceThreshold = 0,
     onValueInput,
     onValueChange,
     onStatusChange,
@@ -88,14 +102,14 @@ export const numericScrubControl = (
     // We will read value lazyly in a moment it will be used to avoid having outdated value
     value: -1,
     cursor: undefined,
-    direction: direction,
+    direction,
     timerId: undefined,
     status: "idle",
   };
 
   let exitPointerLock: (() => void) | undefined = undefined;
-
-  let originalUserSelect = "";
+  let restoreUserSelect: (() => void) | undefined = undefined;
+  let restoreContextMenu: (() => void) | undefined = undefined;
 
   const cleanup = () => {
     targetNode.removeEventListener("pointermove", handleEvent);
@@ -106,17 +120,12 @@ export const numericScrubControl = (
     }
 
     clearTimeout(state.timerId);
-
     exitPointerLock?.();
     exitPointerLock = undefined;
-    if (originalUserSelect) {
-      targetNode.ownerDocument.documentElement.style.userSelect =
-        originalUserSelect;
-    } else {
-      targetNode.ownerDocument.documentElement.style.removeProperty(
-        "user-select"
-      );
-    }
+    restoreUserSelect?.();
+    restoreUserSelect = undefined;
+    restoreContextMenu?.();
+    restoreContextMenu = undefined;
   };
 
   // Cannot define `event:` as PointerEvent,
@@ -133,10 +142,12 @@ export const numericScrubControl = (
 
     switch (type) {
       case "pointerup": {
-        const shouldComponentUpdate = Boolean(state.cursor);
+        const shouldComponentUpdate =
+          Boolean(state.cursor) && state.status === "scrubbing";
         cleanup();
         if (shouldComponentUpdate) {
           onValueChange?.({
+            type: "scrubend",
             target: targetNode,
             value: state.value,
             preventDefault: () => event.preventDefault(),
@@ -155,32 +166,20 @@ export const numericScrubControl = (
         if (event.pressure === 0 || event.button !== 0) {
           break;
         }
-        const value = getInitialValue();
-
-        // We don't support scrub on non unit values
-        // Its highly unlikely that the value here will be undefined, as useScrub tries to not create scrub on non unit values
-        // but having that we use lazy getInitialValue() and vanilla js events it's possible.
-        if (value === undefined) {
-          return;
-        }
 
         onStart?.();
-
-        state.value = value;
-
-        state.timerId = setTimeout(() => {
+        state.value = getInitialValue();
+        state.timerId = setTimeout(async () => {
           exitPointerLock?.();
-
-          exitPointerLock = requestPointerLock(state, event, targetNode);
+          exitPointerLock = await requestPointerLock(state, event, targetNode);
         }, 150);
 
-        state.status = "scrubbing";
-        onStatusChange?.("scrubbing");
-
         targetNode.addEventListener("pointermove", handleEvent);
-        originalUserSelect =
-          targetNode.ownerDocument.documentElement.style.userSelect;
-        targetNode.ownerDocument.documentElement.style.userSelect = "none";
+        // Pointer event will stop firing on touch after ~300ms because browser starts scrolling the page.
+        restoreUserSelect = setRootStyle(targetNode, "user-select", "none");
+        // In chrome mobile touch simulation, you will get the context menu because tapping and holding
+        // results in a right click.
+        restoreContextMenu = preventContextMenu();
         break;
       }
       case "pointermove": {
@@ -189,7 +188,21 @@ export const numericScrubControl = (
           break;
         }
         state.value = nextValue;
+
+        if (state.status !== "scrubbing") {
+          const initialValue = getInitialValue();
+          // If the value is not changing enough, we don't want to start scrubbing.
+          if (Math.abs(initialValue - nextValue) < distanceThreshold) {
+            return;
+          }
+          // We need to reset the value to the initial so that the actual value starts from the initial value
+          // when we start calling onValueInput.
+          state.value = initialValue;
+          state.status = "scrubbing";
+          onStatusChange?.("scrubbing");
+        }
         onValueInput?.({
+          type: "scrubbing",
           target: targetNode,
           value: state.value,
           preventDefault: () => event.preventDefault(),
@@ -231,11 +244,41 @@ export const numericScrubControl = (
   };
 };
 
-const requestPointerLock = (
+// If the same property was set while its already in a temporal state, something is wrong with
+// the logic on call-site and we need to inform the developer.
+const rootStyleTracker = new Map<string, boolean>();
+
+const setRootStyle = (
+  targetNode: HTMLElement | SVGElement,
+  property: string,
+  value: string
+) => {
+  if (rootStyleTracker.has(property)) {
+    throw new Error(
+      "setRootStyle is called while the property is already in a temporal state."
+    );
+  }
+  const root = targetNode.ownerDocument.documentElement;
+  const originalValue = root.style.getPropertyValue(property);
+  root.style.setProperty(property, value);
+  rootStyleTracker.set(property, true);
+  return () => {
+    rootStyleTracker.delete(property);
+    if (originalValue) {
+      root.style.setProperty(property, originalValue);
+      return;
+    }
+    root.style.removeProperty(property);
+  };
+};
+
+const requestPointerLock = async (
   state: NumericScrubState,
   event: PointerEvent,
   targetNode: HTMLElement | SVGElement
 ) => {
+  // After ~0.3 seconds starts touch events as page scrolling.
+  const restoreTouchAction = setRootStyle(targetNode, "touch-action", "none");
   // The pointer lock api nukes the cursor on requestng a pointer lock,
   // creating and managing the visual que of the cursor is thus left to the author
   // we create and append an svg that serves as the visual que of where the cursor currently is
@@ -244,7 +287,15 @@ const requestPointerLock = (
   // other browsers show a warning banner, making the use of it in this scenario subpar: in which case we fallback to using non-pointerLock means:
   // albeit without an infinite cursor ux.
   if (shouldUsePointerLock) {
-    targetNode.requestPointerLock();
+    // based on https://developer.mozilla.org/en-US/docs/Web/API/Element/requestPointerLock is async
+    try {
+      // unadjustedMovement is a chromium only feature, fixes random movementX|Y jumps on windows
+      await targetNode.requestPointerLock({ unadjustedMovement: true });
+    } catch {
+      // Some platforms may not support unadjusted movement.
+      await targetNode.requestPointerLock();
+    }
+
     const cursorNode = (targetNode.ownerDocument.querySelector(
       "#numeric-guesture-control-cursor"
     ) ||
@@ -267,29 +318,31 @@ const requestPointerLock = (
     }`;
     state.cursor = cursorNode;
     if (state.cursor) {
-      targetNode.ownerDocument.documentElement.append(state.cursor);
+      targetNode.ownerDocument.documentElement.appendChild(state.cursor);
     }
     return () => {
       if (state.cursor) {
         state.cursor.remove();
         state.cursor = undefined;
       }
-
+      restoreTouchAction();
       targetNode.ownerDocument.exitPointerLock();
     };
-  } else {
-    const { pointerId } = event;
-    targetNode.ownerDocument.documentElement.style.setProperty(
-      "cursor",
-      state.direction === "horizontal" ? "ew-resize" : "ns-resize"
-    );
-    targetNode.setPointerCapture(pointerId);
-
-    return () => {
-      targetNode.ownerDocument.documentElement.style.removeProperty("cursor");
-      targetNode.releasePointerCapture(pointerId);
-    };
   }
+
+  const { pointerId } = event;
+  const restoreCursor = setRootStyle(
+    targetNode,
+    "cursor",
+    state.direction === "horizontal" ? "ew-resize" : "ns-resize"
+  );
+  targetNode.setPointerCapture(pointerId);
+
+  return () => {
+    restoreCursor();
+    restoreTouchAction();
+    targetNode.releasePointerCapture(pointerId);
+  };
 };
 
 const shouldUsePointerLock = "chrome" in globalThis;

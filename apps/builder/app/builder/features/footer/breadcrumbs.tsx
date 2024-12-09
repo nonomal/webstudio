@@ -1,21 +1,16 @@
+import { Fragment } from "react";
 import { useStore } from "@nanostores/react";
 import { ChevronRightIcon } from "@webstudio-is/icons";
-import {
-  theme,
-  DeprecatedButton,
-  Flex,
-  Text,
-} from "@webstudio-is/design-system";
+import { theme, Button, Flex, Text } from "@webstudio-is/design-system";
 import {
   $instances,
   $registeredComponentMetas,
   $selectedInstanceSelector,
-  $selectedStyleSourceSelector,
 } from "~/shared/nano-states";
 import { getAncestorInstanceSelector } from "~/shared/tree-utils";
 import { $textEditingInstanceSelector } from "~/shared/nano-states";
 import { getInstanceLabel } from "~/shared/instance-utils";
-import { Fragment } from "react";
+import { selectInstance } from "~/shared/awareness";
 
 export const Breadcrumbs = () => {
   const instances = useStore($instances);
@@ -23,14 +18,7 @@ export const Breadcrumbs = () => {
   const metas = useStore($registeredComponentMetas);
 
   return (
-    <Flex
-      align="center"
-      css={{
-        height: "100%",
-        color: theme.colors.hiContrast,
-        px: theme.spacing[3],
-      }}
-    >
+    <Flex align="center" css={{ height: "100%", px: theme.spacing[3] }}>
       {selectedInstanceSelector === undefined ? (
         <Text>No instance selected</Text>
       ) : (
@@ -49,27 +37,22 @@ export const Breadcrumbs = () => {
             }
             return (
               <Fragment key={index}>
-                <DeprecatedButton
-                  ghost
-                  css={{
-                    px: theme.spacing[5],
-                    borderRadius: "100vh",
-                    height: "100%",
-                  }}
+                <Button
+                  color="dark-ghost"
+                  css={{ color: "inherit" }}
                   key={instance.id}
                   onClick={() => {
-                    $selectedInstanceSelector.set(
+                    selectInstance(
                       getAncestorInstanceSelector(
                         selectedInstanceSelector,
                         instance.id
                       )
                     );
                     $textEditingInstanceSelector.set(undefined);
-                    $selectedStyleSourceSelector.set(undefined);
                   }}
                 >
                   {getInstanceLabel(instance, meta)}
-                </DeprecatedButton>
+                </Button>
                 {index < selectedInstanceSelector.length - 1 ? (
                   <ChevronRightIcon />
                 ) : null}

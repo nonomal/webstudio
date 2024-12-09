@@ -2,7 +2,6 @@ import { useLayoutEffect, useRef } from "react";
 import type { Instance } from "@webstudio-is/sdk";
 import {
   type Point,
-  type ItemDropTarget,
   useAutoScroll,
   useDrag,
   useDrop,
@@ -12,16 +11,14 @@ import {
   $dragAndDropState,
   $instances,
   $registeredComponentMetas,
+  type ItemDropTarget,
 } from "~/shared/nano-states";
 import { publish, useSubscribe } from "~/shared/pubsub";
 import {
-  computeInstancesConstraints,
-  findClosestDroppableComponentIndex,
   findClosestDetachableInstanceSelector,
   getComponentTemplateData,
   insertTemplateData,
   reparentInstance,
-  type InsertConstraints,
 } from "~/shared/instance-utils";
 import {
   getElementByInstanceSelector,
@@ -32,6 +29,10 @@ import {
   type InstanceSelector,
   areInstanceSelectorsEqual,
 } from "~/shared/tree-utils";
+import {
+  findClosestInstanceMatchingFragment,
+  isTreeMatching,
+} from "~/shared/matcher";
 
 declare module "~/shared/pubsub" {
   export interface PubsubMap {
@@ -66,50 +67,30 @@ const findClosestDroppableInstanceSelector = (
   const instances = $instances.get();
   const metas = $registeredComponentMetas.get();
 
-  let insertConstraints: undefined | InsertConstraints;
+  let droppableIndex = -1;
   if (dragPayload?.type === "insert") {
-    const templateData = getComponentTemplateData(dragPayload.dragComponent);
-    if (templateData) {
-      const { children, instances } = templateData;
-      const newInstances = new Map(
-        instances.map((instance) => [instance.id, instance])
-      );
-      const rootInstanceIds = children
-        .filter((child) => child.type === "id")
-        .map((child) => child.value);
-      insertConstraints = computeInstancesConstraints(
+    const fragment = getComponentTemplateData(dragPayload.dragComponent);
+    if (fragment) {
+      droppableIndex = findClosestInstanceMatchingFragment({
+        instances,
         metas,
-        newInstances,
-        rootInstanceIds
-      );
+        instanceSelector,
+        fragment,
+      });
     }
   }
   if (dragPayload?.type === "reparent") {
-    insertConstraints = computeInstancesConstraints(metas, instances, [
-      dragPayload.dragInstanceSelector[0],
-    ]);
-  }
-  if (insertConstraints === undefined) {
-    return;
-  }
-
-  const componentSelector: string[] = [];
-  for (const instanceId of instanceSelector) {
-    const component = instances.get(instanceId)?.component;
-    // collection produce fake instances
-    // and fragment does not have constraints
-    if (component === undefined) {
-      componentSelector.push("Fragment");
-      continue;
-    }
-    componentSelector.push(component);
+    const matches = isTreeMatching({
+      instances,
+      metas,
+      instanceSelector: [
+        dragPayload.dragInstanceSelector[0],
+        ...instanceSelector,
+      ],
+    });
+    droppableIndex = matches ? 0 : -1;
   }
 
-  const droppableIndex = findClosestDroppableComponentIndex(
-    $registeredComponentMetas.get(),
-    componentSelector,
-    insertConstraints
-  );
   if (droppableIndex === -1) {
     return;
   }

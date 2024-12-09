@@ -1,55 +1,94 @@
-import { describe, test, expect } from "@jest/globals";
-import { loadProjectDataById } from "./index";
+import { expect, test } from "vitest";
+import { parseBuilderUrl } from "./index";
 
-const existingProjectId = "675e8af3-48fa-4b18-9ebf-fd2b128865e2";
-const notPublishedProjectId = "7ec397c6-b3d0-4967-9073-9d83623fcf8e";
-const onlyHomeProjectId = "36d6c16f-04a0-45d4-ab1d-aa0ab61eb5b6";
-const morePagesProjectId = existingProjectId;
+test("parseBuilderUrl wstd.dev", async () => {
+  expect(
+    parseBuilderUrl("https://p-090e6e14-ae50-4b2e-bd22-71733cec05bb.wstd.dev")
+  ).toMatchInlineSnapshot(`
+    {
+      "projectId": "090e6e14-ae50-4b2e-bd22-71733cec05bb",
+      "sourceOrigin": "https://wstd.dev",
+    }
+  `);
+});
 
-const host = "http://localhost:3000";
+test("parseBuilderUrl localhost", async () => {
+  expect(
+    parseBuilderUrl("https://p-090e6e14-ae50-4b2e-bd22-71733cec05bb.localhost")
+  ).toMatchInlineSnapshot(`
+    {
+      "projectId": "090e6e14-ae50-4b2e-bd22-71733cec05bb",
+      "sourceOrigin": "https://localhost",
+    }
+  `);
+});
 
-describe("getProjectDetails", () => {
-  test("include pages", async () => {
-    const response = await loadProjectDataById({
-      origin: host,
-      projectId: morePagesProjectId,
-    });
+test("parseBuilderUrl localhost", async () => {
+  expect(parseBuilderUrl("https://p-eee.localhost")).toMatchInlineSnapshot(`
+    {
+      "projectId": undefined,
+      "sourceOrigin": "https://p-eee.localhost",
+    }
+  `);
+});
 
-    if (typeof response === "object") {
-      return expect(response.pages.length).toBeTruthy();
+test("parseBuilderUrl development.webstudio.is", async () => {
+  expect(
+    parseBuilderUrl(
+      "https://p-090e6e14-ae50-4b2e-bd22-71733cec05bb.development.webstudio.is"
+    )
+  ).toMatchInlineSnapshot(`
+    {
+      "projectId": "090e6e14-ae50-4b2e-bd22-71733cec05bb",
+      "sourceOrigin": "https://development.webstudio.is",
     }
-    throw new Error("Unexpected response");
-  });
-  test("does not include pages", async () => {
-    const response = await loadProjectDataById({
-      origin: host,
-      projectId: onlyHomeProjectId,
-    });
-    if (typeof response === "object") {
-      return expect(response.pages.length === 1).toBeTruthy();
+  `);
+});
+
+test("parseBuilderUrl main.development.webstudio.is", async () => {
+  expect(
+    parseBuilderUrl(
+      "https://p-090e6e14-ae50-4b2e-bd22-71733cec05bb-dot-main.development.webstudio.is"
+    )
+  ).toMatchInlineSnapshot(`
+    {
+      "projectId": "090e6e14-ae50-4b2e-bd22-71733cec05bb",
+      "sourceOrigin": "https://main.development.webstudio.is",
     }
-    throw new Error("Unexpected response");
-  });
-  test("loads existing project", async () => {
-    const response = await loadProjectDataById({
-      origin: host,
-      projectId: existingProjectId,
-    });
-    expect(response).toBeTruthy();
-  });
-  test("loads not published project", async () => {
-    const response = await loadProjectDataById({
-      origin: host,
-      projectId: notPublishedProjectId,
-    });
-    if (response instanceof Error) {
-      throw response;
+  `);
+});
+
+test("parseBuilderUrl branch.development.webstudio.is", async () => {
+  expect(
+    parseBuilderUrl(
+      "https://p-090e6e14-ae50-4b2e-bd22-71733cec05bb-dot-branch.development.webstudio.is"
+    )
+  ).toMatchInlineSnapshot(`
+{
+  "projectId": "090e6e14-ae50-4b2e-bd22-71733cec05bb",
+  "sourceOrigin": "https://branch.development.webstudio.is",
+}
+`);
+});
+
+test("parseBuilderUrl apps.webstudio.is", async () => {
+  expect(
+    parseBuilderUrl(
+      "https://p-090e6e14-ae50-4b2e-bd22-71733cec05bb.apps.webstudio.is"
+    )
+  ).toMatchInlineSnapshot(`
+    {
+      "projectId": "090e6e14-ae50-4b2e-bd22-71733cec05bb",
+      "sourceOrigin": "https://apps.webstudio.is",
     }
-    if (typeof response === "string") {
-      return expect(response).toBe(
-        `Project ${notPublishedProjectId} not found or not published yet. Please contact us to get help.`
-      );
+  `);
+});
+
+test("parseBuilderUrl apps.webstudio.is", async () => {
+  expect(parseBuilderUrl("https://apps.webstudio.is")).toMatchInlineSnapshot(`
+    {
+      "projectId": undefined,
+      "sourceOrigin": "https://apps.webstudio.is",
     }
-    throw new Error("Unexpected response");
-  });
+  `);
 });

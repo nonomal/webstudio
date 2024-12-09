@@ -1,17 +1,8 @@
 import { Box, Flex } from "@webstudio-is/design-system";
-import { FlexGrid } from "./flex-grid";
+import { FlexGrid as FlexGridComponent } from "./flex-grid";
 
 export default {
-  component: FlexGrid,
-};
-
-const batchUpdate = {
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
-  setProperty: () => () => {},
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
-  deleteProperty: () => {},
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
-  publish: () => {},
+  component: FlexGridComponent,
 };
 
 const alignItems = ["normal", "stretch", "baseline", "center", "start", "end"];
@@ -24,7 +15,7 @@ const justifyContent = [
   "end",
 ];
 
-const Base = ({ flexDirection }: { flexDirection: string }) => {
+export const FlexGrid = () => {
   return (
     <Flex>
       <Box
@@ -65,20 +56,7 @@ const Base = ({ flexDirection }: { flexDirection: string }) => {
             </Box>
             {justifyContent.map((justifyContent) => (
               <Box key={justifyContent} css={{ position: "relative" }}>
-                <FlexGrid
-                  currentStyle={{
-                    flexDirection: {
-                      value: { type: "keyword", value: flexDirection },
-                    },
-                    justifyContent: {
-                      value: { type: "keyword", value: justifyContent },
-                    },
-                    alignItems: {
-                      value: { type: "keyword", value: alignItems },
-                    },
-                  }}
-                  batchUpdate={batchUpdate}
-                />
+                <FlexGridComponent />
               </Box>
             ))}
           </Flex>
@@ -86,20 +64,4 @@ const Base = ({ flexDirection }: { flexDirection: string }) => {
       </Flex>
     </Flex>
   );
-};
-
-export const Row = () => {
-  return <Base flexDirection="row" />;
-};
-
-export const RowReverse = () => {
-  return <Base flexDirection="row-reverse" />;
-};
-
-export const Column = () => {
-  return <Base flexDirection="column" />;
-};
-
-export const ColumnReverse = () => {
-  return <Base flexDirection="column-reverse" />;
 };

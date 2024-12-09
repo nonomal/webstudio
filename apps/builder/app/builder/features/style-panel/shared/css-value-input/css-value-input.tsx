@@ -1,23 +1,29 @@
-import { matchSorter } from "match-sorter";
 import {
   Box,
   useCombobox,
-  Combobox,
+  ComboboxRoot,
   ComboboxContent,
   ComboboxAnchor,
   ComboboxListbox,
   ComboboxListboxItem,
+  ComboboxItemDescription,
+  ComboboxScrollArea,
   numericScrubControl,
   NestedInputButton,
   NestedIconLabel,
   InputField,
   handleNumericInputArrowKeys,
+  theme,
+  Flex,
+  styled,
+  Text,
 } from "@webstudio-is/design-system";
 import type {
   KeywordValue,
   StyleProperty,
   StyleValue,
   Unit,
+  VarValue,
 } from "@webstudio-is/css-engine";
 import {
   type KeyboardEventHandler,
@@ -26,19 +32,48 @@ import {
   useCallback,
   useEffect,
   useRef,
+  useState,
+  useMemo,
+  type ComponentProps,
 } from "react";
 import { useUnitSelect } from "./unit-select";
 import { parseIntermediateOrInvalidValue } from "./parse-intermediate-or-invalid-value";
 import { toValue } from "@webstudio-is/css-engine";
 import { useDebouncedCallback } from "use-debounce";
-import type { StyleSource } from "../style-info";
-import { toPascalCase } from "../keyword-utils";
-import { isValidDeclaration } from "@webstudio-is/css-data";
+import {
+  declarationDescriptions,
+  isValidDeclaration,
+  properties,
+} from "@webstudio-is/css-data";
 import {
   $selectedInstanceBrowserStyle,
   $selectedInstanceUnitSizes,
 } from "~/shared/nano-states";
 import { convertUnits } from "./convert-units";
+import { mergeRefs } from "@react-aria/utils";
+import { composeEventHandlers } from "~/shared/event-utils";
+import type { StyleValueSourceColor } from "~/shared/style-object-model";
+import { ColorThumb } from "../color-thumb";
+
+// We need to enable scrub on properties that can have numeric value.
+const canBeNumber = (property: StyleProperty, value: CssValueInputValue) => {
+  const unitGroups =
+    properties[property as keyof typeof properties]?.unitGroups ?? [];
+  // allow scrubbing css variables with unit value
+  return unitGroups.length !== 0 || value.type === "unit";
+};
+
+// Subjective adjust ment based on how it feels on macbook/trackpad.
+// It won't be ideal for everyone with different input devices and preferences.
+// Ideally we also need some kind of acceleration setting with 1 value.
+const scrubUnitAcceleration = new Map<Unit, number>([
+  ["rem", 1 / 16],
+  ["em", 1 / 16],
+  ["%", 1 / 10],
+  ["dvw", 1 / 10],
+  ["dvh", 1 / 10],
+  ["number", 1 / 20],
+]);
 
 const useScrub = ({
   value,
@@ -76,14 +111,11 @@ const useScrub = ({
     const inputRefCurrent = inputRef.current;
     const scrubRefCurrent = scrubRef.current;
 
-    const { current } = valueRef;
-
     // Support only auto keyword to be scrubbable
     if (
-      (current.type !== "unit" &&
-        !(current.type === "keyword" && current.value === "auto")) ||
       inputRefCurrent === null ||
-      scrubRefCurrent === null
+      scrubRefCurrent === null ||
+      canBeNumber(property, valueRef.current) === false
     ) {
       return;
     }
@@ -132,6 +164,12 @@ const useScrub = ({
     };
 
     return numericScrubControl(scrubRefCurrent, {
+      distanceThreshold: 2,
+      getAcceleration() {
+        if (valueRef.current.type === "unit") {
+          return scrubUnitAcceleration.get(valueRef.current.unit);
+        }
+      },
       // @todo: after this https://github.com/webstudio-is/webstudio/issues/564
       // we can switch back on using just initial value
       //
@@ -145,28 +183,18 @@ const useScrub = ({
         if (valueRef.current.type === "unit") {
           return valueRef.current.value;
         }
-
-        if (
-          valueRef.current.type === "keyword" &&
-          valueRef.current.value === "auto"
-        ) {
-          return 0;
-        }
+        return 0;
       },
       onStart() {
-        // for TS
-        if (valueRef.current.type !== "unit") {
-          return;
+        if (valueRef.current.type === "unit") {
+          unit = valueRef.current.unit;
         }
-
-        unit = valueRef.current.unit;
       },
       onValueInput(event) {
         // Moving focus to container of the input to hide the caret
         // (it makes text harder to read and may jump around as you scrub)
         scrubRef.current?.setAttribute("tabindex", "-1");
         scrubRef.current?.focus();
-
         const value = validateValue(event.value);
 
         onChangeRef.current(value);
@@ -183,7 +211,7 @@ const useScrub = ({
         inputRef.current?.focus();
         inputRef.current?.select();
       },
-      shouldHandleEvent: shouldHandleEvent,
+      shouldHandleEvent,
     });
   }, [shouldHandleEvent, property]);
 
@@ -193,57 +221,6 @@ const useScrub = ({
 export const isNumericString = (input: string) =>
   String(input).trim().length !== 0 && Number.isNaN(Number(input)) === false;
 
-const useHandleKeyDown =
-  ({
-    ignoreEnter,
-    ignoreUpDownNumeric,
-    value,
-    onChange,
-    onChangeComplete,
-    onKeyDown,
-  }: {
-    ignoreEnter: boolean;
-    ignoreUpDownNumeric: boolean;
-    value: CssValueInputValue;
-    onChange: (value: CssValueInputValue) => void;
-    onChangeComplete: (value: CssValueInputValue) => void;
-    onKeyDown: KeyboardEventHandler<HTMLInputElement>;
-  }) =>
-  (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.defaultPrevented) {
-      // Underlying select like `unitSelect` can already prevent an event like up/down buttons
-      return;
-    }
-
-    // Do not prevent downshift behaviour on item select
-    if (ignoreEnter === false) {
-      if (event.key === "Enter") {
-        onChangeComplete(value);
-      }
-    }
-
-    if (
-      ignoreUpDownNumeric === false &&
-      (value.type === "unit" ||
-        (value.type === "intermediate" && isNumericString(value.value))) &&
-      value.unit !== undefined &&
-      (event.key === "ArrowUp" || event.key === "ArrowDown")
-    ) {
-      const inputValue =
-        value.type === "unit" ? value.value : Number(value.value.trim());
-
-      onChange({
-        type: "unit",
-        value: handleNumericInputArrowKeys(inputValue, event),
-        unit: value.unit,
-      });
-      // Prevent Downshift from opening menu on arrow up/down
-      return;
-    }
-
-    onKeyDown(event);
-  };
-
 export type IntermediateStyleValue = {
   type: "intermediate";
   value: string;
@@ -252,32 +229,47 @@ export type IntermediateStyleValue = {
 
 export type CssValueInputValue = StyleValue | IntermediateStyleValue;
 
-export type ChangeReason =
-  | "enter"
-  | "blur"
-  | "unit-select"
-  | "keyword-select"
-  | "scrub-end";
+type Modifiers = {
+  altKey: boolean;
+  shiftKey: boolean;
+};
 
-type CssValueInputProps = {
-  styleSource: StyleSource;
+type ChangeCompleteEvent = {
+  type:
+    | "enter"
+    | "blur"
+    | "scrub-end"
+    | "unit-select"
+    | "keyword-select"
+    | "delta";
+  value: StyleValue;
+} & Modifiers;
+
+type CssValueInputProps = Pick<
+  ComponentProps<typeof InputField>,
+  | "variant"
+  | "text"
+  | "autoFocus"
+  | "disabled"
+  | "aria-disabled"
+  | "fieldSizing"
+  | "prefix"
+  | "inputRef"
+> & {
+  styleSource: StyleValueSourceColor;
   property: StyleProperty;
   value: StyleValue | undefined;
   intermediateValue: CssValueInputValue | undefined;
   /**
    * Selected item in the dropdown
    */
-  keywords?: Array<KeywordValue>;
-  disabled?: boolean;
+  getOptions?: () => Array<KeywordValue | VarValue>;
   onChange: (value: CssValueInputValue | undefined) => void;
-  onChangeComplete: (event: {
-    value: StyleValue;
-    reason: ChangeReason;
-  }) => void;
+  onChangeComplete: (event: ChangeCompleteEvent) => void;
   onHighlight: (value: StyleValue | undefined) => void;
   onAbort: () => void;
+  onReset: () => void;
   icon?: ReactNode;
-  prefix?: ReactNode;
   showSuffix?: boolean;
 };
 
@@ -287,23 +279,114 @@ const initialValue: IntermediateStyleValue = {
 };
 
 const itemToString = (item: CssValueInputValue | null) => {
-  return item === null
-    ? ""
-    : item.type === "keyword"
-    ? toPascalCase(toValue(item))
-    : item.type === "intermediate" || item.type === "unit"
-    ? String(item.value)
-    : toValue(item);
+  if (item === null) {
+    return "";
+  }
+  if (item.type === "var") {
+    return `var(--${item.value})`;
+  }
+  if (item.type === "keyword") {
+    // E.g. we want currentcolor to be lower case
+    return toValue(item).toLocaleLowerCase();
+  }
+  if (item.type === "intermediate" || item.type === "unit") {
+    return String(item.value);
+  }
+  return toValue(item);
 };
 
-const match = <Item,>(
-  search: string,
-  items: Array<Item>,
-  itemToString: (item: Item | null) => string
-) =>
-  matchSorter(items, search, {
-    keys: [itemToString, (item) => itemToString(item).replace(/\s/g, "-")],
-  });
+const scrollAhead = ({ target, clientX }: MouseEvent) => {
+  const element = target as HTMLInputElement;
+  // Get the scrollable width of the input element
+  const scrollWidth = element.scrollWidth;
+  const visibleWidth = element.clientWidth;
+
+  if (scrollWidth === visibleWidth) {
+    // Nothing to scroll.
+    return false;
+  }
+  const inputRect = element.getBoundingClientRect();
+
+  // Calculate the relative x position of the mouse within the input element
+  const relativeMouseX = clientX - inputRect.x;
+
+  // Calculate the percentage position (0% at the beginning, 100% at the end)
+  const inputWidth = inputRect.width;
+  const mousePercentageX = Math.ceil((relativeMouseX / inputWidth) * 100);
+
+  // Apply acceleration based on the relative position of the mouse
+  // Closer to the beginning (-20%), closer to the end (+20%)
+  const accelerationFactor = (mousePercentageX - 50) / 50;
+  const adjustedMousePercentageX = Math.min(
+    Math.max(mousePercentageX + accelerationFactor * 20, 0),
+    100
+  );
+
+  // Calculate the scroll position corresponding to the adjusted percentage
+  const scrollPosition =
+    (adjustedMousePercentageX / 100) * (scrollWidth - visibleWidth);
+
+  // Scroll the input element
+  element.scroll({ left: scrollPosition });
+  return true;
+};
+
+const getAutoScrollProps = () => {
+  let abortController = new AbortController();
+
+  const abort = (reason: string) => {
+    abortController.abort(reason);
+  };
+
+  return {
+    abort,
+    onMouseOver(event: MouseEvent) {
+      if (event.target === document.activeElement) {
+        abort("focused");
+        return;
+      }
+
+      if (scrollAhead(event) === false) {
+        // Nothing to scroll.
+        return;
+      }
+
+      abortController = new AbortController();
+      event.target?.addEventListener(
+        "mousemove",
+        (event) => {
+          if (event.target === document.activeElement) {
+            abort("focused");
+            return;
+          }
+          requestAnimationFrame(() => {
+            scrollAhead(event as MouseEvent);
+          });
+        },
+        {
+          signal: abortController.signal,
+          passive: true,
+        }
+      );
+    },
+    onMouseOut(event: MouseEvent) {
+      if (event.target === document.activeElement) {
+        abort("focused");
+        return;
+      }
+      (event.target as HTMLInputElement).scroll({
+        left: 0,
+        behavior: "smooth",
+      });
+      abort("mouseout");
+    },
+    onFocus() {
+      abort("focus");
+    },
+  };
+};
+
+const Description = styled(Box, { width: theme.spacing[27] });
 
 /**
  * Common:
@@ -321,10 +404,11 @@ const match = <Item,>(
  *   - shift key modifier increases/decreases value by 10
  *   - option/alt key modifier increases/decreases value by 0.1
  *   - no modifier increases/decreases value by 1
+ *   - does not open the combobox when the input is a number (CSS root variables can include numbers in their names)
  * - Scrub interaction
  * - Click outside, unit selection or escape when list is open should unfocus the unit select trigger
  *
- * Keywords mode:
+ * Options mode:
  * - When any character in the input is not a number we automatically switch to keywords mode on keydown
  * - Filterable keywords list (click on chevron or arrow down to show the list)
  * - Arrow keys are used to navigate keyword items
@@ -337,18 +421,31 @@ const match = <Item,>(
  * - Evaluated math expression: "2px + 3em" (like CSS calc())
  */
 export const CssValueInput = ({
+  autoFocus,
   icon,
   prefix,
   showSuffix = true,
   styleSource,
   property,
-  keywords = [],
+  getOptions = () => [],
   onHighlight,
   onAbort,
+  onReset,
   disabled,
+  ["aria-disabled"]: ariaDisabled,
+  fieldSizing,
+  variant,
+  text,
   ...props
 }: CssValueInputProps) => {
   const value = props.intermediateValue ?? props.value ?? initialValue;
+  const valueRef = useRef(value);
+  valueRef.current = value;
+
+  // Used to show description
+  const [highlightedValue, setHighlighedValue] = useState<
+    StyleValue | undefined
+  >();
 
   const onChange = (input: string | undefined) => {
     if (input === undefined) {
@@ -365,11 +462,32 @@ export const CssValueInput = ({
   };
 
   const onChangeComplete = (
-    value: CssValueInputValue,
-    reason: ChangeReason
+    event: {
+      type: ChangeCompleteEvent["type"];
+      value: CssValueInputValue;
+    } & Partial<Modifiers>
   ) => {
+    const { value } = event;
+    const defaultProps = { altKey: false, shiftKey: false };
+
+    // We are resetting by setting the value to an empty string
+    if (value.type === "intermediate" && value.value === "") {
+      closeMenu();
+      onReset();
+      return;
+    }
+
     if (value.type !== "intermediate" && value.type !== "invalid") {
-      props.onChangeComplete({ value, reason });
+      // variables fallback is used for preview value while autocompleting
+      // removed fallback when select variable to not pollute values
+      let newValue = value;
+      if (value.type === "var") {
+        newValue = { ...value };
+        delete newValue.fallback;
+      }
+      // The value might be valid but not selected from the combo menu. Close the menu.
+      closeMenu();
+      props.onChangeComplete({ ...defaultProps, ...event, value: newValue });
       return;
     }
 
@@ -380,9 +498,12 @@ export const CssValueInput = ({
       return;
     }
 
+    // The value might be valid but not selected from the combo menu. Close the menu.
+    closeMenu();
     props.onChangeComplete({
+      ...defaultProps,
+      ...event,
       value: parsedValue,
-      reason,
     });
   };
 
@@ -395,26 +516,29 @@ export const CssValueInput = ({
     getItemProps,
     isOpen,
     highlightedIndex,
+    closeMenu,
   } = useCombobox<CssValueInputValue>({
-    items: keywords,
+    // Used for description to match the item when nothing is highlighted yet and value is still in non keyword mode
+    getItems: getOptions,
     value,
     selectedItem: props.value,
     itemToString,
-    match,
-    onInputChange: (inputValue) => {
+    onChange: (inputValue) => {
       onChange(inputValue);
     },
     onItemSelect: (value) => {
-      onChangeComplete(value, "keyword-select");
+      onChangeComplete({ value, type: "keyword-select" });
     },
     onItemHighlight: (value) => {
       if (value == null) {
         onHighlight(undefined);
+        setHighlighedValue(undefined);
         return;
       }
 
       if (value.type !== "intermediate") {
         onHighlight(value);
+        setHighlighedValue(value);
       }
     },
   });
@@ -426,7 +550,7 @@ export const CssValueInput = ({
     value,
     onChange: (unitOrKeyword) => {
       if (unitOrKeyword.type === "keyword") {
-        onChangeComplete(unitOrKeyword, "unit-select");
+        onChangeComplete({ value: unitOrKeyword, type: "unit-select" });
         return;
       }
 
@@ -438,7 +562,7 @@ export const CssValueInput = ({
         value.type === "intermediate" &&
         Number.isNaN(Number.parseFloat(value.value)) === false
       ) {
-        onChangeComplete({ ...value, unit }, "unit-select");
+        onChangeComplete({ value: { ...value, unit }, type: "unit-select" });
         return;
       }
 
@@ -452,14 +576,14 @@ export const CssValueInput = ({
           unit
         );
 
-        onChangeComplete(
-          {
+        onChangeComplete({
+          value: {
             type: "unit",
             value: Number.parseFloat(convertedValue.toFixed(2)),
             unit,
           },
-          "unit-select"
-        );
+          type: "unit-select",
+        });
         return;
       }
 
@@ -482,25 +606,25 @@ export const CssValueInput = ({
           unit
         );
 
-        onChangeComplete(
-          {
+        onChangeComplete({
+          value: {
             type: "unit",
             value: Number.parseFloat(convertedValue.toFixed(2)),
             unit,
           },
-          "unit-select"
-        );
+          type: "unit-select",
+        });
         return;
       }
 
-      onChangeComplete(
-        {
+      onChangeComplete({
+        value: {
           type: "intermediate",
           value: toValue(value),
           unit,
         },
-        "unit-select"
-      );
+        type: "unit-select",
+      });
     },
     onCloseAutoFocus(event) {
       // We don't want to focus the unit trigger when closing the select (no matter if unit was selected, clicked outside or esc was pressed)
@@ -511,14 +635,22 @@ export const CssValueInput = ({
   });
 
   const shouldHandleEvent = useCallback((node: Node) => {
-    return suffixRef.current?.contains?.(node) === false;
+    // prevent scrubbing when css variable is selected
+    if (valueRef.current.type === "var") {
+      return false;
+    }
+    // prevent scrubbing when unit select is in use
+    if (suffixRef.current?.contains?.(node)) {
+      return false;
+    }
+    return true;
   }, []);
 
   const [scrubRef, inputRef] = useScrub({
     value,
     property,
     onChange: props.onChange,
-    onChangeComplete: (value) => onChangeComplete(value, "scrub-end"),
+    onChangeComplete: (value) => onChangeComplete({ value, type: "scrub-end" }),
     shouldHandleEvent,
   });
 
@@ -530,7 +662,7 @@ export const CssValueInput = ({
    **/
   const callOnCompleteIfIntermediateValueExists = useDebouncedCallback(() => {
     if (props.intermediateValue !== undefined) {
-      onChangeComplete(value, "blur");
+      onChangeComplete({ value, type: "blur" });
     }
   });
 
@@ -556,21 +688,8 @@ export const CssValueInput = ({
       onAbort();
       return;
     }
-    onChangeComplete(value, "blur");
+    onChangeComplete({ value, type: "blur" });
   };
-
-  const handleKeyDown = useHandleKeyDown({
-    // In case of the menu is really open and the selection is inside it
-    // we do not prevent the default downshift Enter key behavior
-    ignoreEnter:
-      isUnitsOpen || (isOpen && !menuProps.empty && highlightedIndex !== -1),
-    // Do not change the number value on the arrow up/down if any menu is opened
-    ignoreUpDownNumeric: isUnitsOpen || isOpen,
-    onChangeComplete: (value) => onChangeComplete(value, "enter"),
-    value,
-    onChange: props.onChange,
-    onKeyDown: inputProps.onKeyDown,
-  });
 
   const finalPrefix =
     prefix ||
@@ -599,54 +718,191 @@ export const CssValueInput = ({
 
   const suffix =
     showSuffix === false ? null : (
-      <Box ref={suffixRef}>
+      <Flex align="center" ref={suffixRef}>
         {isUnitValue
           ? unitSelectElement
           : isKeywordValue
-          ? keywordButtonElement
-          : null}
-      </Box>
+            ? keywordButtonElement
+            : null}
+      </Flex>
     );
 
+  let description;
+  // When user hovers or focuses an item in the combobox list we want to show the description of the item and otherwise show the description of the current value
+  const valueForDescription =
+    highlightedValue?.type === "keyword"
+      ? highlightedValue
+      : highlightedValue?.type === "var"
+        ? undefined
+        : props.value?.type === "keyword"
+          ? props.value
+          : items[0]?.type === "keyword"
+            ? items[0]
+            : undefined;
+
+  if (valueForDescription) {
+    const key = `${property}:${toValue(
+      valueForDescription
+    )}` as keyof typeof declarationDescriptions;
+    description = declarationDescriptions[key];
+  }
+
+  const descriptions = items
+    .map((item) =>
+      item.type === "keyword"
+        ? declarationDescriptions[
+            `${property}:${toValue(
+              item
+            )}` as keyof typeof declarationDescriptions
+          ]
+        : undefined
+    )
+    .filter(Boolean)
+    .map((descr) => <Description>{descr}</Description>);
+
+  const handleUpDownNumeric = (event: KeyboardEvent<HTMLInputElement>) => {
+    const isComboOpen = isOpen && !menuProps.empty;
+
+    if (isUnitsOpen || isComboOpen) {
+      return;
+    }
+
+    if (
+      (value.type === "unit" ||
+        (value.type === "intermediate" && isNumericString(value.value))) &&
+      value.unit !== undefined &&
+      (event.key === "ArrowUp" || event.key === "ArrowDown")
+    ) {
+      const inputValue =
+        value.type === "unit" ? value.value : Number(value.value.trim());
+
+      const meta = { altKey: event.altKey, shiftKey: event.shiftKey };
+      const hasMeta = meta.altKey || meta.shiftKey;
+
+      if (hasMeta) {
+        // @todo switch to using props.onChange instead of props.onChangeComplete
+        // this will require modifying input-popover.tsx
+        const newValue = {
+          type: "unit" as const,
+          value: handleNumericInputArrowKeys(inputValue, event),
+          unit: value.unit,
+        };
+
+        onChangeComplete({ value: newValue, ...meta, type: "delta" });
+      } else {
+        props.onChange({
+          type: "unit",
+          value: handleNumericInputArrowKeys(inputValue, event),
+          unit: value.unit,
+        });
+      }
+      event.preventDefault();
+    }
+  };
+
+  const handleMetaEnter = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (
+      isUnitsOpen ||
+      (isOpen && !menuProps.empty && highlightedIndex !== -1)
+    ) {
+      return;
+    }
+
+    const meta = { altKey: event.altKey, shiftKey: event.shiftKey };
+
+    if (event.key === "Enter") {
+      onChangeComplete({ type: "enter", value, ...meta });
+    }
+  };
+
+  const inputPropsHandleKeyDown = composeEventHandlers(
+    composeEventHandlers(handleUpDownNumeric, inputProps.onKeyDown, {
+      // Pass prevented events to the combobox (e.g., the Escape key doesn't work otherwise, as it's blocked by Radix)
+      checkForDefaultPrevented: false,
+    }),
+    handleMetaEnter
+  );
+
+  const { abort, ...autoScrollProps } = useMemo(() => {
+    return getAutoScrollProps();
+  }, []);
+  useEffect(() => {
+    return () => abort("unmount");
+  }, [abort]);
+
   return (
-    <Combobox>
+    <ComboboxRoot open={isOpen}>
       <Box {...getComboboxProps()}>
-        <ComboboxAnchor>
+        <ComboboxAnchor asChild>
           <InputField
+            variant={variant}
             disabled={disabled}
+            aria-disabled={ariaDisabled}
+            fieldSizing={fieldSizing}
             {...inputProps}
+            {...autoScrollProps}
             onFocus={() => {
               const isFocused = document.activeElement === inputRef.current;
               if (isFocused) {
                 inputRef.current?.select();
               }
             }}
+            autoFocus={autoFocus}
             onBlur={handleOnBlur}
-            onKeyDown={handleKeyDown}
-            containerRef={scrubRef}
-            inputRef={inputRef}
+            onKeyDown={inputPropsHandleKeyDown}
+            containerRef={disabled ? undefined : scrubRef}
+            inputRef={mergeRefs(inputRef, props.inputRef ?? null)}
             name={property}
             color={value.type === "invalid" ? "error" : undefined}
             prefix={finalPrefix}
             suffix={suffix}
-            css={{ cursor: "default" }}
+            css={{ cursor: "default", minWidth: "2em" }}
+            text={text}
           />
         </ComboboxAnchor>
         {isOpen && (
           <ComboboxContent align="start" sideOffset={2} collisionPadding={10}>
             <ComboboxListbox {...menuProps}>
-              {items.map((item, index) => (
-                <ComboboxListboxItem
-                  {...getItemProps({ item, index })}
-                  key={index}
-                >
-                  {itemToString(item)}
-                </ComboboxListboxItem>
-              ))}
+              <ComboboxScrollArea>
+                {items.map((item, index) => (
+                  <ComboboxListboxItem
+                    {...getItemProps({ item, index })}
+                    key={index}
+                  >
+                    {item.type === "var" ? (
+                      <Flex justify="between" align="center" grow gap={2}>
+                        <Box>--{item.value}</Box>
+                        {item.fallback?.type === "unit" && (
+                          <Text variant="small" color="subtle">
+                            {toValue(item.fallback)}
+                          </Text>
+                        )}
+                        {item.fallback?.type === "rgb" && (
+                          <ColorThumb
+                            color={{
+                              r: item.fallback.r,
+                              g: item.fallback.g,
+                              b: item.fallback.b,
+                              a: item.fallback.alpha,
+                            }}
+                          />
+                        )}
+                      </Flex>
+                    ) : (
+                      itemToString(item)
+                    )}
+                  </ComboboxListboxItem>
+                ))}
+              </ComboboxScrollArea>
+              {description && (
+                <ComboboxItemDescription descriptions={descriptions}>
+                  <Description>{description}</Description>
+                </ComboboxItemDescription>
+              )}
             </ComboboxListbox>
           </ComboboxContent>
         )}
       </Box>
-    </Combobox>
+    </ComboboxRoot>
   );
 };

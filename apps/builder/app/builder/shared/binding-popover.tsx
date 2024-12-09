@@ -9,7 +9,6 @@ import {
   useContext,
   type ReactNode,
 } from "react";
-import { isFeatureEnabled } from "@webstudio-is/feature-flags";
 import {
   DotIcon,
   InfoCircleIcon,
@@ -28,7 +27,6 @@ import {
   FloatingPanelPopoverContent,
   FloatingPanelPopoverTitle,
   FloatingPanelPopoverTrigger,
-  InputErrorsTooltip,
   Label,
   ScrollArea,
   SmallIconButton,
@@ -38,61 +36,35 @@ import {
 } from "@webstudio-is/design-system";
 import {
   decodeDataSourceVariable,
-  validateExpression,
-} from "@webstudio-is/react-sdk";
-import { ExpressionEditor, formatValuePreview } from "./expression-editor";
+  getExpressionIdentifiers,
+  lintExpression,
+} from "@webstudio-is/sdk";
+import {
+  ExpressionEditor,
+  formatValuePreview,
+  type EditorApi,
+} from "./expression-editor";
 import { useSideOffset } from "./floating-panel";
-import { $dataSourceVariables } from "~/shared/nano-states";
+import {
+  $dataSourceVariables,
+  $isDesignMode,
+  computeExpression,
+} from "~/shared/nano-states";
+import { useStore } from "@nanostores/react";
 
 export const evaluateExpressionWithinScope = (
   expression: string,
   scope: Record<string, unknown>
 ) => {
-  let expressionWithScope = "";
+  const variables = new Map<string, unknown>();
   for (const [name, value] of Object.entries(scope)) {
-    expressionWithScope += `const ${name} = ${JSON.stringify(value)};\n`;
+    const decodedName = decodeDataSourceVariable(name);
+    if (decodedName) {
+      variables.set(decodedName, value);
+    }
   }
-  expressionWithScope += `return (${expression})`;
-  try {
-    const fn = new Function(expressionWithScope);
-    return fn();
-  } catch {
-    //
-  }
-};
 
-/**
- * execute valid expression without scope
- * to check any variable usage
- */
-export const isLiteralExpression = (expression: string) => {
-  try {
-    const fn = new Function(`return (${expression})`);
-    fn();
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-const getUsedIdentifiers = (expression: string) => {
-  const identifiers = new Set<string>();
-  // prevent parsing empty expression
-  if (expression === "") {
-    return identifiers;
-  }
-  // avoid parsing error
-  try {
-    validateExpression(expression, {
-      transformIdentifier: (identifier) => {
-        identifiers.add(identifier);
-        return identifier;
-      },
-    });
-  } catch {
-    //
-  }
-  return identifiers;
+  return computeExpression(expression, variables);
 };
 
 const BindingPanel = ({
@@ -110,32 +82,28 @@ const BindingPanel = ({
   onChange: () => void;
   onSave: (value: string, invalid: boolean) => void;
 }) => {
+  const editorApiRef = useRef<undefined | EditorApi>();
   const [expression, setExpression] = useState(value);
-  const usedIdentifiers = useMemo(() => getUsedIdentifiers(value), [value]);
-  const [error, setError] = useState<undefined | string>();
+  const usedIdentifiers = useMemo(
+    () => getExpressionIdentifiers(value),
+    [value]
+  );
+  const [errorsCount, setErrorsCount] = useState<number>(0);
   const [touched, setTouched] = useState(false);
   const scopeEntries = Object.entries(scope);
+
+  const validate = (expression: string) => {
+    const diagnostics = lintExpression({
+      expression,
+      availableVariables: new Set(aliases.keys()),
+    });
+    setErrorsCount(diagnostics.length);
+  };
 
   const updateExpression = (newExpression: string) => {
     setExpression(newExpression);
     onChange();
-    try {
-      if (newExpression.trim().length === 0) {
-        throw Error("Cannot use empty expression");
-      }
-      // update value only when expression is valid
-      validateExpression(newExpression, {
-        transformIdentifier: (identifier) => {
-          if (aliases.has(identifier) === false) {
-            throw Error(`Unknown variable "${identifier}"`);
-          }
-          return identifier;
-        },
-      });
-      setError(undefined);
-    } catch (error) {
-      setError((error as Error).message);
-    }
+    validate(newExpression);
   };
 
   return (
@@ -147,7 +115,7 @@ const BindingPanel = ({
       }}
     >
       <Box css={{ paddingBottom: theme.spacing[5] }}>
-        <Flex gap="1" css={{ px: theme.spacing[9], py: theme.spacing[5] }}>
+        <Flex gap="1" css={{ padding: theme.panel.padding }}>
           <Text variant="labelsSentenceCase">Variables</Text>
           <Tooltip
             variant="wrapped"
@@ -182,15 +150,20 @@ const BindingPanel = ({
                 active={usedIdentifiers.has(identifier)}
                 // convert variable to expression
                 onClick={() => {
-                  updateExpression(identifier);
-                  onSave(identifier, false);
+                  editorApiRef.current?.replaceSelection(identifier);
+                }}
+                // expression editor blur is fired after pointer down even
+                // preventing it allows to not trigger validation
+                // and flickering error tooltip
+                onPointerDown={(event) => {
+                  event.preventDefault();
                 }}
               />
             );
           })}
         </CssValueListArrowFocus>
       </Box>
-      <Flex gap="1" css={{ px: theme.spacing[9], py: theme.spacing[5] }}>
+      <Flex gap="1" css={{ padding: theme.panel.padding }}>
         <Text variant="labelsSentenceCase">Expression Editor</Text>
         <Tooltip
           variant="wrapped"
@@ -207,34 +180,27 @@ const BindingPanel = ({
           <InfoCircleIcon tabIndex={0} />
         </Tooltip>
       </Flex>
-      <Box css={{ padding: `0 ${theme.spacing[9]} ${theme.spacing[9]}` }}>
-        <InputErrorsTooltip
-          errors={
-            touched && error ? [error] : valueError ? [valueError] : undefined
+      <Box css={{ padding: theme.panel.padding, pt: 0 }}>
+        <ExpressionEditor
+          editorApiRef={editorApiRef}
+          scope={scope}
+          aliases={aliases}
+          color={
+            (touched && errorsCount > 0) || valueError !== undefined
+              ? "error"
+              : undefined
           }
-        >
-          <div>
-            <ExpressionEditor
-              scope={scope}
-              aliases={aliases}
-              color={
-                error !== undefined || valueError !== undefined
-                  ? "error"
-                  : undefined
-              }
-              autoFocus={true}
-              value={expression}
-              onChange={(value) => {
-                updateExpression(value);
-                setTouched(false);
-              }}
-              onBlur={() => {
-                onSave(expression, error !== undefined);
-                setTouched(true);
-              }}
-            />
-          </div>
-        </InputErrorsTooltip>
+          autoFocus={true}
+          value={expression}
+          onChange={(value) => {
+            updateExpression(value);
+            setTouched(false);
+          }}
+          onBlur={() => {
+            onSave(expression, errorsCount > 0);
+            setTouched(true);
+          }}
+        />
       </Box>
     </ScrollArea>
   );
@@ -296,6 +262,7 @@ const BindingButton = forwardRef<
       <SmallIconButton
         ref={ref}
         data-variant={variant}
+        bleed={false}
         css={{
           // hide by default
           opacity: `var(${bindingOpacityProperty}, 0)`,
@@ -304,6 +271,8 @@ const BindingButton = forwardRef<
           left: 0,
           boxSizing: "border-box",
           padding: 2,
+          // Because of the InputErrorsTooltip, we need to set zIndex to 1 (as InputErrorsTooltip needs an additional position relative wrapper)
+          zIndex: 1,
           transform: "translate(-50%, -50%) scale(1)",
           transition: "transform 60ms, opacity 0ms 60ms",
           // https://easings.net/#easeInOutSine
@@ -319,6 +288,9 @@ const BindingButton = forwardRef<
             transform: `translate(-50%, -50%) scale(1.5)`,
             "--dot-display": "none",
             "--plus-display": "block",
+          },
+          "&:disabled": {
+            display: "none",
           },
         }}
         {...props}
@@ -364,6 +336,7 @@ BindingButton.displayName = "BindingButton";
 
 const BindingPopoverContext = createContext<{
   containerRef?: RefObject<HTMLElement>;
+  side?: "left" | "right";
 }>({});
 
 export const BindingPopoverProvider = BindingPopoverContext.Provider;
@@ -385,15 +358,21 @@ export const BindingPopover = ({
   onChange: (newValue: string) => void;
   onRemove: (evaluatedValue: unknown) => void;
 }) => {
-  const { containerRef } = useContext(BindingPopoverContext);
+  const { side = "left", containerRef } = useContext(BindingPopoverContext);
   const [isOpen, onOpenChange] = useState(false);
-  const [triggerRef, sideOffset] = useSideOffset({ isOpen, containerRef });
+  const [triggerRef, sideOffset] = useSideOffset({
+    side,
+    isOpen,
+    containerRef,
+  });
   const hasUnsavedChange = useRef<boolean>(false);
   const preventedClosing = useRef<boolean>(false);
+  const isDesignMode = useStore($isDesignMode);
 
-  if (isFeatureEnabled("bindings") === false) {
+  if (!isDesignMode) {
     return;
   }
+
   const valueError = validate?.(evaluateExpressionWithinScope(value, scope));
   return (
     <FloatingPanelPopover
@@ -418,7 +397,7 @@ export const BindingPopover = ({
       </FloatingPanelPopoverTrigger>
       <FloatingPanelPopoverContent
         sideOffset={sideOffset}
-        side="left"
+        side={side}
         align="start"
       >
         <BindingPanel
@@ -465,6 +444,7 @@ export const BindingPopover = ({
                       value,
                       scope
                     );
+
                     onRemove(evaluatedValue);
                     preventedClosing.current = false;
                     hasUnsavedChange.current = false;

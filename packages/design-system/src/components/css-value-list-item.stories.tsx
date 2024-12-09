@@ -1,7 +1,9 @@
+import { useState, type ComponentProps, type ReactNode } from "react";
 import { css, styled, theme } from "../stitches.config";
 import {
   CssValueListArrowFocus,
   CssValueListItem,
+  __testing__,
 } from "./css-value-list-item";
 import { Label, labelColors } from "./label";
 import { SmallToggleButton } from "./small-toggle-button";
@@ -10,7 +12,6 @@ import {
   EyeconClosedIcon,
   SubtractIcon,
 } from "@webstudio-is/icons";
-import * as React from "react";
 import { SmallIconButton } from "./small-icon-button";
 import {
   FloatingPanelPopover,
@@ -33,10 +34,6 @@ export default {
   title: "Library/CSS Value List Item",
 };
 
-const LIST_ITEM_ATTRIBUTE = "data-list-item";
-
-const listItemAttributes = { [LIST_ITEM_ATTRIBUTE]: true };
-
 const Thumbnail = styled("div", {
   width: theme.spacing[10],
   height: theme.spacing[10],
@@ -49,14 +46,14 @@ const Panel = styled("div", {
 
 const ListItem = (props: {
   hidden: boolean;
-  labelColor: "default" | "preset" | "local" | "overwritten" | "remote";
+  labelColor: ComponentProps<typeof Label>["color"];
   state: undefined | "open";
   active: boolean;
   focused: undefined | boolean;
-  label?: React.ReactNode;
+  label?: ReactNode;
   index: number;
 }) => {
-  const [pressed, onPressedChange] = React.useState(false);
+  const [pressed, onPressedChange] = useState(false);
 
   return (
     <CssValueListItem
@@ -90,7 +87,7 @@ const ListItem = (props: {
           />
         </>
       }
-      {...listItemAttributes}
+      {...__testing__.listItemAttributes}
     />
   );
 };
@@ -100,7 +97,7 @@ export const Declarative = (props: {
   focused: boolean;
   labelColor: "default";
 }) => {
-  const [pressed, onPressedChange] = React.useState(false);
+  const [pressed, onPressedChange] = useState(false);
 
   return (
     <Panel>

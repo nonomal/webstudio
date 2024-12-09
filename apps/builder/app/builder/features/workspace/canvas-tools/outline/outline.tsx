@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { css, keyframes, type Rect } from "@webstudio-is/design-system";
 import { theme } from "@webstudio-is/design-system";
 
@@ -21,25 +21,36 @@ const angleKeyframes = keyframes({
   },
 });
 
-const baseStyle = css({
-  boxSizing: "border-box",
-  position: "absolute",
-  pointerEvents: "none",
-  outline: `1px solid ${theme.colors.blue9}`,
-  outlineOffset: -1,
-  top: 0,
-  left: 0,
+const baseOutlineStyle = css({
+  borderWidth: 1,
   variants: {
     variant: {
+      default: {
+        borderStyle: "solid",
+        borderColor: `oklch(from ${theme.colors.backgroundPrimary} l c h / 0.7)`,
+      },
       collaboration: {
-        outline: "none",
         [angleVar]: `0deg`,
-        border: `1px solid`,
+        borderStyle: "solid",
         borderImage: `conic-gradient(from var(${angleVar}), #39FBBB 0%, #4A4EFA 12.5%, #E63CFE 25%, #FFAE3C 37.5%, #39FBBB 50%, #4A4EFA 62.5%, #E63CFE 75%, #FFAE3C 87.5%) 1`,
         animation: `2s ${angleKeyframes} linear infinite`,
       },
+      slot: {
+        borderStyle: "solid",
+        borderColor: theme.colors.foregroundReusable,
+      },
     },
   },
+  defaultVariants: { variant: "default" },
+});
+
+const baseStyle = css({
+  boxSizing: "border-box",
+  position: "absolute",
+  display: "grid",
+  pointerEvents: "none",
+  top: 0,
+  left: 0,
 });
 
 const useDynamicStyle = (rect?: Rect) => {
@@ -56,17 +67,21 @@ const useDynamicStyle = (rect?: Rect) => {
 };
 
 type OutlineProps = {
-  children?: JSX.Element;
+  children?: ReactNode;
   rect?: Rect;
-  variant?: "collaboration";
+  variant?: "default" | "collaboration" | "slot";
 };
 
 export const Outline = ({ children, rect, variant }: OutlineProps) => {
   const dynamicStyle = useDynamicStyle(rect);
+
   return (
     <>
       {propertyStyle}
-      <div className={baseStyle({ variant })} style={dynamicStyle}>
+      <div
+        className={`${baseStyle()} ${baseOutlineStyle({ variant })}`}
+        style={dynamicStyle}
+      >
         {children}
       </div>
     </>

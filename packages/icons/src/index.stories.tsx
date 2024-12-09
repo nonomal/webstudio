@@ -1,6 +1,8 @@
+import type { ReactNode } from "react";
+import type { Meta } from "@storybook/react";
 import * as icons from "./index";
 
-export const Icons = ({ testColor }: { testColor: boolean }) => {
+export const Icons = ({ testColor }: { testColor: boolean }): ReactNode => {
   return (
     <>
       <div
@@ -54,8 +56,8 @@ export const Icons = ({ testColor }: { testColor: boolean }) => {
   );
 };
 
-export default {
-  title: "All Icons",
+const IconsMeta: Meta<typeof Icons> = {
+  title: "Icons",
   component: Icons,
   argTypes: {
     testColor: { control: "boolean", name: "Test color" },
@@ -64,3 +66,4 @@ export default {
     testColor: false,
   },
 };
+export default IconsMeta;

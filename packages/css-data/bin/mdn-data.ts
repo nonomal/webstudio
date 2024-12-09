@@ -1,4 +1,3 @@
-/* eslint-disable import/no-internal-modules */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -6,6 +5,7 @@ import { join, dirname } from "node:path";
 import { parse, definitionSyntax, type DSNode, type CssNode } from "css-tree";
 import properties from "mdn-data/css/properties.json";
 import syntaxes from "mdn-data/css/syntaxes.json";
+import selectors from "mdn-data/css/selectors.json";
 import data from "css-tree/dist/data";
 import { camelCase } from "change-case";
 import type {
@@ -14,11 +14,23 @@ import type {
   Unit,
   UnitValue,
   UnparsedValue,
+  FontFamilyValue,
 } from "@webstudio-is/css-engine";
-import { popularityIndex } from "../src/popularity-index";
 import * as customData from "../src/custom-data";
 
-const units = {
+/**
+ * Store prefixed properties without change
+ * and convert to camel case only unprefixed properties
+ * @todo stop converting to camel case and use hyphenated format
+ */
+const normalizePropertyName = (property: string) => {
+  if (property.startsWith("-")) {
+    return property;
+  }
+  return camelCase(property);
+};
+
+const units: Record<string, Array<string>> = {
   number: [],
   // consider % as unit
   percentage: ["%"],
@@ -26,12 +38,7 @@ const units = {
 };
 
 type Property = keyof typeof properties;
-type Value = (typeof properties)[Property] & { alsoAppliesTo?: Array<string> };
-
-const inheritValue = {
-  type: "keyword",
-  value: "inherit",
-} as const;
+type Value = (typeof properties)[Property];
 
 const autoValue = {
   type: "keyword",
@@ -40,9 +47,11 @@ const autoValue = {
 
 // Normalize browser dependant properties.
 const normalizedValues = {
-  "font-family": inheritValue,
-  "font-size": inheritValue,
-  "line-height": inheritValue,
+  // dependsOnUserAgent
+  "font-family": {
+    type: "fontFamily",
+    value: ["serif"],
+  } satisfies FontFamilyValue,
   // startOrNamelessValueIfLTRRightIfRTL
   "text-align": { type: "keyword", value: "start" },
   // canvastext
@@ -209,11 +218,13 @@ const walkSyntax = (
     }
     if (node.type === "Property") {
       // resolve other properties references
-      walkSyntax(
-        properties[node.name as keyof typeof properties].syntax,
-        enter,
-        parsedSyntaxes
-      );
+      if (node.name in properties) {
+        walkSyntax(
+          properties[node.name as Property].syntax,
+          enter,
+          parsedSyntaxes
+        );
+      }
       return;
     }
     enter(node);
@@ -224,90 +235,73 @@ const walkSyntax = (
 
 type FilteredProperties = { [property in Property]: Value };
 
+const experimentalProperties = [
+  "appearance",
+  "aspect-ratio",
+  "text-size-adjust",
+  "-webkit-line-clamp",
+  "background-position-x",
+  "background-position-y",
+  "-webkit-tap-highlight-color",
+  "-webkit-overflow-scrolling",
+  "transition-behavior",
+  "offset-position",
+  // https://github.com/mdn/data/pull/759
+  // offset-anchor is standard according to mdn.
+  // But the mdn_url is missing from its config which is skipping othe starndard check.
+  "offset-anchor",
+];
+
+const unsupportedProperties = [
+  "--*",
+  // shorthand properties
+  "all",
+  "font-synthesis",
+  "font-variant",
+  "overflow",
+  "white-space",
+  "text-wrap",
+  "background-position",
+];
+
 const animatableProperties: string[] = [];
 const filteredProperties: FilteredProperties = (() => {
-  // A list of properties we don't want to show
-  const ignoreProperties = ["all", "-webkit-line-clamp", "--*"];
   let property: Property;
   const result = {} as FilteredProperties;
 
-  /*
-    A transition is a shorthand property that represents the combination of the other four properties.
-    Typically, we exclude shorthand properties when using the expanded ones.
-    However, in this case, the transition property in the designs allows users to set all transition values at once.
-    Therefore, we need to make this property available from the generated list.
-
-    The initial properties for transition is
-    config.initial = [
-      'transition-delay',
-      'transition-duration',
-      'transition-property',
-      'transition-timing-function'
-    ]
-
-    We replace it with the defaults of the rest of the four properties
-    "all 0s ease 0s"
-  */
-
-  const supportedComplexProperties: Record<string, string> = {
-    transition: "all 0s ease 0s",
-  };
-
   for (property in properties) {
     const config = properties[property];
-    const isSupportedStatus =
-      config.status === "standard" || config.status === "experimental";
 
-    if (property in supportedComplexProperties) {
-      config.initial = supportedComplexProperties[property];
-    }
-
-    if (
-      property.charAt(0) !== "-" &&
+    const isSupportedProperty =
+      // make sure the property standard and described in mdn
+      (config.status === "standard" && "mdn_url" in config) ||
+      experimentalProperties.includes(property);
+    const isShorthandProperty = Array.isArray(config.initial);
+    const isAnimatableProperty =
+      property.startsWith("-") === false &&
       config.animationType !== "discrete" &&
-      config.animationType !== "notAnimatable"
-    ) {
-      animatableProperties.push(property);
-    }
+      config.animationType !== "notAnimatable";
 
-    if (
-      isSupportedStatus === false ||
-      // Skipping the complex values, since we want to use the expanded once.
-      Array.isArray(config.initial) ||
-      ignoreProperties.includes(property) === true
-    ) {
+    if (unsupportedProperties.includes(property) || isShorthandProperty) {
       continue;
     }
-    result[property as Property] = config;
+    if (isSupportedProperty) {
+      if (isAnimatableProperty) {
+        animatableProperties.push(property);
+      }
+      result[property as Property] = config;
+    }
   }
   return result;
 })();
 
-const propertiesData = { ...customData.propertiesData };
-
-const patchAppliesTo = (property: Property, config: Value) => {
-  // see https://github.com/mdn/data/issues/585 alignItems and justifyItems have appliesTo = "allElements"
-  // this specification https://www.w3.org/TR/css-align-3/  - "block containers", "grid containers", "flex containers"
-  // chrome devtools check grid or flex here https://github.com/ChromeDevTools/devtools-frontend/blob/354fb0fd3fc0a4af43ef760450e7d644d0e04daf/front_end/panels/elements/CSSRuleValidator.ts#L374
-  // our opinion is that it must be "grid containers", "flex containers"
-  if (property === "align-items" || property === "justify-items") {
-    if (config.appliesto !== "allElements") {
-      throw new Error(
-        "Specification has changed, please check and update the code"
-      );
-    }
-
-    // flexContainersGridContainers not exists in mdn-data, it's our custom value
-    return "flexContainersGridContainers";
-  }
-
-  return config.appliesto;
+const propertiesData = {
+  ...customData.propertiesData,
 };
 
 let property: Property;
 for (property in filteredProperties) {
   const config = filteredProperties[property];
-  // collect node types to improve parsing of css values
   const unitGroups = new Set<string>();
   walkSyntax(config.syntax, (node) => {
     if (node.type === "Type") {
@@ -315,8 +309,9 @@ for (property in filteredProperties) {
         unitGroups.add("number");
         return;
       }
+
       // type names match unit groups
-      if (units[node.name]) {
+      if (node.name in units) {
         unitGroups.add(node.name);
         return;
       }
@@ -331,17 +326,19 @@ for (property in filteredProperties) {
     );
   }
 
-  propertiesData[camelCase(property)] = {
+  propertiesData[normalizePropertyName(property)] = {
     unitGroups: Array.from(unitGroups),
     inherited: config.inherited,
     initial: parseInitialValue(property, config.initial, unitGroups),
-    popularity:
-      popularityIndex.find((data) => data.property === property)
-        ?.dayPercentage || 0,
-
-    appliesTo: patchAppliesTo(property, config),
+    ...("mdn_url" in config && { mdnUrl: config.mdn_url }),
   };
 }
+
+const pseudoElements = Object.keys(selectors)
+  .filter((selector) => {
+    return selector.startsWith("::");
+  })
+  .map((selector) => selector.slice(2));
 
 const targetDir = join(process.cwd(), process.argv.slice(2).pop() as string);
 
@@ -370,6 +367,11 @@ const keywordValues = (() => {
   const result = { ...customData.keywordValues };
 
   for (const property in filteredProperties) {
+    const key = normalizePropertyName(property);
+    // prevent merging with custom keywords
+    if (result[key]) {
+      continue;
+    }
     const keywords = new Set<string>();
     walkSyntax(
       filteredProperties[property as keyof typeof filteredProperties].syntax,
@@ -394,7 +396,6 @@ const keywordValues = (() => {
     }
 
     if (keywords.size !== 0) {
-      const key = camelCase(property);
       result[key] = [...(result[key] ?? []), ...keywords];
     }
   }
@@ -410,6 +411,8 @@ writeToFile(
   "animatableProperties",
   animatableProperties
 );
+
+writeToFile("pseudo-elements.ts", "pseudoElements", pseudoElements);
 
 let types = "";
 

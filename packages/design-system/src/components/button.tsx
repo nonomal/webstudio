@@ -81,7 +81,7 @@ const perColorStyle = (variant: ButtonColor) => ({
 
   "&[data-state=auto]:focus-visible, &[data-state=focus]": {
     color: foregrounds[variant],
-    outline: `2px solid ${theme.colors.borderFocus}`,
+    outline: `1px solid ${theme.colors.borderFocus}`,
     outlineOffset: "1px",
   },
 
@@ -96,10 +96,11 @@ const perColorStyle = (variant: ButtonColor) => ({
           ),
   },
 
-  "&[data-state=disabled]": {
-    background: theme.colors.backgroundButtonDisabled,
-    color: theme.colors.foregroundDisabled,
-  },
+  "&:disabled:not([data-state=pending]), &[data-state=disabled], &[aria-disabled=true], &[aria-disabled=true]:hover, &[aria-disabled=true]:visited":
+    {
+      background: theme.colors.backgroundButtonDisabled,
+      color: theme.colors.foregroundDisabled,
+    },
 
   "&[data-state=pending]": {
     cursor: "wait",
@@ -116,7 +117,7 @@ export const buttonStyle = css({
   justifyContent: "center",
   gap: theme.spacing[2],
   padding: `0 ${theme.spacing[4]}`,
-  height: theme.spacing[12],
+  height: theme.spacing[11],
   borderRadius: theme.borderRadius[4],
   whiteSpace: "nowrap",
 

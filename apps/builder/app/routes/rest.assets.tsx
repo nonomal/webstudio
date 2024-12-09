@@ -1,18 +1,23 @@
-import type { ActionArgs, LoaderArgs } from "@remix-run/node";
+import type {
+  ActionFunctionArgs,
+  LoaderFunctionArgs,
+} from "@remix-run/server-runtime";
 import type { Asset } from "@webstudio-is/sdk";
 import { MaxAssets } from "@webstudio-is/asset-uploader";
 import {
   loadAssetsByProject,
   createUploadName,
 } from "@webstudio-is/asset-uploader/index.server";
-import { sentryException } from "~/shared/sentry";
 import { createContext } from "~/shared/context.server";
 import env from "~/env/env.server";
+import { preventCrossOriginCookie } from "~/services/no-cross-origin-cookie";
+import { checkCsrf } from "~/services/csrf-session.server";
+import { parseError } from "~/shared/error/error-parse";
 
 export const loader = async ({
   params,
   request,
-}: LoaderArgs): Promise<Array<Asset>> => {
+}: LoaderFunctionArgs): Promise<Array<Asset>> => {
   if (params.projectId === undefined) {
     throw new Error("Project id undefined");
   }
@@ -20,12 +25,15 @@ export const loader = async ({
   return await loadAssetsByProject(params.projectId, context);
 };
 
-export const action = async (props: ActionArgs) => {
-  const { request } = props;
-
-  const context = await createContext(request);
-
+export const action = async (props: ActionFunctionArgs) => {
   try {
+    preventCrossOriginCookie(props.request);
+    await checkCsrf(props.request);
+
+    const { request } = props;
+
+    const context = await createContext(request);
+
     if (request.method === "POST") {
       const formData = await request.formData();
       const projectId = formData.get("projectId") as string;
@@ -48,11 +56,10 @@ export const action = async (props: ActionArgs) => {
       };
     }
   } catch (error) {
-    if (error instanceof Error) {
-      sentryException({ error });
-      return {
-        errors: error.message,
-      };
-    }
+    console.error(error);
+
+    return {
+      errors: parseError(error).message,
+    };
   }
 };

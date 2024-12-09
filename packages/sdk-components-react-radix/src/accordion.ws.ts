@@ -14,7 +14,7 @@ import {
   type WsComponentPropsMeta,
   type WsEmbedTemplate,
 } from "@webstudio-is/react-sdk";
-import { div, h3, button } from "@webstudio-is/react-sdk/css-normalize";
+import { div, h3, button } from "@webstudio-is/sdk/normalize.css";
 import * as tc from "./theme/tailwind-classes";
 import { buttonReset } from "./theme/styles";
 import {
@@ -131,23 +131,9 @@ export const metaAccordion: WsComponentMeta = {
     {
       type: "instance",
       component: "Accordion",
-      variables: {
-        accordionValue: { initialValue: "0" },
-      },
       props: [
         { type: "boolean", name: "collapsible", value: true },
-        { type: "expression", name: "value", code: "accordionValue" },
-        {
-          name: "onValueChange",
-          type: "action",
-          value: [
-            {
-              type: "execute",
-              args: ["value"],
-              code: `accordionValue = value`,
-            },
-          ],
-        },
+        { type: "string", name: "defaultValue", value: "0" },
       ],
       children: [
         {
@@ -156,7 +142,9 @@ export const metaAccordion: WsComponentMeta = {
           styles: accordionItemStyles,
           children: [
             createAccordionTrigger({
-              children: [{ type: "text", value: "Is it accessible?" }],
+              children: [
+                { type: "text", value: "Is it accessible?", placeholder: true },
+              ],
             }),
             {
               type: "instance",
@@ -166,6 +154,7 @@ export const metaAccordion: WsComponentMeta = {
                 {
                   type: "text",
                   value: "Yes. It adheres to the WAI-ARIA design pattern.",
+                  placeholder: true,
                 },
               ],
             },
@@ -178,7 +167,9 @@ export const metaAccordion: WsComponentMeta = {
           styles: accordionItemStyles,
           children: [
             createAccordionTrigger({
-              children: [{ type: "text", value: "Is it styled?" }],
+              children: [
+                { type: "text", value: "Is it styled?", placeholder: true },
+              ],
             }),
             {
               type: "instance",
@@ -189,6 +180,7 @@ export const metaAccordion: WsComponentMeta = {
                   type: "text",
                   value:
                     "Yes. It comes with default styles that matches the other components' aesthetic.",
+                  placeholder: true,
                 },
               ],
             },
@@ -201,7 +193,9 @@ export const metaAccordion: WsComponentMeta = {
           styles: accordionItemStyles,
           children: [
             createAccordionTrigger({
-              children: [{ type: "text", value: "Is it animated?" }],
+              children: [
+                { type: "text", value: "Is it animated?", placeholder: true },
+              ],
             }),
             {
               type: "instance",
@@ -212,6 +206,7 @@ export const metaAccordion: WsComponentMeta = {
                   type: "text",
                   value:
                     "Yes. It's animated by default, but you can disable it if you prefer.",
+                  placeholder: true,
                 },
               ],
             },
@@ -227,7 +222,10 @@ export const metaAccordionItem: WsComponentMeta = {
   type: "container",
   label: "Item",
   icon: ItemIcon,
-  requiredAncestors: ["Accordion"],
+  constraints: {
+    relation: "ancestor",
+    component: { $eq: "Accordion" },
+  },
   indexWithinAncestor: "Accordion",
   presetStyle,
 };
@@ -237,7 +235,10 @@ export const metaAccordionHeader: WsComponentMeta = {
   type: "container",
   label: "Item Header",
   icon: HeaderIcon,
-  requiredAncestors: ["AccordionItem"],
+  constraints: {
+    relation: "ancestor",
+    component: { $eq: "AccordionItem" },
+  },
   detachable: false,
   presetStyle: {
     h3: [h3, tc.my(0)].flat(),
@@ -249,7 +250,10 @@ export const metaAccordionTrigger: WsComponentMeta = {
   type: "container",
   label: "Item Trigger",
   icon: TriggerIcon,
-  requiredAncestors: ["AccordionHeader"],
+  constraints: {
+    relation: "ancestor",
+    component: { $eq: "AccordionHeader" },
+  },
   detachable: false,
   states: [
     ...defaultStates,
@@ -269,7 +273,10 @@ export const metaAccordionContent: WsComponentMeta = {
   type: "container",
   label: "Item Content",
   icon: ContentIcon,
-  requiredAncestors: ["AccordionItem"],
+  constraints: {
+    relation: "ancestor",
+    component: { $eq: "AccordionItem" },
+  },
   detachable: false,
   presetStyle,
 };

@@ -1,7 +1,8 @@
-import type { ComponentStory } from "@storybook/react";
+import type { StoryFn } from "@storybook/react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { Dashboard } from "./dashboard";
 import type { UserPlanFeatures } from "~/shared/db/user-plan-features.server";
+import type { DashboardProject } from "@webstudio-is/dashboard";
 
 export default {
   title: "Dashboard / Projects",
@@ -15,6 +16,7 @@ const user = {
   image: null,
   username: "Taylor",
   teamId: null,
+  provider: "github",
 };
 
 const createRouter = (element: JSX.Element) =>
@@ -30,35 +32,41 @@ const userPlanFeatures: UserPlanFeatures = {
   hasProPlan: false,
   hasSubscription: false,
   allowShareAdminLinks: false,
-  allowResourceVariables: false,
-  maxDomainsAllowedPerUser: 5,
+  allowDynamicData: false,
+  maxContactEmails: 0,
+  maxDomainsAllowedPerUser: 1,
 };
 
-export const Empty: ComponentStory<typeof Dashboard> = () => {
+export const Empty: StoryFn<typeof Dashboard> = () => {
   const router = createRouter(
     <Dashboard
       user={user}
       projects={[]}
       projectTemplates={[]}
       userPlanFeatures={userPlanFeatures}
+      publisherHost={"https://wstd.work"}
+      imageBaseUrl=""
     />
   );
   return <RouterProvider router={router} />;
 };
 
-export const WithProjects: ComponentStory<typeof Dashboard> = () => {
+export const WithProjects: StoryFn<typeof Dashboard> = () => {
   const projects = [
     {
       id: "0",
       createdAt: new Date().toString(),
       title: "My Project",
       domain: "domain.com",
-      userId: null,
+      userId: "",
       isDeleted: false,
       isPublished: false,
       latestBuild: null,
       previewImageAsset: null,
-    },
+      previewImageAssetId: "",
+      latestBuildVirtual: null,
+      marketplaceApprovalStatus: "UNLISTED" as const,
+    } as DashboardProject,
   ];
   const router = createRouter(
     <Dashboard
@@ -66,6 +74,8 @@ export const WithProjects: ComponentStory<typeof Dashboard> = () => {
       projects={projects}
       projectTemplates={projects}
       userPlanFeatures={userPlanFeatures}
+      publisherHost={"https://wstd.work"}
+      imageBaseUrl=""
     />
   );
   return <RouterProvider router={router} />;

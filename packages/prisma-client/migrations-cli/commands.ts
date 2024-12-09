@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import { FileLocker, MigrationMeta } from "umzug";
-import prompts from "prompts";
 import { inspect } from "node:util";
 import * as prismaMigrations from "./prisma-migrations";
 import { umzug } from "./umzug";
@@ -14,24 +13,6 @@ const templateFilePath = path.join(
   "template.txt"
 );
 const lockfilePath = path.join(prismaMigrations.migrationsDir, "lockfile");
-
-const ensureUserWantsToContinue = async (defaultResult = false) => {
-  if (args.values.force) {
-    return;
-  }
-
-  const { shouldContinue } = await prompts({
-    type: "confirm",
-    name: "shouldContinue",
-    message: "Continue?",
-    initial: defaultResult,
-  });
-
-  if (shouldContinue === false) {
-    logger.info("Aborted.");
-    process.exit(0);
-  }
-};
 
 const writeFile = (filePath: string, content: string) => {
   const dir = path.dirname(filePath);
@@ -75,8 +56,8 @@ const getStatus = async (): Promise<Status> => {
     const state = prismaMigrations.isAppliedMigration(migration)
       ? "applied"
       : prismaMigrations.isFailedMigration(migration)
-      ? "failed"
-      : "rolled-back";
+        ? "failed"
+        : "rolled-back";
 
     return { migration, state, fileState };
   });
@@ -162,11 +143,6 @@ export const createSchema = async ({ name }: { name: string }) => {
   ensureNoPending(status);
 
   const sqlScript = await prismaMigrations.cliDiff();
-
-  if (isNoopSql(sqlScript ?? "")) {
-    logger.info("No changes to apply");
-    process.exit(0);
-  }
 
   const migrationName = prismaMigrations.generateMigrationName(name);
 
@@ -291,16 +267,6 @@ export const migrate = async () => {
     process.exit(0);
   }
 
-  if (args.values.dev) {
-    logger.info("You're about to apply the following migration(s):");
-    logger.info("");
-    for (const migration of status.pending) {
-      logger.info(`  - ${migration.name}`);
-    }
-    logger.info("");
-    await ensureUserWantsToContinue(true);
-  }
-
   await up();
 };
 
@@ -333,6 +299,12 @@ export const status = async () => {
   logger.info("");
 };
 
+export const pendingCount = async () => {
+  const status = await getStatus();
+
+  return status.pending.length;
+};
+
 // Silimar to https://www.prisma.io/docs/reference/api-reference/command-reference#migrate-resolve
 export const resolve = async ({
   migrationName,
@@ -363,8 +335,6 @@ export const resolve = async ({
   );
   logger.info("");
 
-  await ensureUserWantsToContinue();
-
   if (resolveAs === "applied") {
     await prismaMigrations.setApplied(migrationName);
     logger.info(`Resolved ${migrationName} as applied`);
@@ -375,19 +345,4 @@ export const resolve = async ({
   await prismaMigrations.setRolledBack(migrationName);
   logger.info(`Resolved ${migrationName} as rolled back`);
   logger.info("");
-};
-
-export const reset = async () => {
-  // Just to make it read the migrations folder
-  // and fail early if something is wrong with it.
-  await getStatus();
-
-  logger.info("You're about to DELETE ALL INFORMATION from the database,");
-  logger.info("and run all migrations from scratch!");
-  logger.info("");
-
-  await ensureUserWantsToContinue();
-
-  await prismaMigrations.resetDatabase();
-  await up();
 };

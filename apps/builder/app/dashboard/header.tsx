@@ -1,6 +1,6 @@
 import {
   ChevronDownIcon,
-  UploadIcon,
+  UpgradeIcon,
   WebstudioIcon,
 } from "@webstudio-is/icons";
 import {
@@ -18,6 +18,7 @@ import {
   Button,
   ProBadge,
   DropdownMenuSeparator,
+  Text,
 } from "@webstudio-is/design-system";
 import { useNavigate } from "@remix-run/react";
 import { logoutPath, userPlanSubscriptionPath } from "~/shared/router-utils";
@@ -26,7 +27,7 @@ import type { UserPlanFeatures } from "~/shared/db/user-plan-features.server";
 
 const containerStyle = css({
   px: theme.spacing[13],
-  bc: theme.colors.backgroundPanel,
+  backgroundColor: theme.colors.backgroundPanel,
   height: theme.spacing[15],
   boxShadow: theme.shadows.brandElevationBig,
 });
@@ -34,6 +35,8 @@ const containerStyle = css({
 const getAvatarLetter = (title?: string) => {
   return (title || "X").charAt(0).toLocaleUpperCase();
 };
+
+const defaultUserName = "James Bond";
 
 const Menu = ({
   user,
@@ -43,7 +46,7 @@ const Menu = ({
   userPlanFeatures: UserPlanFeatures;
 }) => {
   const navigate = useNavigate();
-  const title = user?.username ?? user?.email ?? undefined;
+  const nameOrEmail = user.username ?? user.email ?? defaultUserName;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -58,8 +61,8 @@ const Menu = ({
 
             <Avatar
               src={user?.image || undefined}
-              fallback={getAvatarLetter(title)}
-              alt={title || "User Avatar"}
+              fallback={getAvatarLetter(nameOrEmail)}
+              alt={nameOrEmail}
             />
 
             <ChevronDownIcon
@@ -72,7 +75,10 @@ const Menu = ({
       </DropdownMenuTrigger>
       <DropdownMenuPortal>
         <DropdownMenuContent align="end">
-          <DropdownMenuLabel>{title}</DropdownMenuLabel>
+          <DropdownMenuLabel>
+            {user.username ?? defaultUserName}
+            <Text>{user.email}</Text>
+          </DropdownMenuLabel>
           {userPlanFeatures.hasSubscription && (
             <DropdownMenuItem
               onSelect={() => navigate(userPlanSubscriptionPath())}
@@ -89,7 +95,7 @@ const Menu = ({
                 gap: theme.spacing[3],
               }}
             >
-              <UploadIcon />
+              <UpgradeIcon />
               <div>Upgrade to Pro</div>
             </DropdownMenuItem>
           )}
@@ -117,7 +123,7 @@ export const Header = ({
       justify="between"
       className={containerStyle()}
     >
-      <WebstudioIcon width={30} height={23} />
+      <WebstudioIcon size={22} />
 
       <Menu user={user} userPlanFeatures={userPlanFeatures} />
     </Flex>

@@ -1,21 +1,19 @@
-/* eslint-disable react/display-name */
-// We can't use .displayName until this is merged https://github.com/styleguidist/react-docgen-typescript/pull/449
-
 import {
   type ComponentPropsWithoutRef,
   type ForwardRefExoticComponent,
-  type ComponentPropsWithRef,
   forwardRef,
+  type ComponentProps,
+  type RefAttributes,
 } from "react";
 import { Root, List, Trigger, Content } from "@radix-ui/react-tabs";
 import {
   getClosestInstance,
   getIndexWithinAncestorFromComponentProps,
   type Hook,
-} from "@webstudio-is/react-sdk";
+} from "@webstudio-is/react-sdk/runtime";
 
 export const Tabs: ForwardRefExoticComponent<
-  Omit<ComponentPropsWithRef<typeof Root>, "asChild" | "defaultValue">
+  Omit<ComponentProps<typeof Root>, "asChild"> & RefAttributes<HTMLDivElement>
 > = Root;
 
 export const TabsList = List;
@@ -53,10 +51,10 @@ export const hooksTabs: Hook = {
           `${namespace}:Tabs`
         );
         const contentValue =
-          context.getPropValue(instance.id, "value") ??
+          context.getPropValue(instance, "value") ??
           context.indexesWithinAncestors.get(instance.id)?.toString();
         if (tabs && contentValue) {
-          context.setPropVariable(tabs.id, "value", contentValue);
+          context.setMemoryProp(tabs, "value", contentValue);
         }
       }
     }

@@ -113,12 +113,17 @@ const Toolbar = ({ state, scale }: ToolbarProps) => {
         background: theme.colors.backgroundPanel,
         padding: theme.spacing[3],
         borderRadius: theme.borderRadius[6],
-        border: `1px solid ${theme.colors.slate8}`,
+        border: `1px solid ${theme.colors.borderMain}`,
         filter:
           "drop-shadow(0px 2px 7px rgba(0, 0, 0, 0.1)) drop-shadow(0px 5px 17px rgba(0, 0, 0, 0.15))",
       }}
       onClick={(event) => {
         event.stopPropagation();
+      }}
+      // We use onPointerDown here to prevent the canvas from being inert (see builder.tsx for more details)
+      onPointerDown={(event) => {
+        // We don't want the logic in the builder to make canvas inert to be triggered
+        event.preventDefault();
       }}
     >
       <Tooltip content="Clear styles">

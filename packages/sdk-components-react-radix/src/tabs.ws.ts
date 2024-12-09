@@ -11,7 +11,7 @@ import {
   type WsComponentMeta,
   type WsComponentPropsMeta,
 } from "@webstudio-is/react-sdk";
-import { button, div } from "@webstudio-is/react-sdk/css-normalize";
+import { button, div } from "@webstudio-is/sdk/normalize.css";
 import * as tc from "./theme/tailwind-classes";
 import { buttonReset } from "./theme/styles";
 import {
@@ -72,6 +72,20 @@ export const metaTabs: WsComponentMeta = {
   order: 2,
   type: "container",
   icon: TabsIcon,
+  constraints: [
+    {
+      relation: "descendant",
+      component: { $eq: "TabsTrigger" },
+    },
+    {
+      relation: "descendant",
+      component: { $eq: "TabsList" },
+    },
+    {
+      relation: "descendant",
+      component: { $eq: "TabsContent" },
+    },
+  ],
   presetStyle,
   description:
     "A set of panels with content that are displayed one at a time. Duplicate both a tab trigger and tab content to add more tabs. Triggers and content are connected according to their order in the Navigator.",
@@ -79,19 +93,7 @@ export const metaTabs: WsComponentMeta = {
     {
       type: "instance",
       component: "Tabs",
-      variables: {
-        tabsValue: { initialValue: "0" },
-      },
-      props: [
-        { type: "expression", name: "value", code: "tabsValue" },
-        {
-          name: "onValueChange",
-          type: "action",
-          value: [
-            { type: "execute", args: ["value"], code: `tabsValue = value` },
-          ],
-        },
-      ],
+      props: [{ type: "string", name: "defaultValue", value: "0" }],
       children: [
         {
           type: "instance",
@@ -112,13 +114,15 @@ export const metaTabs: WsComponentMeta = {
               type: "instance",
               component: "TabsTrigger",
               styles: tabsTriggerStyles,
-              children: [{ type: "text", value: "Account" }],
+              children: [{ type: "text", value: "Account", placeholder: true }],
             },
             {
               type: "instance",
               component: "TabsTrigger",
               styles: tabsTriggerStyles,
-              children: [{ type: "text", value: "Password" }],
+              children: [
+                { type: "text", value: "Password", placeholder: true },
+              ],
             },
           ],
         },
@@ -127,14 +131,24 @@ export const metaTabs: WsComponentMeta = {
           component: "TabsContent",
           styles: tabsContentStyles,
           children: [
-            { type: "text", value: "Make changes to your account here." },
+            {
+              type: "text",
+              value: "Make changes to your account here.",
+              placeholder: true,
+            },
           ],
         },
         {
           type: "instance",
           component: "TabsContent",
           styles: tabsContentStyles,
-          children: [{ type: "text", value: "Change your password here." }],
+          children: [
+            {
+              type: "text",
+              value: "Change your password here.",
+              placeholder: true,
+            },
+          ],
         },
       ],
     },
@@ -143,10 +157,12 @@ export const metaTabs: WsComponentMeta = {
 
 export const metaTabsList: WsComponentMeta = {
   category: "hidden",
-  detachable: false,
   type: "container",
   icon: HeaderIcon,
-  requiredAncestors: ["Tabs"],
+  constraints: {
+    relation: "ancestor",
+    component: { $eq: "Tabs" },
+  },
   presetStyle,
 };
 
@@ -154,8 +170,16 @@ export const metaTabsTrigger: WsComponentMeta = {
   category: "hidden",
   type: "container",
   icon: TriggerIcon,
-  requiredAncestors: ["TabsList"],
-  invalidAncestors: ["TabsTrigger"],
+  constraints: [
+    {
+      relation: "ancestor",
+      component: { $eq: "TabsList" },
+    },
+    {
+      relation: "ancestor",
+      component: { $neq: "TabsTrigger" },
+    },
+  ],
   indexWithinAncestor: "Tabs",
   label: "Tab Trigger",
   states: [
@@ -176,7 +200,10 @@ export const metaTabsContent: WsComponentMeta = {
   type: "container",
   label: "Tab Content",
   icon: ContentIcon,
-  requiredAncestors: ["Tabs"],
+  constraints: {
+    relation: "ancestor",
+    component: { $eq: "Tabs" },
+  },
   indexWithinAncestor: "Tabs",
   presetStyle,
 };

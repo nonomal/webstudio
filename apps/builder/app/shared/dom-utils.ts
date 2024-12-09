@@ -34,17 +34,52 @@ export const getElementByInstanceSelector = (
   );
 };
 
+// Determine if the element is detached, or lacks visual layout.
+// We want to exclude elements that are display: none, option tags, or are not in the DOM
+const hasLayout = (element: HTMLElement) => {
+  // Detached element
+  if (false === document.documentElement.contains(element)) {
+    return false;
+  }
+
+  if (element.tagName.toLowerCase() === "option") {
+    return false;
+  }
+
+  // Display none
+  if (getComputedStyle(element)?.display?.toLowerCase() === "none") {
+    return false;
+  }
+
+  return true;
+};
+
+export const getVisibleElementsByInstanceSelector = (
+  instanceSelector: InstanceSelector | Readonly<InstanceSelector>
+) => {
+  return getElementsByInstanceSelector(instanceSelector, true);
+};
+
+export const getAllElementsByInstanceSelector = (
+  instanceSelector: InstanceSelector | Readonly<InstanceSelector>
+) => {
+  return getElementsByInstanceSelector(instanceSelector, false);
+};
+
 /**
  * Get root visible elements, even if instance
  **/
-export const getElementsByInstanceSelector = (
-  instanceSelector: InstanceSelector | Readonly<InstanceSelector>
+const getElementsByInstanceSelector = (
+  instanceSelector: InstanceSelector | Readonly<InstanceSelector>,
+  skipHidden: boolean
 ) => {
   const descendantsOrSelf = [
     ...document.querySelectorAll<HTMLElement>(
       `[${selectorIdAttribute}$="${instanceSelector.join(",")}"]`
     ),
-  ].filter((element) => getIsVisuallyHidden(element) === false);
+  ].filter((element) =>
+    skipHidden ? getIsVisuallyHidden(element) === false : true
+  );
 
   const visibleIdSelectors = descendantsOrSelf.map(
     (element) => element.getAttribute(selectorIdAttribute) ?? ""
@@ -67,7 +102,19 @@ export const getElementsByInstanceSelector = (
     rootSelectorSet.has(element.getAttribute(selectorIdAttribute) ?? "")
   );
 
-  return rootElements;
+  return rootElements.map((element) => {
+    let elementResult: HTMLElement = element;
+
+    while (
+      skipHidden &&
+      false === hasLayout(elementResult) &&
+      elementResult.parentElement !== null
+    ) {
+      elementResult = elementResult.parentElement;
+    }
+
+    return elementResult;
+  });
 };
 
 type Rect = {
@@ -86,7 +133,10 @@ const sumRects = (first: Rect, second: Rect) => {
   };
 };
 
-export const getAllElementsBoundingBox = (elements: Element[]): DOMRect => {
+export const getAllElementsBoundingBox = (
+  elements: Element[],
+  depth: number = 0
+): DOMRect => {
   const rects: Rect[] = [];
 
   if (elements.length === 0) {
@@ -103,13 +153,52 @@ export const getAllElementsBoundingBox = (elements: Element[]): DOMRect => {
     }
 
     if (element.children.length === 0) {
+      const textNode = element.firstChild;
+
+      if (textNode?.nodeType === Node.TEXT_NODE) {
+        // Create a range object
+        const range = document.createRange();
+        // Set the range to encompass the text node
+        range.selectNodeContents(textNode);
+        // Get the bounding rectangle
+        const rect = range.getBoundingClientRect();
+
+        if (rect.width !== 0 || rect.height !== 0) {
+          rects.push(rect);
+          range.detach();
+          continue;
+        }
+        range.detach();
+      }
+    }
+
+    if (element.children.length > 0) {
+      const childRect = getAllElementsBoundingBox(
+        [...element.children],
+        depth + 1
+      );
+      if (childRect.width !== 0 || childRect.height !== 0) {
+        const { top, right, bottom, left } = childRect;
+        rects.push({ top, right, bottom, left });
+        continue;
+      }
+    }
+
+    if (depth > 0) {
       continue;
     }
 
-    const childRect = getAllElementsBoundingBox([...element.children]);
-    if (childRect.width !== 0 || childRect.height !== 0) {
-      const { top, right, bottom, left } = childRect;
+    // We here, let's try ancestor size
+    const parentElement = element.parentElement;
+    if (parentElement === null) {
+      continue;
+    }
+    const parentRect = getAllElementsBoundingBox([parentElement]);
+
+    if (parentRect.width !== 0 || parentRect.height !== 0) {
+      const { top, right, bottom, left } = parentRect;
       rects.push({ top, right, bottom, left });
+      continue;
     }
   }
 

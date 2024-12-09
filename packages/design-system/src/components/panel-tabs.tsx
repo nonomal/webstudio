@@ -10,19 +10,19 @@ import { styled, theme } from "../stitches.config";
 export const PanelTabs = styled(Primitive.Root, {
   display: "flex",
   flexDirection: "column",
+  "&[hidden]": { display: "none" },
 });
 
 export const PanelTabsList = styled(Primitive.List, {
   display: "flex",
-  px: theme.spacing[5],
-  py: theme.spacing[3],
+  padding: theme.spacing[5],
 });
 
 export const PanelTabsTrigger = styled(Primitive.Trigger, {
   all: "unset", // reset <button>
   ...textVariants.titles,
   color: theme.colors.foregroundTextMoreSubtle,
-  padding: theme.spacing[5],
+  padding: theme.spacing[3],
   borderRadius: theme.borderRadius[4],
 
   "&:hover": {
@@ -31,14 +31,16 @@ export const PanelTabsTrigger = styled(Primitive.Trigger, {
   },
 
   "&:focus-visible": {
-    outline: `2px solid ${theme.colors.borderFocus}`,
-    outlineOffset: "-2px",
+    outline: `1px solid ${theme.colors.borderFocus}`,
+    outlineOffset: "-1px",
   },
 
   "&[data-state=active]": { color: theme.colors.foregroundMain },
 });
 
 export const PanelTabsContent = styled(Primitive.Content, {
+  display: "grid",
+  minHeight: 0,
   "&:focus": { outline: "none" },
   "&[data-state=inactive]": { display: "none" },
 });

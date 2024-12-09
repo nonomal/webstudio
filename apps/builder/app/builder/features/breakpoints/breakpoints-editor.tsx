@@ -90,7 +90,7 @@ const BreakpointEditorItem = ({
     useHandleChangeComplete(breakpoint, onChangeComplete);
 
   return (
-    <Flex gap="2" css={{ mx: theme.spacing[7] }}>
+    <Flex gap="2">
       <form
         ref={formRef}
         onKeyPress={(event) => {
@@ -118,7 +118,7 @@ const BreakpointEditorItem = ({
           <Flex gap="2" css={{ width: theme.spacing[26] }}>
             <Select
               name="type"
-              css={{ zIndex: theme.zIndices[1], width: theme.spacing[21] }}
+              css={{ width: theme.spacing[28] }}
               options={["maxWidth", "minWidth"]}
               getLabel={(option) =>
                 option === "maxWidth" ? "Max Width" : "Min Width"
@@ -136,7 +136,7 @@ const BreakpointEditorItem = ({
               suffix={
                 <Text
                   variant="unit"
-                  color="subtle"
+                  color="moreSubtle"
                   align="center"
                   css={{ width: theme.spacing[10] }}
                 >
@@ -186,9 +186,7 @@ export const BreakpointsEditor = ({ onDelete }: BreakpointsEditorProps) => {
   return (
     <Flex direction="column">
       <PanelTitle
-        css={{
-          px: theme.spacing[7],
-        }}
+        css={{ paddingInline: theme.panel.paddingInline }}
         suffix={
           <IconButton
             onClick={() => {
@@ -207,21 +205,23 @@ export const BreakpointsEditor = ({ onDelete }: BreakpointsEditorProps) => {
         {"Breakpoints"}
       </PanelTitle>
       <Separator />
-      <Box css={{ marginTop: theme.spacing[5] }}>
+      <Fragment>
         {allBreakpoints.map((breakpoint, index, all) => {
           return (
             <Fragment key={breakpoint.id}>
-              <BreakpointEditorItem
-                breakpoint={breakpoint}
-                onChangeComplete={handleChangeComplete}
-                onDelete={onDelete}
-                autoFocus={index === 0}
-              />
+              <Box css={{ p: theme.panel.padding }}>
+                <BreakpointEditorItem
+                  breakpoint={breakpoint}
+                  onChangeComplete={handleChangeComplete}
+                  onDelete={onDelete}
+                  autoFocus={index === 0}
+                />
+              </Box>
               {index < all.length - 1 && <PopoverSeparator />}
             </Fragment>
           );
         })}
-      </Box>
+      </Fragment>
       {allBreakpoints.length === 0 && (
         <Text css={{ margin: theme.spacing[10] }}>No breakpoints found</Text>
       )}

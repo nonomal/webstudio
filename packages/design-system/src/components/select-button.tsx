@@ -21,7 +21,8 @@ const chevronStyle = css({ color: `var(${chevronColor})` });
 
 const style = css({
   all: "unset", // reset <button>
-  height: theme.spacing[12],
+  minWidth: 0,
+  height: theme.spacing[11],
   boxSizing: "border-box",
   display: "flex",
   alignItems: "center",
@@ -45,7 +46,6 @@ const style = css({
   },
   "&:focus-visible": {
     borderColor: theme.colors.borderFocus,
-    outline: `1px solid ${theme.colors.borderFocus}`,
   },
   variants: {
     fullWidth: { true: { width: "100%" } },

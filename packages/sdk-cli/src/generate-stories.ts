@@ -70,7 +70,9 @@ const generateComponentImports = ({
 };
 
 const getStoriesImports = ({ hasState }: { hasState: boolean }) =>
-  hasState ? `import { useState } from "react";\n` : "";
+  hasState
+    ? `import { useVariableState } from "@webstudio-is/react-sdk/runtime";\n`
+    : "";
 
 const getStoriesExports = (name: string, css: string) => `
 export default {
@@ -130,6 +132,7 @@ export const generateStories = async () => {
           [instance.id, instance] satisfies [Instance["id"], Instance]
       ),
     ]);
+    const props = new Map(data.props.map((prop) => [prop.id, prop]));
     const components = new Set<Instance["component"]>();
     const usedMetas = new Map<Instance["component"], WsComponentMeta>();
     const bodyMeta = baseMetas.get("Body");
@@ -145,21 +148,21 @@ export const generateStories = async () => {
         usedMetas.set(instance.component, meta);
       }
     }
-    const { cssText, classesMap } = generateCss(
-      {
-        assets: [],
-        breakpoints: [
-          [baseBreakpointId, { id: baseBreakpointId, label: "base" }],
-        ],
-        styles: data.styles.map((item) => [getStyleDeclKey(item), item]),
-        styleSourceSelections: data.styleSourceSelections.map((item) => [
-          item.instanceId,
-          item,
-        ]),
-        componentMetas: usedMetas,
-      },
-      { assetBaseUrl: "/", atomic: true }
-    );
+    const { cssText, classes } = generateCss({
+      instances,
+      props,
+      assets: new Map(),
+      breakpoints: new Map([
+        [baseBreakpointId, { id: baseBreakpointId, label: "base" }],
+      ]),
+      styles: new Map(data.styles.map((item) => [getStyleDeclKey(item), item])),
+      styleSourceSelections: new Map(
+        data.styleSourceSelections.map((item) => [item.instanceId, item])
+      ),
+      componentMetas: usedMetas,
+      assetBaseUrl: "/",
+      atomic: false,
+    });
     const scope = createScope(["Component", "Story", "props", "useState"]);
     let content = "";
     content += getStoriesImports({
@@ -174,13 +177,13 @@ export const generateStories = async () => {
     });
     content += `\n`;
     content += generateWebstudioComponent({
-      classesMap,
+      classesMap: classes,
       scope,
       name: `Component`,
       rootInstanceId,
       parameters: [],
       instances,
-      props: new Map(data.props.map((prop) => [prop.id, prop])),
+      props,
       dataSources: new Map(data.dataSources.map((prop) => [prop.id, prop])),
       indexesWithinAncestors: getIndexesWithinAncestors(usedMetas, instances, [
         rootInstanceId,

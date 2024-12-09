@@ -8,7 +8,7 @@ import {
   type WsComponentMeta,
   type WsComponentPropsMeta,
 } from "@webstudio-is/react-sdk";
-import { button, span } from "@webstudio-is/react-sdk/css-normalize";
+import { button, span } from "@webstudio-is/sdk/normalize.css";
 import * as tc from "./theme/tailwind-classes";
 import { buttonReset } from "./theme/styles";
 import {
@@ -126,7 +126,7 @@ export const metaCheckbox: WsComponentMeta = {
           component: "Text",
           label: "Checkbox Label",
           props: [{ name: "tag", type: "string", value: "span" }],
-          children: [{ type: "text", value: "Checkbox" }],
+          children: [{ type: "text", value: "Checkbox", placeholder: true }],
         },
       ],
     },
@@ -146,7 +146,7 @@ export const metaCheckboxIndicator: WsComponentMeta = {
 
 export const propsMetaCheckbox: WsComponentPropsMeta = {
   props: propsCheckbox,
-  initialProps: ["id", "checked", "name", "required"],
+  initialProps: ["id", "className", "name", "value", "required", "checked"],
 };
 
 export const propsMetaCheckboxIndicator: WsComponentPropsMeta = {

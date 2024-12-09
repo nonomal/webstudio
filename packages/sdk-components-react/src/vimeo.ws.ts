@@ -5,7 +5,7 @@ import {
   type WsComponentMeta,
   type WsComponentPropsMeta,
 } from "@webstudio-is/react-sdk";
-import { div } from "@webstudio-is/react-sdk/css-normalize";
+import { div } from "@webstudio-is/sdk/normalize.css";
 import { props } from "./__generated__/vimeo.props";
 import { Vimeo } from "./vimeo";
 import type { ComponentProps } from "react";
@@ -17,13 +17,16 @@ const presetStyle = {
 export const meta: WsComponentMeta = {
   category: "media",
   type: "container",
-  label: "Vimeo",
   description:
     "Add a video to your page that is hosted on Vimeo. Paste a Vimeo URL and configure the video in the Settings tab.",
   order: 1,
   icon: VimeoIcon,
   states: defaultStates,
   presetStyle,
+  constraints: {
+    relation: "ancestor",
+    component: { $nin: ["Button", "Link", "Heading"] },
+  },
   template: [
     {
       type: "instance",
@@ -100,7 +103,7 @@ export const meta: WsComponentMeta = {
         },
         {
           type: "instance",
-          component: "Box",
+          component: "VimeoSpinner",
           label: "Spinner",
           styles: [
             {
@@ -314,6 +317,7 @@ export const meta: WsComponentMeta = {
 
 const initialProps: Array<keyof ComponentProps<typeof Vimeo>> = [
   "id",
+  "className",
   "url",
   "quality",
   "showPreview",

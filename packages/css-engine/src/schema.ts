@@ -3,6 +3,7 @@ import type {
   Property as GeneratedProperty,
   Unit as GeneratedUnit,
 } from "./__generated__/types";
+import { toValue, type TransformValue } from "./core/to-value";
 
 export type CustomProperty = `--${string}`;
 
@@ -16,6 +17,7 @@ export const UnitValue = z.object({
   type: z.literal("unit"),
   unit: Unit,
   value: z.number(),
+  hidden: z.boolean().optional(),
 });
 
 export type UnitValue = z.infer<typeof UnitValue>;
@@ -24,6 +26,7 @@ export const KeywordValue = z.object({
   type: z.literal("keyword"),
   // @todo use exact type
   value: z.string(),
+  hidden: z.boolean().optional(),
 });
 export type KeywordValue = z.infer<typeof KeywordValue>;
 
@@ -42,6 +45,7 @@ export type UnparsedValue = z.infer<typeof UnparsedValue>;
 const FontFamilyValue = z.object({
   type: z.literal("fontFamily"),
   value: z.array(z.string()),
+  hidden: z.boolean().optional(),
 });
 export type FontFamilyValue = z.infer<typeof FontFamilyValue>;
 
@@ -51,8 +55,23 @@ const RgbValue = z.object({
   g: z.number(),
   b: z.number(),
   alpha: z.number(),
+  hidden: z.boolean().optional(),
 });
 export type RgbValue = z.infer<typeof RgbValue>;
+
+export type FunctionValue = z.infer<typeof FunctionValue>;
+
+export const FunctionValue: z.ZodType<{
+  type: "function";
+  name: string;
+  args: StyleValue;
+  hidden?: boolean;
+}> = z.object({
+  type: z.literal("function"),
+  name: z.string(),
+  args: z.lazy(() => StyleValue),
+  hidden: z.boolean().optional(),
+});
 
 export const ImageValue = z.object({
   type: z.literal("image"),
@@ -68,25 +87,70 @@ export const ImageValue = z.object({
 
 export type ImageValue = z.infer<typeof ImageValue>;
 
+// initial value of custom properties
+// https://www.w3.org/TR/css-variables-1/#guaranteed-invalid
+export const GuaranteedInvalidValue = z.object({
+  type: z.literal("guaranteedInvalid"),
+  hidden: z.boolean().optional(),
+});
+export type GuaranteedInvalidValue = z.infer<typeof GuaranteedInvalidValue>;
+
 // We want to be able to render the invalid value
 // and show it is invalid visually, without saving it to the db
 export const InvalidValue = z.object({
   type: z.literal("invalid"),
   value: z.string(),
+  hidden: z.boolean().optional(),
 });
 export type InvalidValue = z.infer<typeof InvalidValue>;
 
 const UnsetValue = z.object({
   type: z.literal("unset"),
   value: z.literal(""),
+  hidden: z.boolean().optional(),
 });
 export type UnsetValue = z.infer<typeof UnsetValue>;
+
+export const VarFallback = z.union([
+  UnparsedValue,
+  KeywordValue,
+  UnitValue,
+  RgbValue,
+]);
+export type VarFallback = z.infer<typeof VarFallback>;
+
+export const toVarFallback = (
+  styleValue: StyleValue,
+  transformValue?: TransformValue
+): VarFallback => {
+  if (
+    styleValue.type === "unparsed" ||
+    styleValue.type === "keyword" ||
+    styleValue.type === "unit" ||
+    styleValue.type === "rgb"
+  ) {
+    return styleValue;
+  }
+  styleValue satisfies Exclude<StyleValue, VarFallback>;
+  return { type: "unparsed", value: toValue(styleValue, transformValue) };
+};
+
+const VarValue = z.object({
+  type: z.literal("var"),
+  value: z.string(),
+  fallback: VarFallback.optional(),
+  hidden: z.boolean().optional(),
+});
+export type VarValue = z.infer<typeof VarValue>;
 
 export const TupleValueItem = z.union([
   UnitValue,
   KeywordValue,
   UnparsedValue,
+  ImageValue,
   RgbValue,
+  FunctionValue,
+  VarValue,
 ]);
 export type TupleValueItem = z.infer<typeof TupleValueItem>;
 
@@ -104,7 +168,10 @@ const LayerValueItem = z.union([
   UnparsedValue,
   ImageValue,
   TupleValue,
+  RgbValue,
   InvalidValue,
+  FunctionValue,
+  VarValue,
 ]);
 
 export type LayerValueItem = z.infer<typeof LayerValueItem>;
@@ -114,11 +181,12 @@ export type LayerValueItem = z.infer<typeof LayerValueItem>;
 export const LayersValue = z.object({
   type: z.literal("layers"),
   value: z.array(LayerValueItem),
+  hidden: z.boolean().optional(),
 });
 
 export type LayersValue = z.infer<typeof LayersValue>;
 
-const ValidStaticStyleValue = z.union([
+export const StyleValue = z.union([
   ImageValue,
   LayersValue,
   UnitValue,
@@ -127,41 +195,8 @@ const ValidStaticStyleValue = z.union([
   RgbValue,
   UnparsedValue,
   TupleValue,
-]);
-
-export type ValidStaticStyleValue = z.infer<typeof ValidStaticStyleValue>;
-
-/**
- * All StyleValue types that going to need wrapping into a CSS variable when rendered
- * on canvas inside builder.
- * Values like InvalidValue, UnsetValue, VarValue don't need to be wrapped
- */
-export const isValidStaticStyleValue = (
-  styleValue: StyleValue
-): styleValue is ValidStaticStyleValue => {
-  // guard against invalid checks
-  const staticStyleValue = styleValue as ValidStaticStyleValue;
-  return (
-    staticStyleValue.type === "image" ||
-    staticStyleValue.type === "layers" ||
-    staticStyleValue.type === "unit" ||
-    staticStyleValue.type === "keyword" ||
-    staticStyleValue.type === "fontFamily" ||
-    staticStyleValue.type === "rgb" ||
-    staticStyleValue.type === "unparsed" ||
-    staticStyleValue.type === "tuple"
-  );
-};
-
-const VarValue = z.object({
-  type: z.literal("var"),
-  value: z.string(),
-  fallbacks: z.array(ValidStaticStyleValue),
-});
-export type VarValue = z.infer<typeof VarValue>;
-
-export const StyleValue = z.union([
-  ValidStaticStyleValue,
+  FunctionValue,
+  GuaranteedInvalidValue,
   InvalidValue,
   UnsetValue,
   VarValue,

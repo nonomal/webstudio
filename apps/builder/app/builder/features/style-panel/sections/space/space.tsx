@@ -1,64 +1,51 @@
-import { type ComponentProps, useState, useRef } from "react";
-import type { RenderCategoryProps } from "../../style-sections";
+import { useState, useRef } from "react";
 import { SpaceLayout } from "./layout";
 import { ValueText } from "../shared/value-text";
 import { getSpaceModifiersGroup, useScrub } from "../shared/scrub";
-import { spacePropertiesNames } from "./types";
+import { spaceProperties } from "./properties";
 import type { SpaceStyleProperty, HoverTarget } from "./types";
 import { InputPopover } from "../shared/input-popover";
 import { SpaceTooltip } from "./tooltip";
-import { getStyleSource } from "../../shared/style-info";
-import { CollapsibleSection } from "../../shared/collapsible-section";
+import { StyleSection } from "../../shared/style-section";
 import { movementMapSpace, useKeyboardNavigation } from "../shared/keyboard";
-
-import type { CreateBatchUpdate } from "../../shared/use-style-data";
+import { useComputedStyleDecl, useComputedStyles } from "../../shared/model";
+import { createBatchUpdate, deleteProperty } from "../../shared/use-style-data";
+import { useModifierKeys } from "../../shared/modifier-keys";
+import { theme } from "@webstudio-is/design-system";
 
 const Cell = ({
   isPopoverOpen,
   onPopoverClose,
-  onChange,
   onHover,
   property,
+  activeProperties,
   scrubStatus,
-  currentStyle,
-  createBatchUpdate,
 }: {
   isPopoverOpen: boolean;
   onPopoverClose: () => void;
-  onChange: ComponentProps<typeof InputPopover>["onChange"];
   onHover: (target: HoverTarget | undefined) => void;
   property: SpaceStyleProperty;
+  activeProperties: SpaceStyleProperty[];
   scrubStatus: ReturnType<typeof useScrub>;
-  currentStyle: RenderCategoryProps["currentStyle"];
-  createBatchUpdate: CreateBatchUpdate;
 }) => {
-  const styleInfo = currentStyle[property];
+  const styleDecl = useComputedStyleDecl(property);
   const finalValue =
-    (scrubStatus.isActive && scrubStatus.values[property]) || styleInfo?.value;
-  const styleSource = getStyleSource(styleInfo);
-
-  // for TypeScript
-  if (finalValue === undefined) {
-    return null;
-  }
+    (scrubStatus.isActive && scrubStatus.values[property]) ||
+    styleDecl.cascadedValue;
 
   return (
     <>
       <InputPopover
-        styleSource={styleSource}
+        styleSource={styleDecl.source.name}
         value={finalValue}
         isOpen={isPopoverOpen}
         property={property}
-        onChange={onChange}
+        activeProperties={activeProperties}
         onClose={onPopoverClose}
       />
-      <SpaceTooltip
-        property={property}
-        style={currentStyle}
-        createBatchUpdate={createBatchUpdate}
-        preventOpen={scrubStatus.isActive}
-      >
+      <SpaceTooltip property={property} preventOpen={scrubStatus.isActive}>
         <ValueText
+          truncate
           css={{
             // We want value to have `default` cursor to indicate that it's clickable,
             // unlike the rest of the value area that has cursor that indicates scrubbing.
@@ -67,9 +54,10 @@ const Cell = ({
             // In order to have control over cursor we're setting pointerEvents to "all" here
             // because SpaceLayout sets it to "none" for cells' content.
             pointerEvents: "all",
+            maxWidth: theme.spacing[18],
           }}
           value={finalValue}
-          source={styleSource}
+          source={styleDecl.source.name}
           onMouseEnter={(event) =>
             onHover({ property, element: event.currentTarget })
           }
@@ -80,24 +68,21 @@ const Cell = ({
   );
 };
 
-export const SpaceSection = ({
-  setProperty,
-  deleteProperty,
-  createBatchUpdate,
-  currentStyle,
-}: RenderCategoryProps) => {
+export { spaceProperties as properties };
+
+export const Section = () => {
+  const styles = useComputedStyles(spaceProperties);
   const [hoverTarget, setHoverTarget] = useState<HoverTarget>();
 
   const scrubStatus = useScrub({
-    value:
-      hoverTarget === undefined
-        ? undefined
-        : currentStyle[hoverTarget.property]?.value,
+    value: styles.find(
+      (styleDecl) => styleDecl.property === hoverTarget?.property
+    )?.usedValue,
     target: hoverTarget,
     getModifiersGroup: getSpaceModifiersGroup,
     onChange: (values, options) => {
       const batch = createBatchUpdate();
-      for (const property of spacePropertiesNames) {
+      for (const property of spaceProperties) {
         const value = values[property];
         if (value !== undefined) {
           batch.setProperty(property)(value);
@@ -108,26 +93,30 @@ export const SpaceSection = ({
   });
 
   const [openProperty, setOpenProperty] = useState<SpaceStyleProperty>();
+  const [activePopoverProperties, setActivePopoverProperties] = useState<
+    undefined | readonly SpaceStyleProperty[]
+  >();
+  const modifiers = useModifierKeys();
+  const handleOpenProperty = (property: undefined | SpaceStyleProperty) => {
+    setOpenProperty(property);
+    setActivePopoverProperties(
+      property ? getSpaceModifiersGroup(property, modifiers) : undefined
+    );
+  };
 
   const layoutRef = useRef<HTMLDivElement>(null);
 
   const keyboardNavigation = useKeyboardNavigation({
-    onOpen: setOpenProperty,
+    onOpen: handleOpenProperty,
     movementMap: movementMapSpace,
   });
 
   // by deafult highlight hovered or scrubbed properties
-  let activeProperties = scrubStatus.properties;
-
   // if keyboard navigation is active, highlight its active property
-  if (keyboardNavigation.isActive) {
-    activeProperties = [keyboardNavigation.activeProperty];
-  }
-
   // if popover is open, highlight its property and hovered properties
-  if (openProperty !== undefined) {
-    activeProperties = [openProperty, ...scrubStatus.properties];
-  }
+  const activeProperties = [
+    ...(activePopoverProperties ?? scrubStatus.properties),
+  ];
 
   const handleHover = (target: HoverTarget | undefined) => {
     setHoverTarget(target);
@@ -135,20 +124,24 @@ export const SpaceSection = ({
   };
 
   return (
-    <CollapsibleSection
-      label="Space"
-      currentStyle={currentStyle}
-      properties={spacePropertiesNames}
-    >
+    <StyleSection label="Space" properties={spaceProperties}>
       <SpaceLayout
         ref={layoutRef}
         onClick={(event) => {
           const property = hoverTarget?.property;
-          if (event.altKey && property) {
+          const styleValueSource = styles.find(
+            (styleDecl) => styleDecl.property === property
+          )?.source.name;
+          if (
+            event.altKey &&
+            property &&
+            // reset when the value is set and after try to edit two sides
+            (styleValueSource === "local" || styleValueSource === "overwritten")
+          ) {
             deleteProperty(property);
             return;
           }
-          setOpenProperty(property);
+          handleOpenProperty(property);
         }}
         onHover={handleHover}
         onFocus={keyboardNavigation.handleFocus}
@@ -162,25 +155,17 @@ export const SpaceSection = ({
             isPopoverOpen={openProperty === property}
             onPopoverClose={() => {
               if (openProperty === property) {
-                setOpenProperty(undefined);
+                handleOpenProperty(undefined);
                 layoutRef.current?.focus();
-              }
-            }}
-            onChange={(update, options) => {
-              if (update.operation === "set") {
-                setProperty(update.property)(update.value, options);
-              } else {
-                deleteProperty(update.property, options);
               }
             }}
             onHover={handleHover}
             property={property}
+            activeProperties={activeProperties}
             scrubStatus={scrubStatus}
-            currentStyle={currentStyle}
-            createBatchUpdate={createBatchUpdate}
           />
         )}
       />
-    </CollapsibleSection>
+    </StyleSection>
   );
 };

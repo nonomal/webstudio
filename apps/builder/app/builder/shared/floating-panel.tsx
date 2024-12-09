@@ -17,9 +17,11 @@ import {
 } from "@webstudio-is/design-system";
 
 export const useSideOffset = ({
+  side = "left",
   isOpen,
   containerRef,
 }: {
+  side?: "left" | "right";
   isOpen: boolean;
   containerRef?: RefObject<HTMLElement>;
 }): [MutableRefObject<HTMLButtonElement | null>, number] => {
@@ -39,8 +41,15 @@ export const useSideOffset = ({
     }
     const containerRect = containerRef.current.getBoundingClientRect();
     const triggerRect = triggerRef.current.getBoundingClientRect();
-    setSideOffset(triggerRect.left - containerRect.left);
-  }, [isOpen, containerRef]);
+    if (side === "left") {
+      setSideOffset(triggerRect.left - containerRect.left);
+    }
+    if (side === "right") {
+      const containerRight = containerRect.left + containerRect.width;
+      const triggerRight = triggerRect.left + triggerRect.width;
+      setSideOffset(containerRight - triggerRight);
+    }
+  }, [side, isOpen, containerRef]);
 
   return [triggerRef, sideOffset];
 };
@@ -65,28 +74,18 @@ export const FloatingPanelProvider = ({
   </FloatingPanelContext.Provider>
 );
 
-const useLogic = (open?: boolean, onOpenChange?: (isOpen: boolean) => void) => {
-  const { container: containerRef } = useContext(FloatingPanelContext);
-  const [isOpen, setIsOpen] = useState(Boolean(open));
-  const [triggerRef, sideOffset] = useSideOffset({ isOpen, containerRef });
-  const handleOpenChange = (open: boolean) => {
-    setIsOpen(open);
-    onOpenChange?.(open);
-  };
-  return { isOpen, handleOpenChange, triggerRef, sideOffset };
-};
-
 // @todo add support for positioning next to the left panel
 type FloatingPanelProps = {
   title: string;
   content: JSX.Element;
   children: JSX.Element;
-  open?: boolean;
-  onOpenChange?: (isOpen: boolean) => void;
-  // Left Aside panels (e.g., Pages, Components) use zIndex: theme.zIndices[1].
-  // For a panel to appear above these panels, both overlay and content should also have zIndex: theme.zIndices[1].
-  // After layout is fixed, this prop should be removed.
-  zIndex?: 1;
+  isOpen?: boolean;
+  onIsOpenChange?: (isOpen: boolean) => void;
+  // collisionPadding is the distance in pixels from the boundary edges where collision detection should occur.
+  collisionPadding?:
+    | number
+    | Partial<Record<"top" | "right" | "bottom" | "left", number>>;
+  align?: "start" | "center" | "end";
 };
 
 const contentStyle = css({
@@ -97,29 +96,28 @@ export const FloatingPanel = ({
   title,
   content,
   children,
-  open,
-  onOpenChange,
-  zIndex,
+  isOpen: externalIsOpen,
+  align,
+  onIsOpenChange: setExternalIsOpen,
+  collisionPadding,
 }: FloatingPanelProps) => {
-  const { isOpen, handleOpenChange, triggerRef, sideOffset } = useLogic(
-    open,
-    onOpenChange
-  );
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  const isOpen = externalIsOpen ?? internalIsOpen;
+  const setIsOpen = setExternalIsOpen ?? setInternalIsOpen;
+  const { container: containerRef } = useContext(FloatingPanelContext);
+  const [triggerRef, sideOffset] = useSideOffset({ isOpen, containerRef });
 
   return (
-    <FloatingPanelPopover open={isOpen} onOpenChange={handleOpenChange} modal>
+    <FloatingPanelPopover open={isOpen} onOpenChange={setIsOpen} modal>
       <FloatingPanelPopoverTrigger asChild ref={triggerRef}>
         {children}
       </FloatingPanelPopoverTrigger>
       <FloatingPanelPopoverContent
         sideOffset={sideOffset}
         side="left"
-        align="start"
-        className={contentStyle({
-          css: {
-            zIndex: zIndex ? theme.zIndices[zIndex] : undefined,
-          },
-        })}
+        align={align ?? "start"}
+        className={contentStyle()}
+        collisionPadding={collisionPadding}
       >
         {content}
         <FloatingPanelPopoverTitle>{title}</FloatingPanelPopoverTitle>

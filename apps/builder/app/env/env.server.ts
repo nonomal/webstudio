@@ -20,9 +20,6 @@ const env = {
 
   PORT: process.env.PORT,
 
-  // Preview support
-  BRANCH_NAME: process.env.BRANCH_NAME,
-
   // Assets
   MAX_UPLOAD_SIZE: process.env.MAX_UPLOAD_SIZE,
   MAX_ASSETS_PER_PROJECT: process.env.MAX_ASSETS_PER_PROJECT,
@@ -93,6 +90,22 @@ const env = {
 
   N8N_WEBHOOK_URL: process.env.N8N_WEBHOOK_URL,
   N8N_WEBHOOK_TOKEN: process.env.N8N_WEBHOOK_TOKEN,
+
+  PUBLISHER_HOST: process.env.PUBLISHER_HOST || "wstd.work",
+
+  FEATURES: process.env.FEATURES ?? "",
+
+  // current user plan features (default)
+  USER_PLAN: process.env.USER_PLAN ?? "",
+
+  POSTGREST_URL: process.env.POSTGREST_URL ?? "http://localhost:3000",
+  POSTGREST_API_KEY: process.env.POSTGREST_API_KEY ?? "",
+
+  SECURE_COOKIE: true,
+
+  // Used for project oauth login flow @todo remove ??
+  AUTH_WS_CLIENT_ID: process.env.AUTH_WS_CLIENT_ID ?? "12345",
+  AUTH_WS_CLIENT_SECRET: process.env.AUTH_WS_CLIENT_SECRET ?? "12345678",
 };
 
 export type ServerEnv = typeof env;
@@ -104,9 +117,6 @@ if (process.env.VERCEL !== undefined) {
   }
   if (env.DEPLOYMENT_URL === undefined) {
     env.DEPLOYMENT_URL = process.env.VERCEL_URL;
-  }
-  if (env.BRANCH_NAME === undefined) {
-    env.BRANCH_NAME = process.env.VERCEL_GIT_COMMIT_REF;
   }
 }
 

@@ -3,7 +3,7 @@ import {
   type ElementRef,
   type ComponentPropsWithoutRef,
 } from "react";
-import { getClosestInstance, type Hook } from "@webstudio-is/react-sdk";
+import { getClosestInstance, type Hook } from "@webstudio-is/react-sdk/runtime";
 import * as Dialog from "./dialog";
 
 export const Sheet = Dialog.Dialog;
@@ -13,7 +13,6 @@ export const SheetClose = Dialog.DialogClose;
 export const SheetTitle = Dialog.DialogTitle;
 export const SheetDescription = Dialog.DialogDescription;
 
-// eslint-disable-next-line react/display-name
 export const SheetContent = forwardRef<
   ElementRef<"div">,
   ComponentPropsWithoutRef<typeof Dialog.DialogContent> & {
@@ -56,8 +55,9 @@ export const hooksSheet: Hook = {
           instance,
           `${namespace}:Sheet`
         );
+
         if (sheet) {
-          context.setPropVariable(sheet.id, "open", false);
+          context.setMemoryProp(sheet, "open", undefined);
         }
       }
     }
@@ -71,7 +71,7 @@ export const hooksSheet: Hook = {
           `${namespace}:Sheet`
         );
         if (sheet) {
-          context.setPropVariable(sheet.id, "open", true);
+          context.setMemoryProp(sheet, "open", true);
         }
       }
     }

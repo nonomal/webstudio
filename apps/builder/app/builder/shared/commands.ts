@@ -1,11 +1,15 @@
+import { blockTemplateComponent } from "@webstudio-is/react-sdk";
+import { toast } from "@webstudio-is/design-system";
 import { createCommandsEmitter, type Command } from "~/shared/commands-emitter";
 import {
-  $isPreviewMode,
-  $editingItemId,
+  $editingItemSelector,
   $instances,
   $selectedInstanceSelector,
-  $selectedStyleSourceSelector,
   $textEditingInstanceSelector,
+  $isDesignMode,
+  toggleBuilderMode,
+  $isPreviewMode,
+  $isContentMode,
 } from "~/shared/nano-states";
 import {
   $breakpointsMenuView,
@@ -14,29 +18,43 @@ import {
 import {
   deleteInstanceMutable,
   findAvailableDataSources,
-  getInstancesSlice,
-  insertInstancesSliceCopy,
-  isInstanceDetachable,
+  extractWebstudioFragment,
+  insertWebstudioFragmentCopy,
   updateWebstudioData,
+  isInstanceDetachable,
 } from "~/shared/instance-utils";
 import type { InstanceSelector } from "~/shared/tree-utils";
 import { serverSyncStore } from "~/shared/sync";
 import { $publisher } from "~/shared/pubsub";
-import { $activeSidebarPanel } from "./nano-states";
-import { toast } from "@webstudio-is/design-system";
+import {
+  $activeInspectorPanel,
+  setActiveSidebarPanel,
+  toggleActiveSidebarPanel,
+} from "./nano-states";
+import { selectInstance } from "~/shared/awareness";
+import { openCommandPanel } from "../features/command-panel";
+import { builderApi } from "~/shared/builder-api";
+import { findBlockSelector } from "../features/workspace/canvas-tools/outline/block-instance-outline";
 
 const makeBreakpointCommand = <CommandName extends string>(
   name: CommandName,
   number: number
 ): Command<CommandName> => ({
   name,
-  defaultHotkeys: [`meta+${number}`, `ctrl+${number}`],
+  hidden: true,
+  defaultHotkeys: [`${number}`],
+  disableHotkeyOnFormTags: true,
+  disableHotkeyOnContentEditable: true,
   handler: () => {
     selectBreakpointByOrder(number);
   },
 });
 
 const deleteSelectedInstance = () => {
+  if ($isPreviewMode.get()) {
+    builderApi.toast.info("Deleting is not allowed in preview mode.");
+    return;
+  }
   const textEditingInstanceSelector = $textEditingInstanceSelector.get();
   const selectedInstanceSelector = $selectedInstanceSelector.get();
   // cannot delete instance while editing
@@ -49,8 +67,44 @@ const deleteSelectedInstance = () => {
   if (selectedInstanceSelector.length === 1) {
     return;
   }
-  let newSelectedInstanceSelector: undefined | InstanceSelector;
   const instances = $instances.get();
+  if (isInstanceDetachable(instances, selectedInstanceSelector) === false) {
+    toast.error(
+      "This instance can not be moved outside of its parent component."
+    );
+    return false;
+  }
+
+  if ($isContentMode.get()) {
+    // In content mode we are allowing to delete childen of the editable block
+    const editableInstanceSelector = findBlockSelector(
+      selectedInstanceSelector,
+      instances
+    );
+    if (editableInstanceSelector === undefined) {
+      builderApi.toast.info("You can't delete this instance in conent mode.");
+      return;
+    }
+
+    const isChildOfBlock =
+      selectedInstanceSelector.length - editableInstanceSelector.length === 1;
+
+    const isTemplateInstance =
+      instances.get(selectedInstanceSelector[0])?.component ===
+      blockTemplateComponent;
+
+    if (isTemplateInstance) {
+      builderApi.toast.info("You can't delete this instance in conent mode.");
+      return;
+    }
+
+    if (!isChildOfBlock) {
+      builderApi.toast.info("You can't delete this instance in conent mode.");
+      return;
+    }
+  }
+
+  let newSelectedInstanceSelector: undefined | InstanceSelector;
   const [selectedInstanceId, parentInstanceId] = selectedInstanceSelector;
   const parentInstance = instances.get(parentInstanceId);
   if (parentInstance) {
@@ -72,8 +126,7 @@ const deleteSelectedInstance = () => {
   }
   updateWebstudioData((data) => {
     if (deleteInstanceMutable(data, selectedInstanceSelector)) {
-      $selectedInstanceSelector.set(newSelectedInstanceSelector);
-      $selectedStyleSourceSelector.set(undefined);
+      selectInstance(newSelectedInstanceSelector);
     }
   });
 };
@@ -95,6 +148,7 @@ export const { emitCommand, subscribeCommands } = createCommandsEmitter({
 
     {
       name: "cancelCurrentDrag",
+      hidden: true,
       defaultHotkeys: ["escape"],
       // radix check event.defaultPrevented before invoking callbacks
       preventDefault: false,
@@ -107,25 +161,89 @@ export const { emitCommand, subscribeCommands } = createCommandsEmitter({
       name: "clickCanvas",
       handler: () => {
         $breakpointsMenuView.set(undefined);
-        $activeSidebarPanel.set("none");
+        setActiveSidebarPanel("auto");
       },
     },
 
     // ui
 
     {
-      name: "togglePreview",
+      name: "togglePreviewMode",
       defaultHotkeys: ["meta+shift+p", "ctrl+shift+p"],
       handler: () => {
-        $isPreviewMode.set($isPreviewMode.get() === false);
+        setActiveSidebarPanel("auto");
+        toggleBuilderMode("preview");
+      },
+    },
+    {
+      name: "toggleDesignMode",
+      defaultHotkeys: ["meta+shift+d", "ctrl+shift+d"],
+      handler: () => {
+        setActiveSidebarPanel("auto");
+        toggleBuilderMode("design");
+      },
+    },
+    {
+      name: "toggleContentMode",
+      defaultHotkeys: ["meta+shift+c", "ctrl+shift+c"],
+      handler: () => {
+        setActiveSidebarPanel("auto");
+        toggleBuilderMode("content");
       },
     },
     {
       name: "openBreakpointsMenu",
-      defaultHotkeys: ["meta+b", "ctrl+b"],
       handler: () => {
         $breakpointsMenuView.set("initial");
       },
+    },
+    {
+      name: "toggleComponentsPanel",
+      defaultHotkeys: ["a"],
+      handler: () => {
+        if ($isDesignMode.get() === false) {
+          builderApi.toast.info(
+            "Components panel is only available in design mode."
+          );
+          return;
+        }
+        toggleActiveSidebarPanel("components");
+      },
+      disableHotkeyOnFormTags: true,
+      disableHotkeyOnContentEditable: true,
+    },
+    {
+      name: "toggleNavigatorPanel",
+      defaultHotkeys: ["z"],
+      handler: () => {
+        toggleActiveSidebarPanel("navigator");
+      },
+      disableHotkeyOnFormTags: true,
+      disableHotkeyOnContentEditable: true,
+    },
+    {
+      name: "openStylePanel",
+      defaultHotkeys: ["s"],
+      handler: () => {
+        if ($isDesignMode.get() === false) {
+          builderApi.toast.info(
+            "Style panel is only available in design mode."
+          );
+          return;
+        }
+        $activeInspectorPanel.set("style");
+      },
+      disableHotkeyOnFormTags: true,
+      disableHotkeyOnContentEditable: true,
+    },
+    {
+      name: "openSettingsPanel",
+      defaultHotkeys: ["d"],
+      handler: () => {
+        $activeInspectorPanel.set("settings");
+      },
+      disableHotkeyOnFormTags: true,
+      disableHotkeyOnContentEditable: true,
     },
     makeBreakpointCommand("selectBreakpoint1", 1),
     makeBreakpointCommand("selectBreakpoint2", 2),
@@ -166,15 +284,13 @@ export const { emitCommand, subscribeCommands } = createCommandsEmitter({
       name: "duplicateInstance",
       defaultHotkeys: ["meta+d", "ctrl+d"],
       handler: () => {
-        const instanceSelector = $selectedInstanceSelector.get();
-        if (instanceSelector === undefined) {
+        if ($isDesignMode.get() === false) {
+          builderApi.toast.info("Duplicating is only allowed in design mode.");
           return;
         }
-        const instances = $instances.get();
-        if (isInstanceDetachable(instances, instanceSelector) === false) {
-          toast.error(
-            "This instance can not be moved outside of its parent component."
-          );
+
+        const instanceSelector = $selectedInstanceSelector.get();
+        if (instanceSelector === undefined) {
           return;
         }
         // @todo tell user they can't copy or cut root
@@ -185,18 +301,19 @@ export const { emitCommand, subscribeCommands } = createCommandsEmitter({
         // so clipboard always have at least two level instance selector
         const [targetInstanceId, parentInstanceId] = instanceSelector;
         const parentInstanceSelector = instanceSelector.slice(1);
-        const slice = getInstancesSlice(targetInstanceId);
         updateWebstudioData((data) => {
-          const rootInstanceId = insertInstancesSliceCopy({
+          const fragment = extractWebstudioFragment(data, targetInstanceId);
+          const { newInstanceIds } = insertWebstudioFragmentCopy({
             data,
-            slice,
+            fragment,
             availableDataSources: findAvailableDataSources(
               data.dataSources,
               data.instances,
               parentInstanceSelector
             ),
           });
-          if (rootInstanceId === undefined) {
+          const newRootInstanceId = newInstanceIds.get(targetInstanceId);
+          if (newRootInstanceId === undefined) {
             return;
           }
           const parentInstance = data.instances.get(parentInstanceId);
@@ -210,13 +327,10 @@ export const { emitCommand, subscribeCommands } = createCommandsEmitter({
           const position = indexWithinChildren + 1;
           parentInstance.children.splice(position, 0, {
             type: "id",
-            value: rootInstanceId,
+            value: newRootInstanceId,
           });
           // select new instance
-          $selectedInstanceSelector.set([
-            rootInstanceId,
-            ...parentInstanceSelector,
-          ]);
+          selectInstance([newRootInstanceId, ...parentInstanceSelector]);
         });
       },
     },
@@ -228,8 +342,7 @@ export const { emitCommand, subscribeCommands } = createCommandsEmitter({
         if (selectedInstanceSelector === undefined) {
           return;
         }
-        const [targetInstanceId] = selectedInstanceSelector;
-        $editingItemId.set(targetInstanceId);
+        $editingItemSelector.set(selectedInstanceSelector);
       },
     },
 
@@ -253,6 +366,15 @@ export const { emitCommand, subscribeCommands } = createCommandsEmitter({
       disableHotkeyOnFormTags: true,
       handler: () => {
         serverSyncStore.redo();
+      },
+    },
+
+    {
+      name: "openCommandPanel",
+      hidden: true,
+      defaultHotkeys: ["meta+k", "ctrl+k"],
+      handler: () => {
+        openCommandPanel();
       },
     },
   ],

@@ -1,9 +1,11 @@
 import { z } from "zod";
-import { initTRPC } from "@trpc/server";
-import type { AppContext } from "@webstudio-is/trpc-interface/index.server";
+import { router, procedure } from "@webstudio-is/trpc-interface/index.server";
 import { db } from "../db";
+import type { IsEqual } from "type-fest";
+import type { Database } from "@webstudio-is/postrest/index.server";
 
-const { router, procedure } = initTRPC.context<AppContext>().create();
+type Relation =
+  Database["public"]["Tables"]["AuthorizationToken"]["Row"]["relation"];
 
 const TokenProjectRelation = z.enum([
   "viewers",
@@ -11,6 +13,10 @@ const TokenProjectRelation = z.enum([
   "builders",
   "administrators",
 ]);
+
+// Check DB types are compatible with zod types
+type TokenRelation = z.infer<typeof TokenProjectRelation>;
+true satisfies IsEqual<TokenRelation, Relation>;
 
 export const authorizationTokenRouter = router({
   findMany: procedure
@@ -60,15 +66,21 @@ export const authorizationTokenRouter = router({
         token: z.string(),
         name: z.string(),
         relation: TokenProjectRelation,
+        canClone: z.boolean(),
+        canCopy: z.boolean(),
+        canPublish: z.boolean(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       return await db.update(
+        input.projectId,
         {
-          projectId: input.projectId,
           token: input.token,
           name: input.name,
           relation: input.relation,
+          canPublish: input.canPublish,
+          canClone: input.canClone,
+          canCopy: input.canCopy,
         },
         ctx
       );
