@@ -1,6 +1,5 @@
 import { useState } from "react";
-import type { Instance, Prop, Asset } from "@webstudio-is/sdk";
-import type { PropMeta } from "@webstudio-is/react-sdk";
+import type { PropMeta, Instance, Prop, Asset, Page } from "@webstudio-is/sdk";
 import { textVariants } from "@webstudio-is/design-system";
 import { PropsSection } from "./props-section";
 import { usePropsLogic } from "./use-props-logic";
@@ -10,14 +9,9 @@ import {
   $pages,
   $props,
   registerComponentLibrary,
-  $selectedPageId,
 } from "~/shared/nano-states";
-import { setMockEnv } from "~/shared/env";
-// eslint-disable-next-line import/no-internal-modules
-import catPath from "./props-panel.stories.assets/cat.jpg";
 import { createDefaultPages } from "@webstudio-is/project-build";
-
-setMockEnv({ ASSET_BASE_URL: catPath.replace("cat.jpg", "") });
+import { $awareness } from "~/shared/awareness";
 
 let id = 0;
 const unique = () => `${++id}`;
@@ -25,18 +19,23 @@ const unique = () => `${++id}`;
 const instanceId = unique();
 const projectId = unique();
 
-const page = (name: string, path: string) => ({
+const page = (name: string, path: string): Page => ({
   id: unique(),
   name,
   title: name,
   path,
   meta: {},
   rootInstanceId: unique(),
+  systemDataSourceId: unique(),
 });
 
 $pages.set({
-  ...createDefaultPages({ rootInstanceId: unique() }),
-  homePage: page("Home", "/"),
+  ...createDefaultPages({
+    rootInstanceId: unique(),
+    systemDataSourceId: unique(),
+  }),
+
+  homePage: page("Home", "") as Page & { path: "" },
   pages: [
     page("About", "/about"),
     page("Pricing", "/pricing"),
@@ -44,12 +43,14 @@ $pages.set({
   ],
 });
 
-const getSectionInstanceId = (name: string, page = $pages.get()?.homePage) =>
-  page === undefined ? "" : `${page.id}-${name}`;
+const getSectionInstanceId = (
+  name: string,
+  page: Page = $pages.get()?.homePage as Page
+) => (page === undefined ? "" : `${page.id}-${name}`);
 
 const addLinkableSections = (
   names: string[],
-  page = $pages.get()?.homePage
+  page: Page = $pages.get()?.homePage as Page
 ) => {
   if (page === undefined) {
     return;
@@ -93,7 +94,7 @@ const rootInstance = addLinkableSections(
   ["company", "employees"],
   $pages.get()?.pages[0]
 );
-$selectedPageId.set($pages.get()?.homePage.id);
+$awareness.set({ pageId: $pages.get()?.homePage.id ?? "" });
 
 const instance: Instance = {
   id: instanceId,
@@ -204,6 +205,7 @@ const checkProp = (options = defaultOptions, label?: string): PropMeta => ({
 registerComponentLibrary({
   components: {},
   metas: {},
+  templates: {},
   propsMetas: {
     Box: {
       props: {
@@ -401,7 +403,6 @@ export const Story = () => {
           propsLogic={logic}
           propValues={new Map()}
           component="Button"
-          setCssProperty={() => () => undefined}
         />
       </div>
       <pre style={textVariants.mono}>

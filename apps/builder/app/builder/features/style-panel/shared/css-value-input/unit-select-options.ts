@@ -1,11 +1,5 @@
 import type { CssValueInputValue } from "./css-value-input";
-import { toPascalCase } from "../keyword-utils";
-import {
-  keywordValues,
-  properties,
-  units,
-  isValidDeclaration,
-} from "@webstudio-is/css-data";
+import { properties, units, isValidDeclaration } from "@webstudio-is/css-data";
 import type { UnitOption } from "./unit-select";
 
 // To make sorting stable
@@ -15,6 +9,10 @@ const preferedSorting = [
   ...units.percentage,
   "em",
   "rem",
+  "svw",
+  "svh",
+  "lvw",
+  "lvh",
   "dvw",
   "dvh",
   ...units.length,
@@ -27,7 +25,16 @@ const preferedSorting = [
   ...units.time,
 ];
 
-const visibleLengthUnits = ["px", "em", "rem", "dvw", "dvh"] as const;
+const initialLengthUnits = [
+  "px",
+  "em",
+  "rem",
+  "ch",
+  "svw",
+  "svh",
+  "lvw",
+  "lvh",
+] as const;
 
 export const buildOptions = (
   property: string,
@@ -40,7 +47,11 @@ export const buildOptions = (
       : undefined;
 
   const options: UnitOption[] = [];
-  const { unitGroups } = properties[property as keyof typeof properties];
+
+  // show at least current unit when no property meta is available
+  // for example in custom properties
+  const unitGroups =
+    properties[property as keyof typeof properties]?.unitGroups ?? [];
 
   for (const unitGroup of unitGroups) {
     if (unitGroup === "number") {
@@ -53,12 +64,12 @@ export const buildOptions = (
     }
 
     const visibleUnits =
-      unitGroup === "length" ? visibleLengthUnits : units[unitGroup];
+      unitGroup === "length" ? initialLengthUnits : units[unitGroup];
     for (const unit of visibleUnits) {
       options.push({
         id: unit,
         type: "unit",
-        label: unit.toLocaleUpperCase(),
+        label: unit,
       });
     }
   }
@@ -89,10 +100,7 @@ export const buildOptions = (
     options.push({
       id: unit,
       type: "unit",
-      label:
-        unit === "number"
-          ? nestedSelectButtonUnitless
-          : unit.toLocaleUpperCase(),
+      label: unit === "number" ? nestedSelectButtonUnitless : unit,
     });
   }
 
@@ -106,40 +114,6 @@ export const buildOptions = (
       indexSortValue(preferedSorting.indexOf(optionA.id)) -
       indexSortValue(preferedSorting.indexOf(optionB.id))
   );
-
-  // This value can't have units, skip select
-  // (show keywords menu instead)
-  if (options.length === 0) {
-    return [];
-  }
-
-  const propertyKeywordsSet = new Set(
-    keywordValues[property as keyof typeof keywordValues]
-  );
-
-  // Opinionated set of keywords to show
-  const webstudioKeywords = ["auto", "normal", "none"].filter((keyword) =>
-    propertyKeywordsSet.has(keyword as never)
-  );
-
-  for (const keyword of webstudioKeywords) {
-    options.push({
-      id: keyword,
-      label: toPascalCase(keyword),
-      type: "keyword",
-    });
-  }
-
-  if (
-    value.type === "keyword" &&
-    options.some((option) => option.id === value.value) === false
-  ) {
-    options.push({
-      id: value.value,
-      label: toPascalCase(value.value),
-      type: "keyword",
-    });
-  }
 
   return options;
 };

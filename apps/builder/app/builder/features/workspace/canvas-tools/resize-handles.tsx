@@ -18,7 +18,7 @@ import {
 const handlesContainerStyle = css({
   position: "absolute",
   top: 0,
-  width: 4,
+  width: 5,
   bottom: 0,
   cursor: "col-resize",
   pointerEvents: "auto",
@@ -105,7 +105,7 @@ const useScrub = ({ side }: { side: "right" | "left" }) => {
 
     const disposeScrubControl = numericScrubControl(ref.current, {
       getInitialValue() {
-        return $canvasWidth.get();
+        return $canvasWidth.get() ?? 0;
       },
       getValue(state, movement) {
         const value =
@@ -135,7 +135,6 @@ const useScrub = ({ side }: { side: "right" | "left" }) => {
 
     return () => {
       enableCanvasPointerEvents?.();
-
       disposeScrubControl();
     };
   }, [side]);
@@ -143,21 +142,11 @@ const useScrub = ({ side }: { side: "right" | "left" }) => {
   return ref;
 };
 
-const useResize = () => {
+export const ResizeHandles = () => {
   const isResizing = useStore($isResizingCanvas);
   const leftRef = useScrub({ side: "left" });
   const rightRef = useScrub({ side: "right" });
   const state = isResizing ? "resizing" : "idle";
-
-  return {
-    state,
-    leftRef,
-    rightRef,
-  };
-};
-
-export const ResizeHandles = () => {
-  const { state, leftRef, rightRef } = useResize();
 
   return (
     <>

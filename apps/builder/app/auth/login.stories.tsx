@@ -1,4 +1,5 @@
-import type { ComponentStory } from "@storybook/react";
+import type { JSX } from "react";
+import type { StoryFn } from "@storybook/react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { Login } from "./login";
 
@@ -15,7 +16,7 @@ const createRouter = (element: JSX.Element) =>
     },
   ]);
 
-export const Basic: ComponentStory<typeof Login> = () => {
+export const Basic: StoryFn<typeof Login> = () => {
   const router = createRouter(
     <Login isGoogleEnabled={false} isSecretLoginEnabled />
   );

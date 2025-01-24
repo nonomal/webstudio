@@ -20,6 +20,7 @@ _build
 # misc
 .DS_Store
 *.pem
+!https/*.pem
 /.idea
 
 # logs
@@ -29,14 +30,12 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # local env files
-.env
+# .env
+.env.development
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
-
-# turbo
-.turbo
 
 # data
 /data
@@ -56,3 +55,11 @@ tsconfig.tsbuildinfo
 # to save thunder https://marketplace.visualstudio.com/items?itemName=rangav.vscode-thunder-client files
 .thunder
 .env*.local
+
+# wrangler builds
+dist
+
+# should be here otherwise if placed inside prisma-client pnpm deploy doesn't copy it
+packages/prisma-client/src/__generated__
+
+.temp

@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+export type System = {
+  params: Record<string, string | undefined>;
+  search: Record<string, string | undefined>;
+  origin: string;
+};
+
 const MIN_TITLE_LENGTH = 2;
 
 const PageId = z.string();
@@ -36,16 +42,25 @@ export const PageTitle = z
     `Minimum ${MIN_TITLE_LENGTH} characters required`
   );
 
+export const documentTypes = ["html", "xml"] as const;
+
 const commonPageFields = {
   id: PageId,
   name: PageName,
   title: PageTitle,
+  history: z.optional(z.array(z.string())),
+  rootInstanceId: z.string(),
+  systemDataSourceId: z.string(),
   meta: z.object({
     description: z.string().optional(),
     title: z.string().optional(),
-    excludePageFromSearch: z.boolean().optional(),
+    excludePageFromSearch: z.string().optional(),
+    language: z.string().optional(),
     socialImageAssetId: z.string().optional(),
     socialImageUrl: z.string().optional(),
+    status: z.string().optional(),
+    redirect: z.string().optional(),
+    documentType: z.optional(z.enum(documentTypes)),
     custom: z
       .array(
         z.object({
@@ -55,8 +70,13 @@ const commonPageFields = {
       )
       .optional(),
   }),
-  rootInstanceId: z.string(),
-  pathVariableId: z.optional(z.string()),
+  marketplace: z.optional(
+    z.object({
+      include: z.optional(z.boolean()),
+      category: z.optional(z.string()),
+      thumbnailAssetId: z.optional(z.string()),
+    })
+  ),
 } as const;
 
 export const HomePagePath = z
@@ -76,8 +96,8 @@ export const PagePath = z
   .refine((path) => path.endsWith("/") === false, "Can't end with a /")
   .refine((path) => path.includes("//") === false, "Can't contain repeating /")
   .refine(
-    (path) => /^[-_a-z0-9*:?\\/]*$/.test(path),
-    "Only a-z, 0-9, -, _, /, :, ? and * are allowed"
+    (path) => /^[-_a-z0-9*:?\\/.]*$/.test(path),
+    "Only a-z, 0-9, -, _, /, :, ?, . and * are allowed"
   )
   .refine(
     // We use /s for our system stuff like /s/css or /s/uploads
@@ -99,12 +119,19 @@ const Page = z.object({
 const ProjectMeta = z.object({
   // All fields are optional to ensure consistency and allow for the addition of new fields without requiring migration
   siteName: z.string().optional(),
+  contactEmail: z.string().optional(),
   faviconAssetId: z.string().optional(),
   code: z.string().optional(),
 });
+export type ProjectMeta = z.infer<typeof ProjectMeta>;
 
-export const ProjectNewRedirectPathSchema = PagePath.or(
+export const ProjectNewRedirectPath = PagePath.or(
   z.string().refine((data) => {
+    // Users should be able to redirect from any old-path to the home page in the new project.
+    if (data === "/") {
+      return true;
+    }
+
     try {
       new URL(data);
       return true;
@@ -114,33 +141,27 @@ export const ProjectNewRedirectPathSchema = PagePath.or(
   }, "Must be a valid URL")
 );
 
-export const PageRedirectSchema = z.object({
+export const PageRedirect = z.object({
   old: PagePath,
-  new: ProjectNewRedirectPathSchema,
+  new: ProjectNewRedirectPath,
+  status: z.enum(["301", "302"]).optional(),
 });
+export type PageRedirect = z.infer<typeof PageRedirect>;
 
-const ProjectSettings = z.object({
+export const CompilerSettings = z.object({
   // All fields are optional to ensure consistency and allow for the addition of new fields without requiring migration
   atomicStyles: z.boolean().optional(),
-  redirects: z.array(PageRedirectSchema).optional(),
 });
-
-export type PageRedirect = z.infer<typeof PageRedirectSchema>;
-
-export type ProjectMeta = z.infer<typeof ProjectMeta>;
+export type CompilerSettings = z.infer<typeof CompilerSettings>;
 
 export type Page = z.infer<typeof Page>;
 
 export const Pages = z.object({
   meta: ProjectMeta.optional(),
-  settings: ProjectSettings.optional(),
+  compiler: CompilerSettings.optional(),
+  redirects: z.array(PageRedirect).optional(),
   homePage: HomePage,
-  pages: z
-    .array(Page)
-    .refine(
-      (array) => new Set(array.map((page) => page.path)).size === array.length,
-      "All paths must be unique"
-    ),
+  pages: z.array(Page),
   folders: z
     .array(Folder)
     .refine((folders) => folders.length > 0, "Folders can't be empty"),

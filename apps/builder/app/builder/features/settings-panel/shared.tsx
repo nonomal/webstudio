@@ -1,5 +1,6 @@
 import { atom, computed, type ReadableAtom } from "nanostores";
 import { useStore } from "@nanostores/react";
+import { useDebouncedCallback } from "use-debounce";
 import {
   type ComponentPropsWithoutRef,
   type ReactNode,
@@ -13,10 +14,9 @@ import equal from "fast-deep-equal";
 import {
   decodeDataSourceVariable,
   encodeDataSourceVariable,
-  type PropMeta,
-} from "@webstudio-is/react-sdk";
-import type { Prop, Asset } from "@webstudio-is/sdk";
-import { HelpIcon, SubtractIcon } from "@webstudio-is/icons";
+} from "@webstudio-is/sdk";
+import type { PropMeta, Prop, Asset } from "@webstudio-is/sdk";
+import { InfoCircleIcon, MinusIcon } from "@webstudio-is/icons";
 import {
   SmallIconButton,
   Label as BaseLabel,
@@ -29,14 +29,14 @@ import {
   theme,
   rawTheme,
 } from "@webstudio-is/design-system";
-import { humanizeString } from "~/shared/string-utils";
 import {
   $dataSourceVariables,
   $dataSources,
-  $selectedInstanceSelector,
   $variableValuesByInstanceSelector,
 } from "~/shared/nano-states";
 import type { BindingVariant } from "~/builder/shared/binding-popover";
+import { humanizeString } from "~/shared/string-utils";
+import { $selectedInstanceKey } from "~/shared/awareness";
 
 export type PropValue =
   | { type: "number"; value: number }
@@ -64,15 +64,13 @@ export type ControlProps<Control> = {
   propName: string;
   computedValue: unknown;
   deletable: boolean;
-  onChange: (value: PropValue, asset?: Asset) => void;
+  onChange: (value: PropValue) => void;
   onDelete: () => void;
+  autoFocus?: boolean;
 };
 
-export const getLabel = (meta: { label?: string }, fallback: string) =>
-  meta.label || humanizeString(fallback);
-
 export const RemovePropButton = (props: { onClick: () => void }) => (
-  <SmallIconButton icon={<SubtractIcon />} variant="destructive" {...props} />
+  <SmallIconButton icon={<MinusIcon />} variant="destructive" {...props} />
 );
 
 const SimpleLabel = ({
@@ -137,7 +135,7 @@ export const Label = ({
   }
 
   return (
-    <Flex align="center" css={{ gap: theme.spacing[3] }}>
+    <Flex align="center" css={{ gap: theme.spacing[3], width: "100%" }}>
       {label}
       {readOnly && (
         <Tooltip
@@ -146,7 +144,10 @@ export const Label = ({
           }
           variant="wrapped"
         >
-          <HelpIcon color={rawTheme.colors.foregroundSubtle} tabIndex={0} />
+          <InfoCircleIcon
+            color={rawTheme.colors.foregroundSubtle}
+            tabIndex={0}
+          />
         </Tooltip>
       )}
     </Flex>
@@ -155,7 +156,8 @@ export const Label = ({
 
 export const useLocalValue = <Type,>(
   savedValue: Type,
-  onSave: (value: Type) => void
+  onSave: (value: Type) => void,
+  { autoSave = true } = {}
 ) => {
   const isEditingRef = useRef(false);
   const localValueRef = useRef(savedValue);
@@ -173,10 +175,15 @@ export const useLocalValue = <Type,>(
     }
   };
 
+  const saveDebounced = useDebouncedCallback(save, 500);
+
   const setLocalValue = (value: Type) => {
     isEditingRef.current = true;
     localValueRef.current = value;
     setRefresh((refresh) => refresh + 1);
+    if (autoSave) {
+      saveDebounced();
+    }
   };
 
   // onBlur will not trigger if control is unmounted when props panel is closed or similar.
@@ -261,7 +268,7 @@ export const HorizontalLayout = ({
       gridTemplateColumns: deletable
         ? `${theme.spacing[19]} 1fr max-content`
         : `${theme.spacing[19]} 1fr`,
-      minHeight: theme.spacing[13],
+      minHeight: theme.spacing[12],
     }}
     align="center"
     gap="2"
@@ -298,22 +305,23 @@ export const Row = ({
   children,
   css,
 }: Pick<ComponentProps<typeof Flex>, "css" | "children">) => (
-  <Flex css={{ px: theme.spacing[9], ...css }} direction="column">
+  <Flex
+    css={{ paddingInline: theme.panel.paddingInline, ...css }}
+    direction="column"
+  >
     {children}
   </Flex>
 );
 
 export const $selectedInstanceScope = computed(
-  [$selectedInstanceSelector, $variableValuesByInstanceSelector, $dataSources],
-  (instanceSelector, variableValuesByInstanceSelector, dataSources) => {
+  [$selectedInstanceKey, $variableValuesByInstanceSelector, $dataSources],
+  (instanceKey, variableValuesByInstanceSelector, dataSources) => {
     const scope: Record<string, unknown> = {};
     const aliases = new Map<string, string>();
-    if (instanceSelector === undefined) {
+    if (instanceKey === undefined) {
       return { scope, aliases };
     }
-    const values = variableValuesByInstanceSelector.get(
-      JSON.stringify(instanceSelector)
-    );
+    const values = variableValuesByInstanceSelector.get(instanceKey);
     if (values) {
       for (const [dataSourceId, value] of values) {
         const dataSource = dataSources.get(dataSourceId);
@@ -345,11 +353,13 @@ export const updateExpressionValue = (expression: string, value: unknown) => {
   }
 };
 
+type BindingState = {
+  overwritable: boolean;
+  variant: BindingVariant;
+};
+
 export const useBindingState = (expression: undefined | string) => {
-  const $bindingState = useMemo((): ReadableAtom<{
-    overwritable: boolean;
-    variant: BindingVariant;
-  }> => {
+  const $bindingState = useMemo((): ReadableAtom<BindingState> => {
     if (expression === undefined) {
       // value is not bound to expression and can be updated
       return atom({ overwritable: true, variant: "default" });
@@ -362,7 +372,7 @@ export const useBindingState = (expression: undefined | string) => {
     }
     return computed(
       [$dataSources, $dataSourceVariables],
-      (dataSources, dataSourceVariables) => {
+      (dataSources, dataSourceVariables): BindingState => {
         const dataSource = dataSources.get(potentialVariableId);
         // resources and parameters cannot be updated
         if (dataSource?.type !== "variable") {
@@ -380,4 +390,17 @@ export const useBindingState = (expression: undefined | string) => {
     );
   }, [expression]);
   return useStore($bindingState);
+};
+
+export const humanizeAttribute = (string: string) => {
+  if (string.includes("-")) {
+    return string;
+  }
+  if (string === "className") {
+    return "Class";
+  }
+  if (string === "htmlFor") {
+    return "For";
+  }
+  return humanizeString(string);
 };

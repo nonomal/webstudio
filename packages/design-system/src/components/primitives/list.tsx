@@ -1,4 +1,4 @@
-import { usePress } from "@react-aria/interactions";
+import { usePress, type PressEvent } from "@react-aria/interactions";
 import { Slot, type SlotProps } from "@radix-ui/react-slot";
 import { ArrowFocus } from "./arrow-focus";
 
@@ -24,7 +24,7 @@ type ListItemProps = SlotProps & {
   state?: "disabled" | "selected";
   current?: boolean;
   index?: number;
-  onSelect?: () => void;
+  onSelect?: (event: PressEvent) => void;
   asChild?: boolean;
 };
 
@@ -40,11 +40,11 @@ export const ListItem = ({
     state === "disabled"
       ? { "data-state": "disabled" }
       : state === "selected"
-      ? { "data-state": "selected" }
-      : undefined;
+        ? { "data-state": "selected" }
+        : undefined;
   const { pressProps } = usePress({
-    onPress() {
-      onSelect?.();
+    onPress(event) {
+      onSelect?.(event);
     },
   });
   const Component = asChild ? Slot : "li";
@@ -63,3 +63,24 @@ export const ListItem = ({
 };
 
 ListItem.displayName = "ListItem";
+
+export const findNextListItemIndex = (
+  currentIndex: number,
+  total: number,
+  direction: "next" | "previous"
+) => {
+  const nextIndex =
+    direction === "next"
+      ? currentIndex + 1
+      : direction === "previous"
+        ? currentIndex - 1
+        : currentIndex;
+
+  if (nextIndex < 0) {
+    return total - 1;
+  }
+  if (nextIndex >= total) {
+    return 0;
+  }
+  return nextIndex;
+};

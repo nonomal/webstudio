@@ -25,9 +25,8 @@ const StyledAvatar = styled(AvatarPrimitive.Root, {
   outline: "none",
   padding: "0",
   fontWeight: "500",
-  color: theme.colors.hiContrast,
-  width: 22,
-  height: 22,
+  width: 24,
+  height: 24,
   backgroundColor: theme.colors.foregroundSubtle,
   borderRadius: "50%",
 });

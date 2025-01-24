@@ -1,11 +1,13 @@
-import { redirect } from "@remix-run/node";
+import { type LoaderFunctionArgs, json } from "@remix-run/server-runtime";
 import { isRouteErrorResponse, useRouteError } from "@remix-run/react";
 import { z } from "zod";
 import { findAuthenticatedUser } from "~/services/auth.server";
-import { loginPath } from "~/shared/router-utils";
+import { isDashboard, loginPath } from "~/shared/router-utils";
 import env from "~/env/env.server";
-import { type LoaderArgs, json } from "@remix-run/server-runtime";
 import cookie from "cookie";
+import { preventCrossOriginCookie } from "~/services/no-cross-origin-cookie";
+import { redirect } from "~/services/no-store-redirect";
+import { allowedDestinations } from "~/services/destinations.server";
 
 const zN8NResponse = z.union([
   z.object({
@@ -23,7 +25,19 @@ const zWebhookEnv = z.object({
   N8N_WEBHOOK_TOKEN: z.string(),
 });
 
-export const loader = async ({ request, params }: LoaderArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+  if (isDashboard(request) === false) {
+    throw new Response("Not Found", {
+      status: 404,
+    });
+  }
+
+  preventCrossOriginCookie(request);
+  allowedDestinations(request, ["document", "empty"]);
+  // CSRF token checks are not necessary for dashboard-only pages.
+  // All requests from the builder or canvas app are safeguarded either by preventCrossOriginCookie for fetch requests
+  // or by allowedDestinations for iframe requests.
+
   const user = await findAuthenticatedUser(request);
 
   if (user === null) {
@@ -54,12 +68,6 @@ export const loader = async ({ request, params }: LoaderArgs) => {
   n8nWebhookUrl.search = new URL(request.url).search;
 
   const requestUrl = new URL(request.url);
-  const host =
-    request.headers.get("x-forwarded-host") ?? request.headers.get("host");
-
-  if (host != null) {
-    requestUrl.host = host;
-  }
 
   const response = await fetch(n8nWebhookUrl.href, {
     method: "POST",

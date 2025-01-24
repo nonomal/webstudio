@@ -1,13 +1,16 @@
 import { useEffect } from "react";
-import { useBeforeUnload } from "react-use";
 import { atom } from "nanostores";
-import { Project } from "@webstudio-is/project";
+import type { Change } from "immerhin";
+import type { Project } from "@webstudio-is/project";
 import type { Build } from "@webstudio-is/project-build";
 import type { AuthPermit } from "@webstudio-is/trpc-interface/index.server";
 import * as commandQueue from "./command-queue";
 import { restPatchPath } from "~/shared/router-utils";
 import { toast } from "@webstudio-is/design-system";
-import { serverSyncStore } from "~/shared/sync";
+import { fetch } from "~/shared/fetch.client";
+import type { SyncStorage, Transaction } from "~/shared/sync-client";
+import { $project } from "~/shared/nano-states";
+import { loadBuilderData } from "~/shared/builder-data";
 
 // Periodic check for new entries to group them into one job/call in sync queue.
 const NEW_ENTRIES_INTERVAL = 1000;
@@ -157,22 +160,25 @@ const syncServer = async function () {
     for await (const _ of retry()) {
       // in case of any error continue retrying
       try {
-        const response = await fetch(
-          restPatchPath({ authToken: details.authToken }),
-          {
-            method: "post",
-            body: JSON.stringify({
-              transactions,
-              buildId: details.buildId,
-              projectId,
-              // provide latest stored version to server
-              version: details.version,
-            }),
-          }
-        );
+        const headers = new Headers();
+        if (details.authToken) {
+          headers.append("x-auth-token", details.authToken);
+        }
+        const response = await fetch(restPatchPath(), {
+          method: "post",
+          body: JSON.stringify({
+            transactions,
+            buildId: details.buildId,
+            projectId,
+            // provide latest stored version to server
+            version: details.version,
+            headers,
+          }),
+        });
 
         if (response.ok) {
-          const result = await response.json();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const result = (await response.json()) as any;
           if (result.status === "ok") {
             details.version += 1;
             // stop retrying and wait next transactions
@@ -180,11 +186,12 @@ const syncServer = async function () {
           }
           // when versions mismatched ask user to reload
           // user may cancel to copy own state before reloading
-          if (result.status === "version_mismatched") {
+          if (
+            result.status === "version_mismatched" ||
+            result.status === "authorization_error"
+          ) {
             const error =
-              "You are currently in single-player mode. " +
-              "The project has been edited in a different tab, browser, or by another user. " +
-              "Please reload the page to get the latest version.";
+              result.errors ?? "Unknown version mismatch. Please reload.";
 
             const shouldReload = confirm(error);
             if (shouldReload) {
@@ -226,22 +233,24 @@ const syncServer = async function () {
           // It's usually ok to be here, probably restorable with retries
           const text = await response.text();
           // To investigate some strange errors we have seen
-          // eslint-disable-next-line no-console
+
           console.info(`Non ok respone: ${text}`);
         }
-      } catch (e) {
+      } catch (error) {
         if (navigator.onLine) {
           // ERR_CONNECTION_REFUSED or like, probably restorable with retries
           // anyway lets's log it
-          // eslint-disable-next-line no-console
-          console.info(e instanceof Error ? e.message : JSON.stringify(e));
+
+          console.info(
+            error instanceof Error ? error.message : JSON.stringify(error)
+          );
         }
       }
     }
   }
 };
 
-const useSyncProject = async ({
+export const startProjectSync = ({
   projectId,
   buildId,
   version,
@@ -254,67 +263,83 @@ const useSyncProject = async ({
   version: number;
   authPermit: AuthPermit;
 }) => {
+  if (authPermit === "view") {
+    return;
+  }
+  commandQueue.enqueue({
+    type: "setDetails",
+    projectId,
+    buildId,
+    version,
+    authToken,
+  });
+};
+
+const useSyncProject = ({
+  projectId,
+  authPermit,
+}: {
+  projectId: Project["id"];
+  authPermit: AuthPermit;
+}) => {
   useEffect(() => {
     if (authPermit === "view") {
       return;
     }
     syncServer();
-
-    commandQueue.enqueue({
-      type: "setDetails",
-      projectId,
-      buildId,
-      version,
-      authToken,
-    });
-
-    const updateProjectTransactions = () => {
-      const transactions = serverSyncStore.popAll();
-      if (transactions.length === 0) {
-        return;
-      }
-      commandQueue.enqueue({ type: "transactions", transactions, projectId });
-    };
-
-    const intervalHandle = setInterval(
-      updateProjectTransactions,
-      NEW_ENTRIES_INTERVAL
-    );
-
-    return () => {
-      updateProjectTransactions();
-      clearInterval(intervalHandle);
-    };
-  }, [authPermit, authToken, buildId, projectId, version]);
+  }, [projectId, authPermit]);
 };
+
+export class ServerSyncStorage implements SyncStorage {
+  name = "server";
+  sendTransaction(transaction: Transaction<Change[]>) {
+    if (transaction.object === "server") {
+      const projectId = $project.get()?.id ?? "";
+      commandQueue.enqueue({
+        type: "transactions",
+        transactions: [transaction],
+        projectId,
+      });
+    }
+  }
+  subscribe(setState: (state: unknown) => void, signal: AbortSignal) {
+    const projectId = $project.get()?.id ?? "";
+    loadBuilderData({ projectId, signal })
+      .then((data) => {
+        const serverData = new Map(Object.entries(data));
+        setState(new Map([["server", serverData]]));
+      })
+      .catch((err) => {
+        if (err instanceof Error) {
+          console.error(err);
+          return;
+        }
+
+        // Abort error do nothing
+      });
+  }
+}
 
 type SyncServerProps = {
-  buildId: Build["id"];
   projectId: Project["id"];
-  authToken: string | undefined;
   authPermit: AuthPermit;
-  version: number;
 };
 
-export const useSyncServer = ({
-  buildId,
-  projectId,
-  authToken,
-  authPermit,
-  version,
-}: SyncServerProps) => {
+export const useSyncServer = ({ projectId, authPermit }: SyncServerProps) => {
   useSyncProject({
-    buildId,
     projectId,
-    authToken,
-    version,
     authPermit,
   });
 
-  useBeforeUnload(
-    () =>
-      queueStatus.get().status !== "idle" &&
-      queueStatus.get().status !== "fatal",
-    "You have unsaved changes. Are you sure you want to leave?"
-  );
+  useEffect(() => {
+    const handler = (event: BeforeUnloadEvent) => {
+      const { status } = queueStatus.get();
+      if (status === "idle" || status === "fatal") {
+        return;
+      }
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, []);
 };

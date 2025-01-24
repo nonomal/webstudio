@@ -3,11 +3,11 @@ import {
   type PresetStyle,
   type WsComponentMeta,
   type WsComponentPropsMeta,
-} from "@webstudio-is/react-sdk";
-import { props } from "./__generated__/vimeo-play-button.props";
+} from "@webstudio-is/sdk";
 import { ButtonElementIcon } from "@webstudio-is/icons/svg";
-import { button } from "@webstudio-is/react-sdk/css-normalize";
-import { defaultTag } from "./vimeo-play-button";
+import { button } from "@webstudio-is/sdk/normalize.css";
+import type { defaultTag } from "./vimeo-play-button";
+import { props } from "./__generated__/vimeo-play-button.props";
 
 const presetStyle = {
   button,
@@ -16,8 +16,16 @@ const presetStyle = {
 export const meta: WsComponentMeta = {
   category: "hidden",
   type: "container",
-  invalidAncestors: ["Button"],
-  requiredAncestors: ["Vimeo"],
+  constraints: [
+    {
+      relation: "ancestor",
+      component: { $in: ["Vimeo", "YouTube"] },
+    },
+    {
+      relation: "ancestor",
+      component: { $neq: "Button" },
+    },
+  ],
   label: "Play Button",
   icon: ButtonElementIcon,
   presetStyle,
@@ -26,5 +34,5 @@ export const meta: WsComponentMeta = {
 
 export const propsMeta: WsComponentPropsMeta = {
   props,
-  initialProps: ["id"],
+  initialProps: ["id", "className"],
 };

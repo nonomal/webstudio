@@ -1,11 +1,14 @@
+import { executeExpression } from "./expression";
 import type { Folder, Page, Pages } from "./schema/pages";
+import { isPathnamePattern } from "./url-pattern";
 
 export const ROOT_FOLDER_ID = "root";
 
 /**
  * Returns true if folder is the root folder.
  */
-export const isRoot = (folder: Folder) => folder.id === ROOT_FOLDER_ID;
+export const isRootFolder = ({ id }: { id: Folder["id"] }) =>
+  id === ROOT_FOLDER_ID;
 
 /**
  * Find a page by id or path.
@@ -72,4 +75,22 @@ export const getPagePath = (id: Folder["id"] | Page["id"], pages: Pages) => {
   }
 
   return paths.reverse().join("/").replace(/\/+/g, "/");
+};
+
+export const getStaticSiteMapXml = (pages: Pages, updatedAt: string) => {
+  const allPages = [pages.homePage, ...pages.pages];
+  return (
+    allPages
+      .filter((page) => (page.meta.documentType ?? "html") === "html")
+      // ignore pages with excludePageFromSearch bound to variables
+      // because there is no data from cms available at build time
+      .filter(
+        (page) => executeExpression(page.meta.excludePageFromSearch) !== true
+      )
+      .filter((page) => false === isPathnamePattern(page.path))
+      .map((page) => ({
+        path: getPagePath(page.id, pages),
+        lastModified: updatedAt.split("T")[0],
+      }))
+  );
 };

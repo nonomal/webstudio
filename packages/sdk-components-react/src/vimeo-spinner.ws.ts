@@ -3,10 +3,10 @@ import {
   type PresetStyle,
   type WsComponentMeta,
   type WsComponentPropsMeta,
-} from "@webstudio-is/react-sdk";
-import { props } from "./__generated__/vimeo-spinner.props";
-import { div } from "@webstudio-is/react-sdk/css-normalize";
+} from "@webstudio-is/sdk";
+import { div } from "@webstudio-is/sdk/normalize.css";
 import { BoxIcon } from "@webstudio-is/icons/svg";
+import { props } from "./__generated__/vimeo-spinner.props";
 
 const presetStyle = {
   div,
@@ -14,15 +14,18 @@ const presetStyle = {
 
 export const meta: WsComponentMeta = {
   type: "container",
+  constraints: {
+    relation: "ancestor",
+    component: { $in: ["Vimeo", "YouTube"] },
+  },
   icon: BoxIcon,
   states: defaultStates,
   presetStyle,
   category: "hidden",
   label: "Spinner",
-  requiredAncestors: ["Vimeo"],
 };
 
 export const propsMeta: WsComponentPropsMeta = {
   props,
-  initialProps: ["id"],
+  initialProps: ["id", "className"],
 };

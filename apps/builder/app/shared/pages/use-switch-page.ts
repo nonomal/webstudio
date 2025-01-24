@@ -1,39 +1,18 @@
 import { useEffect } from "react";
 import { useStore } from "@nanostores/react";
 import { useNavigate } from "@remix-run/react";
-import { findPageByIdOrPath, type Page } from "@webstudio-is/sdk";
-import { useMount } from "~/shared/hook-utils/use-mount";
 import {
   $authToken,
   $pages,
   $project,
-  $selectedPage,
-  $selectedPageId,
   $selectedPageHash,
-  $selectedInstanceSelector,
-  $isPreviewMode,
+  $builderMode,
+  isBuilderMode,
+  setBuilderMode,
 } from "~/shared/nano-states";
 import { builderPath } from "~/shared/router-utils";
-
-export const switchPage = (pageId: Page["id"], pageHash: string = "") => {
-  const pages = $pages.get();
-
-  if (pages === undefined) {
-    return;
-  }
-
-  const page = findPageByIdOrPath(pageId, pages);
-
-  if (page === undefined) {
-    return;
-  }
-
-  $selectedPageHash.set(pageHash);
-  $selectedPageId.set(page.id);
-  $selectedInstanceSelector.set([
-    page.rootInstanceId ?? pages.homePage.rootInstanceId,
-  ]);
-};
+import { $selectedPage, selectPage } from "../awareness";
+import { findPageByIdOrPath } from "@webstudio-is/sdk";
 
 const setPageStateFromUrl = () => {
   const searchParams = new URLSearchParams(window.location.search);
@@ -41,12 +20,24 @@ const setPageStateFromUrl = () => {
   if (pages === undefined) {
     return;
   }
-  const pageId = searchParams.get("pageId") ?? pages.homePage.id;
-  const pageHash = searchParams.get("pageHash") ?? undefined;
 
-  $isPreviewMode.set(searchParams.get("mode") === "preview");
+  let mode = searchParams.get("mode");
 
-  switchPage(pageId, pageHash);
+  // Check in case of BuilderMode rename
+  if (!isBuilderMode(mode)) {
+    mode = null;
+  }
+
+  setBuilderMode(mode);
+
+  // check the page actually exists
+  // to avoid confusing the user with broken state
+  const pageId =
+    findPageByIdOrPath(searchParams.get("pageId") ?? "", pages)?.id ??
+    pages.homePage.id;
+
+  $selectedPageHash.set({ hash: searchParams.get("pageHash") ?? "" });
+  selectPage(pageId);
 };
 
 /**
@@ -62,12 +53,19 @@ export const useSyncPageUrl = () => {
   const navigate = useNavigate();
   const page = useStore($selectedPage);
   const pageHash = useStore($selectedPageHash);
-  const isPreviewMode = useStore($isPreviewMode);
+  const builderMode = useStore($builderMode);
 
   // Get pageId and pageHash from URL
-  useMount(() => {
-    setPageStateFromUrl();
-  });
+  // once pages are loaded
+  useEffect(() => {
+    const unsubscribe = $pages.subscribe((pages) => {
+      if (pages) {
+        unsubscribe();
+        setPageStateFromUrl();
+      }
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     window.addEventListener("popstate", setPageStateFromUrl);
@@ -88,27 +86,29 @@ export const useSyncPageUrl = () => {
 
     const searchParamsPageId = searchParams.get("pageId") ?? pages.homePage.id;
     const searchParamsPageHash = searchParams.get("pageHash") ?? "";
-    const searchParamsIsPreviewMode = searchParams.get("mode") === "preview";
+    const searParamsModeRaw = searchParams.get("mode");
+    const searParamsMode = isBuilderMode(searParamsModeRaw)
+      ? searParamsModeRaw
+      : undefined;
 
     // Do not navigate on popstate change
     if (
       searchParamsPageId === page.id &&
-      searchParamsPageHash === pageHash &&
-      searchParamsIsPreviewMode === isPreviewMode
+      searchParamsPageHash === pageHash.hash &&
+      searParamsMode === builderMode
     ) {
       return;
     }
 
     navigate(
       builderPath({
-        projectId: project.id,
         pageId: page.id === pages.homePage.id ? undefined : page.id,
         authToken: $authToken.get(),
-        pageHash: pageHash === "" ? undefined : pageHash,
-        mode: isPreviewMode ? "preview" : undefined,
+        pageHash: pageHash.hash === "" ? undefined : pageHash.hash,
+        mode: builderMode === "design" ? undefined : builderMode,
       })
     );
-  }, [isPreviewMode, navigate, page, pageHash]);
+  }, [builderMode, navigate, page, pageHash]);
 };
 
 /**
@@ -118,13 +118,13 @@ export const useHashLinkSync = () => {
   const pageHash = useStore($selectedPageHash);
 
   useEffect(() => {
-    if (pageHash === "") {
+    if (pageHash.hash === "") {
       // native browser behavior is to do nothing if hash is empty
       // remix scroll to top, we emulate native
       return;
     }
 
-    let elementId = decodeURIComponent(pageHash);
+    let elementId = decodeURIComponent(pageHash.hash);
     if (elementId.startsWith("#")) {
       elementId = elementId.slice(1);
     }
@@ -134,6 +134,7 @@ export const useHashLinkSync = () => {
     if (element !== null) {
       element.scrollIntoView();
     }
+
     // Remix scroll to top if element not found
     // browser do nothing
   }, [pageHash]);

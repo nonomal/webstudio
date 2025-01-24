@@ -1,22 +1,112 @@
-/* eslint-disable react/display-name */
-// We can't use .displayName until this is merged https://github.com/styleguidist/react-docgen-typescript/pull/449
-
 import {
   type ComponentPropsWithoutRef,
   type ReactNode,
   forwardRef,
   Children,
   type ComponentProps,
+  useEffect,
+  useRef,
+  useContext,
+  useCallback,
 } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { getClosestInstance, type Hook } from "@webstudio-is/react-sdk";
+import {
+  ReactSdkContext,
+  getClosestInstance,
+  type Hook,
+} from "@webstudio-is/react-sdk/runtime";
+import { useControllableState } from "@radix-ui/react-use-controllable-state";
+import interactionResponse from "await-interaction-response";
+
+/**
+ * Naive heuristic to determine if a click event will cause navigate
+ */
+const willNavigate = (event: MouseEvent) => {
+  const { target } = event;
+
+  if (target instanceof HTMLAnchorElement === false) {
+    return false;
+  }
+
+  if (target.hasAttribute("href") === false) {
+    return false;
+  }
+
+  if (target.href === "#") {
+    return false;
+  }
+
+  if (target.hasAttribute("target") && target.target === "_blank") {
+    return false;
+  }
+
+  if (event.ctrlKey || event.metaKey) {
+    return false;
+  }
+
+  return true;
+};
 
 // wrap in forwardRef because Root is functional component without ref
 export const Dialog = forwardRef<
   HTMLDivElement,
   Omit<ComponentPropsWithoutRef<typeof DialogPrimitive.Root>, "defaultOpen">
 >((props, _ref) => {
-  return <DialogPrimitive.Root {...props} />;
+  const { renderer } = useContext(ReactSdkContext);
+
+  const [open, onOpenChange] = useControllableState({
+    prop: props.open,
+    defaultProp: false,
+    onChange: props.onOpenChange,
+  });
+
+  const onOpenChangeHandler = useCallback(
+    async (open: boolean) => {
+      await interactionResponse();
+      onOpenChange(open);
+    },
+    [onOpenChange]
+  );
+
+  /**
+   * Close the dialog when a navigable link within it is clicked.
+   */
+  useEffect(() => {
+    if (renderer !== undefined) {
+      return;
+    }
+
+    if (open === false) {
+      return;
+    }
+
+    const handleClick = (event: MouseEvent) => {
+      const { target } = event;
+
+      if (willNavigate(event) === false) {
+        return;
+      }
+
+      if (target instanceof HTMLAnchorElement === false) {
+        return false;
+      }
+
+      if (target.closest('[role="dialog"]')) {
+        onOpenChangeHandler?.(false);
+      }
+    };
+
+    window.addEventListener("click", handleClick);
+    return () => window.removeEventListener("click", handleClick);
+  }, [open, onOpenChangeHandler, renderer]);
+
+  return (
+    <DialogPrimitive.Root
+      {...props}
+      onOpenChange={onOpenChangeHandler}
+      open={open}
+    />
+  );
 });
 
 /**
@@ -49,7 +139,56 @@ export const DialogOverlay = forwardRef<
   );
 });
 
-export const DialogContent = DialogPrimitive.Content;
+export const DialogContent = forwardRef<
+  HTMLDivElement,
+  ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
+>((props, ref) => {
+  const preventAutoFocusOnClose = useRef(false);
+  const { renderer } = useContext(ReactSdkContext);
+
+  /**
+   * Prevent focusing on the trigger after a navigable link in a dialog is clicked and closes the dialog.
+   */
+  useEffect(() => {
+    if (renderer !== undefined) {
+      return;
+    }
+
+    preventAutoFocusOnClose.current = false;
+
+    const handleClick = (event: MouseEvent) => {
+      const { target } = event;
+
+      if (willNavigate(event) === false) {
+        return;
+      }
+
+      if (target instanceof HTMLAnchorElement === false) {
+        return false;
+      }
+
+      if (target.closest('[role="dialog"]')) {
+        preventAutoFocusOnClose.current = true;
+      }
+    };
+
+    window.addEventListener("click", handleClick);
+    return () => window.removeEventListener("click", handleClick);
+  }, [renderer]);
+
+  return (
+    <DialogPrimitive.Content
+      ref={ref}
+      {...props}
+      onCloseAutoFocus={(event) => {
+        if (preventAutoFocusOnClose.current) {
+          event.preventDefault();
+        }
+      }}
+    />
+  );
+});
+
 export const DialogClose = DialogPrimitive.Close;
 
 type Tag = "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
@@ -60,7 +199,7 @@ export const DialogTitle = forwardRef<
 >(({ tag: Tag = defaultTag, children, ...props }, ref) => (
   <DialogPrimitive.DialogTitle asChild>
     <Tag ref={ref} {...props}>
-      {children ?? "Heading title you can edit"}
+      {children}
     </Tag>
   </DialogPrimitive.DialogTitle>
 ));
@@ -84,7 +223,7 @@ export const hooksDialog: Hook = {
           `${namespace}:Dialog`
         );
         if (dialog) {
-          context.setPropVariable(dialog.id, "open", false);
+          context.setMemoryProp(dialog, "open", undefined);
         }
       }
     }
@@ -98,7 +237,7 @@ export const hooksDialog: Hook = {
           `${namespace}:Dialog`
         );
         if (dialog) {
-          context.setPropVariable(dialog.id, "open", true);
+          context.setMemoryProp(dialog, "open", true);
         }
       }
     }

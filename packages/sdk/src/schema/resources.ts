@@ -18,6 +18,7 @@ const Header = z.object({
 export const Resource = z.object({
   id: ResourceId,
   name: z.string(),
+  control: z.optional(z.union([z.literal("system"), z.literal("graphql")])),
   method: Method,
   // expression
   url: z.string(),
@@ -27,6 +28,18 @@ export const Resource = z.object({
 });
 
 export type Resource = z.infer<typeof Resource>;
+
+// evaluated variant of resource
+export const ResourceRequest = z.object({
+  id: ResourceId,
+  name: z.string(),
+  method: Method,
+  url: z.string(),
+  headers: z.array(Header),
+  body: z.optional(z.unknown()),
+});
+
+export type ResourceRequest = z.infer<typeof ResourceRequest>;
 
 export const Resources = z.map(ResourceId, Resource);
 

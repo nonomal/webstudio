@@ -92,6 +92,8 @@ export type ImageLoader = (
         quality: number;
         src: string;
         format?: "auto";
+        height?: number;
+        fit?: "pad";
       }
     | { src: string; format: "raw" }
 ) => string;
@@ -102,7 +104,7 @@ export type ImageLoader = (
 const imageSizes = [16, 32, 48, 64, 96, 128, 256, 384];
 const deviceSizes = [640, 750, 828, 1080, 1200, 1920, 2048, 3840];
 
-export const allSizes = [...imageSizes, ...deviceSizes];
+export const allSizes: number[] = [...imageSizes, ...deviceSizes];
 
 /**
  * https://github.com/vercel/next.js/blob/canary/packages/next/client/image.tsx
@@ -230,6 +232,18 @@ const DEFAULT_SIZES = "(min-width: 1280px) 50vw, 100vw";
 
 const DEFAULT_QUALITY = 80;
 
+/**
+ * URL.canParse(props.src)
+ */
+const UrlCanParse = (url: string): boolean => {
+  try {
+    new URL(url);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const getImageAttributes = (props: {
   src: string | undefined;
   srcSet: string | undefined;
@@ -238,12 +252,15 @@ export const getImageAttributes = (props: {
   quality: string | number | undefined;
   loader: ImageLoader;
   optimize: boolean;
-}): {
-  src: string;
-  srcSet?: string;
-  sizes?: string;
-} | null => {
+}):
+  | {
+      src: string;
+      srcSet?: string;
+      sizes?: string;
+    }
+  | undefined => {
   const width = getInt(props.width);
+
   const quality = Math.max(
     Math.min(getInt(props.quality) ?? DEFAULT_QUALITY, 100),
     0
@@ -267,7 +284,11 @@ export const getImageAttributes = (props: {
       src: string;
       srcSet?: string;
       sizes?: string;
-    } = { src: props.src };
+    } = {
+      src: UrlCanParse(props.src)
+        ? props.src
+        : props.loader({ src: props.src, format: "raw" }),
+    };
 
     if (props.srcSet != null) {
       resAttrs.srcSet = props.srcSet;
@@ -279,6 +300,4 @@ export const getImageAttributes = (props: {
 
     return resAttrs;
   }
-
-  return null;
 };

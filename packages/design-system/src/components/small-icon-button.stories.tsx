@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import { MenuIcon, CrossIcon, TrashIcon } from "@webstudio-is/icons";
+import { EllipsesIcon, XIcon, TrashIcon } from "@webstudio-is/icons";
 import {
   SmallIconButton,
   smallIconButtonStates,
@@ -8,8 +8,8 @@ import {
 import { StorySection, StoryGrid } from "./storybook";
 
 const iconsMap = {
-  "<MenuIcon>": <MenuIcon />,
-  "<CrossIcon>": <CrossIcon />,
+  "<EllipsesIcon>": <EllipsesIcon />,
+  "<XIcon>": <XIcon />,
   "<TrashIcon>": <TrashIcon />,
 } as const;
 
@@ -73,7 +73,7 @@ Demo.argTypes = {
 };
 
 Demo.args = {
-  icon: "<MenuIcon>",
+  icon: "<EllipsesIcon>",
   variant: "normal",
   state: undefined,
   focused: false,

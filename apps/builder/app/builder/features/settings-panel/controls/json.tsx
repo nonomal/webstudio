@@ -1,13 +1,15 @@
+import { useState } from "react";
 import { useStore } from "@nanostores/react";
+import { isLiteralExpression } from "@webstudio-is/sdk";
 import {
   type ControlProps,
-  getLabel,
   useLocalValue,
   VerticalLayout,
   Label,
   updateExpressionValue,
   $selectedInstanceScope,
   useBindingState,
+  humanizeAttribute,
 } from "../shared";
 import {
   ExpressionEditor,
@@ -27,8 +29,15 @@ export const JsonControl = ({
   onChange,
   onDelete,
 }: ControlProps<"json">) => {
+  const [error, setError] = useState<boolean>(false);
   const valueString = formatValue(computedValue ?? "");
   const localValue = useLocalValue(valueString, (value) => {
+    const isLiteral = isLiteralExpression(value);
+    setError(isLiteral ? false : true);
+    // prevent executing expressions which depends on global variables
+    if (isLiteral === false) {
+      return;
+    }
     try {
       // wrap into parens to treat object expression as value instead of block
       const parsedValue = eval(`(${value})`);
@@ -41,7 +50,7 @@ export const JsonControl = ({
       // empty block
     }
   });
-  const label = getLabel(meta, propName);
+  const label = humanizeAttribute(meta.label || propName);
 
   const { scope, aliases } = useStore($selectedInstanceScope);
   const expression = prop?.type === "expression" ? prop.value : valueString;
@@ -61,10 +70,11 @@ export const JsonControl = ({
     >
       <BindingControl>
         <ExpressionEditor
+          color={error ? "error" : undefined}
           readOnly={overwritable === false}
           value={localValue.value}
           onChange={localValue.set}
-          onBlur={localValue.save}
+          onChangeComplete={localValue.save}
         />
         <BindingPopover
           scope={scope}

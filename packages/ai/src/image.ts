@@ -1,9 +1,8 @@
-import { traverseTemplate } from "@webstudio-is/jsx-utils";
 import type {
   EmbedTemplateInstance,
   EmbedTemplateProp,
   WsEmbedTemplate,
-} from "@webstudio-is/react-sdk";
+} from "@webstudio-is/sdk";
 
 const isRemoteImageGeneratedByAi = (url: string) => {
   // wsai search param is added when image is queried by ai
@@ -130,6 +129,18 @@ const queryImageAndMutateInstance = async (
       property: "objectFit",
       value: { type: "keyword", value: "cover" },
     });
+  }
+};
+
+const traverseTemplate = (
+  template: WsEmbedTemplate,
+  fn: (node: WsEmbedTemplate[number]) => void
+) => {
+  for (const node of template) {
+    fn(node);
+    if (node.type === "instance") {
+      traverseTemplate(node.children, fn);
+    }
   }
 };
 

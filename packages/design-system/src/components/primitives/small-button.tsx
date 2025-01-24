@@ -48,7 +48,7 @@ const perVariantStyle = (variant: (typeof smallButtonVariants)[number]) => ({
   },
   "&[data-focused=true], &:focus-visible": {
     borderRadius: theme.borderRadius[3],
-    outline: `2px solid ${focusColors[variant]}`,
+    outline: `1px solid ${focusColors[variant]}`,
     "&:disabled, &[data-disabled]": {
       outline: "none",
     },
@@ -59,6 +59,7 @@ const style = css({
   all: "unset",
   width: theme.spacing[9],
   height: theme.spacing[9],
+  position: "relative",
   "&:disabled, &[data-disabled]": {
     color: theme.colors.foregroundDisabled,
   },
@@ -68,15 +69,27 @@ const style = css({
       contrast: perVariantStyle("contrast"),
       destructive: perVariantStyle("destructive"),
     },
+    bleed: {
+      true: {
+        // We want to bleed outside of the 16px icon size because its too small
+        "&::after": {
+          content: '""',
+          position: "absolute",
+          inset: `-${theme.spacing[4]}`,
+        },
+      },
+    },
   },
   defaultVariants: {
     variant: "normal",
+    bleed: true,
   },
 });
 
 type Props = {
   children: ReactNode;
   variant?: (typeof smallButtonVariants)[number];
+  bleed?: boolean;
   "data-state"?: (typeof smallButtonStates)[number];
   "data-focused"?: boolean;
   css?: CSS;
@@ -84,13 +97,13 @@ type Props = {
 
 export const SmallButton = forwardRef(
   (
-    { variant, children, css, className, ...restProps }: Props,
+    { variant, children, css, className, bleed, ...restProps }: Props,
     ref: Ref<HTMLButtonElement>
   ) => {
     return (
       <button
         {...restProps}
-        className={style({ css, className, variant })}
+        className={style({ css, className, variant, bleed })}
         ref={ref}
       >
         {children}

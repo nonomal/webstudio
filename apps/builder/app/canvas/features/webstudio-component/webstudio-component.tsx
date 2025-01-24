@@ -7,40 +7,48 @@ import {
   useMemo,
   Fragment,
   type ReactNode,
+  type JSX,
 } from "react";
-import { Suspense, lazy } from "react";
+import { $getSelection, $isRangeSelection } from "lexical";
 import { computed } from "nanostores";
 import { useStore } from "@nanostores/react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { mergeRefs } from "@react-aria/utils";
-import type { Instance, Instances, Prop } from "@webstudio-is/sdk";
-import { findTreeInstanceIds } from "@webstudio-is/sdk";
+import type {
+  Instance,
+  Instances,
+  Prop,
+  WsComponentMeta,
+} from "@webstudio-is/sdk";
 import {
-  type WebstudioComponentProps,
+  findTreeInstanceIds,
+  collectionComponent,
+  descendantComponent,
+  blockComponent,
+  blockTemplateComponent,
+} from "@webstudio-is/sdk";
+import {
   idAttribute,
   componentAttribute,
   showAttribute,
   selectorIdAttribute,
   indexAttribute,
   getIndexesWithinAncestors,
-  createInstanceChildrenElements,
-  collectionComponent,
   type AnyComponent,
   textContentAttribute,
+  editingPlaceholderVariable,
+  editablePlaceholderVariable,
 } from "@webstudio-is/react-sdk";
+import { rawTheme } from "@webstudio-is/design-system";
 import {
-  $propValuesByInstanceSelector,
+  $propValuesByInstanceSelectorWithMemoryProps,
   getIndexedInstanceId,
   $instances,
   $registeredComponentMetas,
   $selectedInstanceRenderState,
-  $selectedInstanceSelector,
-  $selectedPage,
-  $selectedStyleSourceSelector,
-  useInstanceStyles,
+  findBlockSelector,
 } from "~/shared/nano-states";
 import { $textEditingInstanceSelector } from "~/shared/nano-states";
-import { useCssRules } from "~/canvas/shared/styles";
 import {
   type InstanceSelector,
   areInstanceSelectorsEqual,
@@ -48,12 +56,26 @@ import {
 import { setDataCollapsed } from "~/canvas/collapsed";
 import { getIsVisuallyHidden } from "~/shared/visually-hidden";
 import { serverSyncStore } from "~/shared/sync";
-
-const TextEditor = lazy(() => import("../text-editor"));
+import { TextEditor } from "../text-editor";
+import {
+  $selectedPage,
+  getInstanceKey,
+  selectInstance,
+} from "~/shared/awareness";
+import {
+  createInstanceChildrenElements,
+  type WebstudioComponentProps,
+} from "~/canvas/elements";
+import { Block } from "../build-mode/block";
+import { BlockTemplate } from "../build-mode/block-template";
+import { getInstanceLabel } from "~/shared/instance-utils";
+import { editablePlaceholderComponents } from "~/canvas/shared/styles";
 
 const ContentEditable = ({
+  placeholder,
   renderComponentWithRef,
 }: {
+  placeholder: string | undefined;
   renderComponentWithRef: (
     elementRef: ForwardedRef<HTMLElement>
   ) => JSX.Element;
@@ -66,7 +88,7 @@ const ContentEditable = ({
    * useLayoutEffect to be sure that editor plugins on useEffect would have access to rootElement
    */
   useLayoutEffect(() => {
-    let rootElement = ref.current;
+    const rootElement = ref.current;
 
     if (rootElement == null) {
       return;
@@ -76,42 +98,140 @@ const ContentEditable = ({
       return;
     }
 
-    if (rootElement?.tagName === "BUTTON" || rootElement.tagName === "A") {
-      // <button> with contentEditable does not let to press space
-      // <a> stops working with inline-flex when only 1 character left
-      // so add span inside and use it as editor element in lexical
-      const span = document.createElement("span");
-      for (const child of rootElement.childNodes) {
-        rootElement.removeChild(child);
-        span.appendChild(child);
+    if (rootElement.tagName === "A") {
+      if (window.getComputedStyle(rootElement).display === "inline-flex") {
+        // Issue: <a> tag doesn't work with inline-flex when the cursor is at the start or end of the text.
+        // Solution: Inline-flex is not supported by Lexical. Use "inline" during editing.
+        rootElement.style.display = "inline";
       }
-      rootElement.appendChild(span);
+    }
 
-      rootElement = span;
+    // Issue: <button> with contentEditable does not allow pressing space.
+    // Solution: Add space on space keydown.
+    const abortController = new AbortController();
+    if (rootElement.tagName === "BUTTON") {
+      rootElement.addEventListener(
+        "keydown",
+        (event) => {
+          if (event.code === "Space") {
+            editor.update(() => {
+              const selection = $getSelection();
+
+              if ($isRangeSelection(selection)) {
+                selection.insertText(" ");
+              }
+            });
+
+            event.preventDefault();
+          }
+        },
+        { signal: abortController.signal }
+      );
+
+      // Some controls like Tab and TabTrigger intercept arrow keys for navigation.
+      // Prevent propagation to avoid conflicts with Lexical's default behavior.
+      rootElement.addEventListener(
+        "keydown",
+        (event) => {
+          if (["ArrowLeft", "ArrowRight"].includes(event.code)) {
+            event.stopPropagation();
+          }
+        },
+        { signal: abortController.signal }
+      );
     }
-    if (rootElement) {
-      rootElement.contentEditable = "true";
-    }
+
+    rootElement.contentEditable = "true";
 
     editor.setRootElement(rootElement);
-  }, [editor]);
+
+    // Must be done after 'setRootElement' to avoid Lexical's default behavior
+    // white-space affects "text-wrap", remove it and use "white-space-collapse" instead
+    rootElement.style.removeProperty("white-space");
+    rootElement.style.setProperty("white-space-collapse", "pre-wrap");
+
+    if (placeholder !== undefined) {
+      rootElement.style.setProperty(
+        editingPlaceholderVariable,
+        `'${placeholder.replaceAll("'", "\\'")}'`
+      );
+    }
+
+    return () => {
+      abortController.abort();
+    };
+  }, [editor, placeholder]);
 
   return renderComponentWithRef(ref);
 };
 
-const StubComponent = forwardRef<HTMLDivElement, { children?: ReactNode }>(
-  (props, ref) => {
-    return (
-      <div
-        {...props}
-        ref={ref}
-        style={{ display: props.children ? "contents" : "block" }}
-      />
-    );
+const ErrorStub = forwardRef<
+  HTMLDivElement,
+  {
+    children?: ReactNode;
   }
-);
+>((props, ref) => {
+  return (
+    <div
+      {...props}
+      ref={ref}
+      style={{
+        padding: rawTheme.spacing[5],
+        border: `1px solid ${rawTheme.colors.borderDestructiveMain}`,
+        color: rawTheme.colors.foregroundDestructive,
+      }}
+    />
+  );
+});
+ErrorStub.displayName = "ErrorStub";
 
-StubComponent.displayName = "StubComponent";
+const MissingComponentStub = forwardRef<
+  HTMLDivElement,
+  { children?: ReactNode }
+>((props, ref) => {
+  return (
+    <ErrorStub ref={ref} {...props}>
+      Component {props[componentAttribute as never]} does not exist
+    </ErrorStub>
+  );
+});
+MissingComponentStub.displayName = "MissingComponentStub";
+
+const InvalidCollectionDataStub = forwardRef<
+  HTMLDivElement,
+  { children?: ReactNode }
+>((props, ref) => {
+  return (
+    <ErrorStub ref={ref} {...props}>
+      The Collection component requires an array in the data property. When
+      binding external data, it is likely that the array is nested somewhere
+      within, and you need to provide the correct path in the binding.{" "}
+      <a
+        style={{ color: "inherit" }}
+        target="_blank"
+        href="https://docs.webstudio.is/university/core-components/collection.md#whats-an-array"
+        // avoid preventing click by events interceptor
+        onClickCapture={(event) => event.stopPropagation()}
+      >
+        Learn more
+      </a>
+    </ErrorStub>
+  );
+});
+InvalidCollectionDataStub.displayName = "InvalidCollectionDataStub";
+
+const DroppableComponentStub = forwardRef<
+  HTMLDivElement,
+  { children?: ReactNode }
+>((props, ref) => {
+  return (
+    <div {...props} ref={ref} style={{ display: "block" }}>
+      {/* explicitly specify undefined to override passed children */}
+      {undefined}
+    </div>
+  );
+});
+DroppableComponentStub.displayName = "DroppableComponentStub";
 
 // this utility is temporary solution to compute instance selectors
 // for rich text subtree which cannot have slots so its safe to traverse ancestors
@@ -156,19 +276,18 @@ const $indexesWithinAncestors = computed(
 );
 
 const useInstanceProps = (instanceSelector: InstanceSelector) => {
-  const instanceSelectorKey = JSON.stringify(instanceSelector);
+  const instanceKey = getInstanceKey(instanceSelector);
   const [instanceId] = instanceSelector;
   const $instancePropsObject = useMemo(() => {
     return computed(
-      [$propValuesByInstanceSelector, $indexesWithinAncestors],
+      [$propValuesByInstanceSelectorWithMemoryProps, $indexesWithinAncestors],
       (propValuesByInstanceSelector, indexesWithinAncestors) => {
         const instancePropsObject: Record<Prop["name"], unknown> = {};
         const index = indexesWithinAncestors.get(instanceId);
         if (index !== undefined) {
           instancePropsObject[indexAttribute] = index.toString();
         }
-        const instanceProps =
-          propValuesByInstanceSelector.get(instanceSelectorKey);
+        const instanceProps = propValuesByInstanceSelector.get(instanceKey);
         if (instanceProps) {
           for (const [name, value] of instanceProps) {
             instancePropsObject[name] = value;
@@ -177,7 +296,7 @@ const useInstanceProps = (instanceSelector: InstanceSelector) => {
         return instancePropsObject;
       }
     );
-  }, [instanceSelectorKey, instanceId]);
+  }, [instanceKey, instanceId]);
   const instancePropsObject = useStore($instancePropsObject);
   return instancePropsObject;
 };
@@ -250,16 +369,45 @@ const getTextContent = (instanceProps: Record<string, unknown>) => {
   return value as ReactNode;
 };
 
-// eslint-disable-next-line react/display-name
+const getEditableComponentPlaceholder = (
+  instance: Instance,
+  instanceSelector: InstanceSelector,
+  instances: Instances,
+  metas: Map<string, WsComponentMeta>,
+  mode: "editing" | "editable"
+) => {
+  if (!editablePlaceholderComponents.includes(instance.component)) {
+    return;
+  }
+
+  const isContentBlockChild =
+    undefined !== findBlockSelector(instanceSelector, instances);
+
+  const meta = metas.get(instance.component);
+
+  const label = meta
+    ? getInstanceLabel(instance, meta)
+    : (instance.label ?? instance.component);
+
+  const isParagraph = instance.component === "Paragraph";
+
+  if (isParagraph && isContentBlockChild) {
+    return mode === "editing"
+      ? "Write something or press '/' for commands..."
+      : // The paragraph contains only an "editing" placeholder within the content block.
+        undefined;
+  }
+
+  return label;
+};
+
 export const WebstudioComponentCanvas = forwardRef<
   HTMLElement,
   WebstudioComponentProps
 >(({ instance, instanceSelector, components, ...restProps }, ref) => {
-  const rootRef = useRef<null | HTMLDivElement>(null);
   const instanceId = instance.id;
-  const instanceStyles = useInstanceStyles(instanceId);
-  useCssRules({ instanceId: instance.id, instanceStyles });
   const instances = useStore($instances);
+  const metas = useStore($registeredComponentMetas);
 
   const textEditingInstanceSelector = useStore($textEditingInstanceSelector);
 
@@ -302,10 +450,16 @@ export const WebstudioComponentCanvas = forwardRef<
     return <></>;
   }
 
+  let Component =
+    components.get(instance.component) ??
+    (MissingComponentStub as AnyComponent);
+
   if (instance.component === collectionComponent) {
     const data = instanceProps.data;
-    // render stub component when no data or children
-    if (
+    if (data && Array.isArray(data) === false) {
+      Component = InvalidCollectionDataStub as AnyComponent;
+    } else if (
+      // render stub component when no data or children
       Array.isArray(data) &&
       data.length > 0 &&
       instance.children.length > 0
@@ -327,17 +481,47 @@ export const WebstudioComponentCanvas = forwardRef<
           </Fragment>
         );
       });
+    } else {
+      Component = DroppableComponentStub as AnyComponent;
     }
   }
 
-  const Component =
-    components.get(instance.component) ?? (StubComponent as AnyComponent);
+  if (instance.component === descendantComponent) {
+    return <></>;
+  }
+
+  if (instance.component === blockComponent) {
+    Component = Block;
+  }
+
+  if (instance.component === blockTemplateComponent) {
+    Component = BlockTemplate;
+  }
+
+  const placeholder = getEditableComponentPlaceholder(
+    instance,
+    instanceSelector,
+    instances,
+    metas,
+    "editable"
+  );
+
+  const mergedProps = mergeProps(restProps, instanceProps, "delete");
 
   const props: {
     [componentAttribute]: string;
     [idAttribute]: string;
+    [selectorIdAttribute]: string;
   } & Record<string, unknown> = {
-    ...mergeProps(restProps, instanceProps, "delete"),
+    ...mergedProps,
+    ...(placeholder !== undefined
+      ? {
+          style: {
+            ...mergedProps.style,
+            [editablePlaceholderVariable]: `'${placeholder.replaceAll("'", "\\'")}'`,
+          },
+        }
+      : null),
     // current props should override bypassed from parent
     // important for data-ws-* props
     tabIndex: 0,
@@ -346,80 +530,88 @@ export const WebstudioComponentCanvas = forwardRef<
     [idAttribute]: instance.id,
   };
 
+  // React ignores defaultValue changes after first render.
+  // Key prop forces re-creation to reflect updates on canvas.
+  const key =
+    props.defaultValue != null ? props.defaultValue.toString() : undefined;
+
   const instanceElement = (
     <>
-      <Component {...props} ref={mergeRefs(ref, rootRef)}>
+      <Component key={key} {...props} ref={ref}>
         {children}
       </Component>
     </>
   );
 
   if (
-    areInstanceSelectorsEqual(textEditingInstanceSelector, instanceSelector) ===
-    false
+    areInstanceSelectorsEqual(
+      textEditingInstanceSelector?.selector,
+      instanceSelector
+    ) === false
   ) {
     initialContentEditableContent.current = children;
     return instanceElement;
   }
 
   return (
-    <Suspense fallback={instanceElement}>
-      <TextEditor
-        rootRef={rootRef}
-        rootInstanceSelector={instanceSelector}
-        instances={instances}
-        contentEditable={
-          <ContentEditable
-            renderComponentWithRef={(elementRef) => (
-              <Component {...props} ref={mergeRefs(ref, elementRef, rootRef)}>
-                {initialContentEditableContent.current}
-              </Component>
-            )}
-          />
-        }
-        onChange={(instancesList) => {
-          serverSyncStore.createTransaction([$instances], (instances) => {
-            const deletedTreeIds = findTreeInstanceIds(instances, instance.id);
-            for (const updatedInstance of instancesList) {
-              instances.set(updatedInstance.id, updatedInstance);
-              // exclude reused instances
-              deletedTreeIds.delete(updatedInstance.id);
-            }
-            for (const instanceId of deletedTreeIds) {
-              instances.delete(instanceId);
-            }
-          });
-        }}
-        onSelectInstance={(instanceId) => {
-          const instances = $instances.get();
-          const newSelectedSelector = getInstanceSelector(
-            instances,
+    <TextEditor
+      rootInstanceSelector={instanceSelector}
+      instances={instances}
+      contentEditable={
+        <ContentEditable
+          placeholder={getEditableComponentPlaceholder(
+            instance,
             instanceSelector,
-            instanceId
-          );
-          $textEditingInstanceSelector.set(undefined);
-          $selectedInstanceSelector.set(newSelectedSelector);
-          $selectedStyleSourceSelector.set(undefined);
-        }}
-      />
-    </Suspense>
+            instances,
+            metas,
+            "editing"
+          )}
+          renderComponentWithRef={(elementRef) => (
+            <Component {...props} ref={mergeRefs(ref, elementRef)}>
+              {initialContentEditableContent.current}
+            </Component>
+          )}
+        />
+      }
+      onChange={(instancesList) => {
+        serverSyncStore.createTransaction([$instances], (instances) => {
+          const deletedTreeIds = findTreeInstanceIds(instances, instance.id);
+          for (const updatedInstance of instancesList) {
+            instances.set(updatedInstance.id, updatedInstance);
+            // exclude reused instances
+            deletedTreeIds.delete(updatedInstance.id);
+          }
+          for (const instanceId of deletedTreeIds) {
+            instances.delete(instanceId);
+          }
+        });
+      }}
+      onSelectInstance={(instanceId) => {
+        const instances = $instances.get();
+        const newSelectedSelector = getInstanceSelector(
+          instances,
+          instanceSelector,
+          instanceId
+        );
+        $textEditingInstanceSelector.set(undefined);
+        selectInstance(newSelectedSelector);
+      }}
+    />
   );
 });
 
-// eslint-disable-next-line react/display-name
 export const WebstudioComponentPreview = forwardRef<
   HTMLElement,
   WebstudioComponentProps
 >(({ instance, instanceSelector, components, ...restProps }, ref) => {
   const instances = useStore($instances);
-  const instanceStyles = useInstanceStyles(instance.id);
-  useCssRules({ instanceId: instance.id, instanceStyles });
   const { [showAttribute]: show = true, ...instanceProps } =
     useInstanceProps(instanceSelector);
   const props = {
     ...mergeProps(restProps, instanceProps, "merge"),
     [idAttribute]: instance.id,
     [componentAttribute]: instance.component,
+    [selectorIdAttribute]: instanceSelector.join(","),
   };
   if (show === false) {
     return <></>;
@@ -427,7 +619,7 @@ export const WebstudioComponentPreview = forwardRef<
 
   if (instance.component === collectionComponent) {
     const data = instanceProps.data;
-    // render stub component when no data or children
+    // render nothing when no data or children
     if (
       Array.isArray(data) &&
       data.length > 0 &&
@@ -453,7 +645,20 @@ export const WebstudioComponentPreview = forwardRef<
     }
   }
 
-  const Component = components.get(instance.component);
+  if (instance.component === descendantComponent) {
+    return <></>;
+  }
+
+  let Component = components.get(instance.component);
+
+  if (instance.component === blockComponent) {
+    Component = Block;
+  }
+
+  if (instance.component === blockTemplateComponent) {
+    Component = BlockTemplate;
+  }
+
   if (Component === undefined) {
     return <></>;
   }

@@ -1,44 +1,36 @@
 {
   "name": "@webstudio-is/image",
-  "version": "0.129.0",
+  "version": "0.0.0-webstudio-version",
   "description": "Image optimization",
   "author": "Webstudio <github@webstudio.is>",
   "homepage": "https://webstudio.is",
   "type": "module",
   "scripts": {
     "typecheck": "tsc",
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
-    "checks": "pnpm typecheck && pnpm test",
-    "dev": "rm -rf lib && esbuild 'src/**/*.ts' 'src/**/*.tsx' --outdir=lib --watch",
+    "test": "vitest run",
     "build": "rm -rf lib && esbuild src/index.ts --outdir=lib --bundle --format=esm --packages=external",
-    "dts": "tsc --project tsconfig.dts.json",
-    "storybook:dev": "storybook dev -p 6006",
-    "storybook:build": "storybook build"
+    "dts": "tsc --project tsconfig.dts.json"
   },
   "dependencies": {
-    "react": "^18.2.0",
+    "react": "18.3.0-canary-14898b6a9-20240318",
     "warn-once": "^0.1.1"
   },
   "devDependencies": {
-    "@jest/globals": "^29.7.0",
-    "@storybook/react": "^7.4.0",
-    "@types/react": "^18.2.21",
-    "@webstudio-is/jest-config": "workspace:*",
-    "@webstudio-is/storybook-config": "workspace:*",
+    "@types/react": "^18.2.70",
+    "@types/react-dom": "^18.2.25",
     "@webstudio-is/tsconfig": "workspace:*",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "typescript": "5.2.2"
+    "react": "18.3.0-canary-14898b6a9-20240318",
+    "react-dom": "18.3.0-canary-14898b6a9-20240318",
+    "vitest": "^3.0.2"
   },
   "peerDependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react": "18.3.0-canary-14898b6a9-20240318",
+    "react-dom": "18.3.0-canary-14898b6a9-20240318"
   },
   "exports": {
     "webstudio": "./src/index.ts",
     "types": "./lib/types/index.d.ts",
-    "import": "./lib/index.js",
-    "require": "./lib/index.js"
+    "import": "./lib/index.js"
   },
   "files": [
     "lib/*",

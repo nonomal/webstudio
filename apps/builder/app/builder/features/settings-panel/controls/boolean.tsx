@@ -1,17 +1,17 @@
 import { useStore } from "@nanostores/react";
-import { Grid, Switch, theme, useId } from "@webstudio-is/design-system";
+import { Grid, Switch, theme } from "@webstudio-is/design-system";
 import {
   BindingControl,
   BindingPopover,
 } from "~/builder/shared/binding-popover";
 import {
   type ControlProps,
-  getLabel,
   Label,
   RemovePropButton,
   $selectedInstanceScope,
   updateExpressionValue,
   useBindingState,
+  humanizeAttribute,
 } from "../shared";
 
 export const BooleanControl = ({
@@ -23,8 +23,7 @@ export const BooleanControl = ({
   onChange,
   onDelete,
 }: ControlProps<"boolean">) => {
-  const id = useId();
-  const label = getLabel(meta, propName);
+  const label = humanizeAttribute(meta.label || propName);
   const { scope, aliases } = useStore($selectedInstanceScope);
   const expression =
     prop?.type === "expression" ? prop.value : JSON.stringify(computedValue);
@@ -44,16 +43,11 @@ export const BooleanControl = ({
       align="center"
       gap="2"
     >
-      <Label
-        htmlFor={id}
-        description={meta.description}
-        readOnly={overwritable === false}
-      >
+      <Label description={meta.description} readOnly={overwritable === false}>
         {label}
       </Label>
       <BindingControl>
         <Switch
-          id={id}
           disabled={overwritable === false}
           checked={Boolean(computedValue ?? false)}
           onCheckedChange={(value) => {

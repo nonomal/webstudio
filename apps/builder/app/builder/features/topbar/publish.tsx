@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useState,
+  useOptimistic,
+  useTransition,
+  startTransition,
+  useRef,
+  useId,
+} from "react";
 import { useStore } from "@nanostores/react";
 import {
   Button,
-  useId,
   Tooltip,
-  FloatingPanelPopover,
-  FloatingPanelAnchor,
-  FloatingPanelPopoverTrigger,
-  FloatingPanelPopoverContent,
-  FloatingPanelPopoverTitle,
   IconButton,
   Grid,
   Flex,
@@ -17,99 +19,69 @@ import {
   InputField,
   Separator,
   ScrollArea,
-  Box,
   rawTheme,
   Select,
   theme,
   TextArea,
   Link,
+  PanelBanner,
+  buttonStyle,
+  toast,
+  RadioGroup,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  PopoverTitle,
+  PopoverClose,
+  PopoverTitleActions,
 } from "@webstudio-is/design-system";
 import stripIndent from "strip-indent";
-import { useIsPublishDialogOpen } from "../../shared/nano-states";
+import { $publishDialog } from "../../shared/nano-states";
 import { validateProjectDomain, type Project } from "@webstudio-is/project";
-import { getPublishedUrl } from "~/shared/router-utils";
-import { $authPermit } from "~/shared/nano-states";
 import {
-  Domains,
-  getPublishStatusAndText,
-  getStatus,
-  type Domain,
-  PENDING_TIMEOUT,
-} from "./domains";
+  $authTokenPermissions,
+  $project,
+  $publishedOrigin,
+  $userPlanFeatures,
+} from "~/shared/nano-states";
+import { Domains, PENDING_TIMEOUT, getPublishStatusAndText } from "./domains";
 import { CollapsibleDomainSection } from "./collapsible-domain-section";
 import {
   CheckCircleIcon,
   ExternalLinkIcon,
   AlertIcon,
   CopyIcon,
+  GearIcon,
 } from "@webstudio-is/icons";
-import { createTrpcFetchProxy } from "~/shared/remix/trpc-remix-proxy";
-import { builderDomainsPath } from "~/shared/router-utils";
-import type { DomainRouter } from "@webstudio-is/domain/index.server";
 import { AddDomain } from "./add-domain";
 import { humanizeString } from "~/shared/string-utils";
-
-const trpc = createTrpcFetchProxy<DomainRouter>(builderDomainsPath);
-
-type ProjectData =
-  | {
-      success: true;
-      project: Project;
-    }
-  | {
-      success: false;
-      error: string;
-    };
+import { trpcClient, nativeClient } from "~/shared/trpc/trpc-client";
+import { isFeatureEnabled } from "@webstudio-is/feature-flags";
+import type { Templates } from "@webstudio-is/sdk";
+import DomainCheckbox, { domainToPublishName } from "./domain-checkbox";
+import { CopyToClipboard } from "~/builder/shared/copy-to-clipboard";
+import { $openProjectSettings } from "~/shared/nano-states/project-settings";
+import { RelativeTime } from "~/builder/shared/relative-time";
 
 type ChangeProjectDomainProps = {
   project: Project;
   projectState: "idle" | "submitting";
-  isPublishing: boolean;
-  projectLoad: (
-    props: { projectId: Project["id"] },
-    callback: (projectData: ProjectData) => void
-  ) => void;
+  refresh: () => Promise<void>;
 };
-
-type TimeoutId = undefined | ReturnType<typeof setTimeout>;
 
 const ChangeProjectDomain = ({
   project,
-  projectLoad,
-  projectState,
-  isPublishing,
+  refresh,
 }: ChangeProjectDomainProps) => {
   const id = useId();
-
-  const {
-    send: updateProjectDomain,
-    state: updateProjectDomainState,
-    error: updateProjectSystemError,
-  } = trpc.updateProjectDomain.useMutation();
+  const publishedOrigin = useStore($publishedOrigin);
 
   const [domain, setDomain] = useState(project.domain);
   const [error, setError] = useState<string>();
+  const [isUpdateInProgress, setIsUpdateInProgress] = useOptimistic(false);
 
-  const refreshProject = useCallback(
-    () =>
-      projectLoad({ projectId: project.id }, (projectData) => {
-        if (projectData?.success === false) {
-          setError(projectData.error);
-          return;
-        }
-
-        setDomain(projectData.project.domain);
-      }),
-    [projectLoad, project.id]
-  );
-
-  useEffect(() => {
-    refreshProject();
-  }, [refreshProject]);
-
-  const publishedUrl = new URL(getPublishedUrl(project.domain));
-
-  const handleUpdateProjectDomain = () => {
+  const updateProjectDomain = async () => {
+    setIsUpdateInProgress(true);
     const validationResult = validateProjectDomain(domain);
 
     if (validationResult.success === false) {
@@ -117,26 +89,28 @@ const ChangeProjectDomain = ({
       return;
     }
 
-    if (updateProjectDomainState !== "idle") {
-      return;
-    }
-    if (domain === project.domain) {
+    const updateResult = await nativeClient.domain.updateProjectDomain.mutate({
+      domain,
+      projectId: project.id,
+    });
+
+    if (updateResult.success === false) {
+      setError(updateResult.error);
       return;
     }
 
-    updateProjectDomain({ domain, projectId: project.id }, (data) => {
-      if (data?.success === false) {
-        setError(data.error);
-        return;
-      }
+    await refresh();
+  };
 
-      refreshProject();
+  const handleUpdateProjectDomain = () => {
+    startTransition(async () => {
+      await updateProjectDomain();
     });
   };
 
   const { statusText, status } =
-    project.latestBuild != null
-      ? getPublishStatusAndText(project.latestBuild)
+    project.latestBuildVirtual != null
+      ? getPublishStatusAndText(project.latestBuildVirtual)
       : {
           statusText: "Not published",
           status: "PENDING" as const,
@@ -144,17 +118,24 @@ const ChangeProjectDomain = ({
 
   return (
     <CollapsibleDomainSection
-      title={publishedUrl.host}
+      title={new URL(publishedOrigin).host}
+      prefix={
+        <DomainCheckbox
+          defaultChecked={project.latestBuildVirtual?.domain === domain}
+          buildId={project.latestBuildVirtual?.buildId}
+          domain={domain}
+        />
+      }
       suffix={
-        <Grid flow="column">
+        <Grid flow="column" align="center">
           <Tooltip content={error !== undefined ? error : statusText}>
             <Flex
-              align={"center"}
-              justify={"center"}
+              align="center"
+              justify="center"
               css={{
                 cursor: "pointer",
-                width: theme.spacing[12],
-                height: theme.spacing[12],
+                width: theme.sizes.controlHeight,
+                height: theme.sizes.controlHeight,
                 color:
                   error !== undefined || status === "FAILED"
                     ? theme.colors.foregroundDestructive
@@ -168,12 +149,11 @@ const ChangeProjectDomain = ({
               )}
             </Flex>
           </Tooltip>
-          <Tooltip content={`Proceed to ${publishedUrl.href}`}>
+          <Tooltip content={`Proceed to ${publishedOrigin}`}>
             <IconButton
               tabIndex={-1}
-              disabled={error !== undefined || status !== "PUBLISHED"}
               onClick={(event) => {
-                window.open(publishedUrl.href, "_blank");
+                window.open(publishedOrigin, "_blank");
                 event.preventDefault();
               }}
             >
@@ -187,15 +167,11 @@ const ChangeProjectDomain = ({
         <Grid gap={1}>
           <Label htmlFor={id}>Domain:</Label>
           <InputField
-            variant="mono"
+            text="mono"
             id={id}
             placeholder="Domain"
             value={domain}
-            disabled={
-              isPublishing ||
-              updateProjectDomainState !== "idle" ||
-              projectState !== "idle"
-            }
+            disabled={isUpdateInProgress}
             onChange={(event) => {
               setError(undefined);
               setDomain(event.target.value);
@@ -213,16 +189,9 @@ const ChangeProjectDomain = ({
                 }
               }
             }}
-            color={
-              error !== undefined || updateProjectSystemError !== undefined
-                ? "error"
-                : undefined
-            }
+            color={error !== undefined ? "error" : undefined}
           />
           {error !== undefined && <Text color="destructive">{error}</Text>}
-          {updateProjectSystemError !== undefined && (
-            <Text color="destructive">{updateProjectSystemError}</Text>
-          )}
         </Grid>
       </Grid>
     </CollapsibleDomainSection>
@@ -231,99 +200,173 @@ const ChangeProjectDomain = ({
 
 const Publish = ({
   project,
-  domainsToPublish,
   refresh,
-
-  isPublishing,
-  setIsPublishing,
 }: {
   project: Project;
-  domainsToPublish: Domain[];
-  refresh: () => void;
 
-  isPublishing: boolean;
-  setIsPublishing: (isPublishing: boolean) => void;
+  refresh: () => Promise<void>;
 }) => {
-  const {
-    send: publish,
-    state: publishState,
-    data: publishData,
-    error: publishSystemError,
-  } = trpc.publish.useMutation();
+  const [publishError, setPublishError] = useState<
+    undefined | JSX.Element | string
+  >();
+  const [isPublishing, setIsPublishing] = useOptimistic(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [hasSelectedDomains, setHasSelectedDomains] = useState(false);
+  const hasProPlan = useStore($userPlanFeatures).hasProPlan;
 
   useEffect(() => {
-    if (isPublishing) {
-      let timeoutHandle: TimeoutId;
-      let totalCalls = 0;
-      const timeout = 10000;
-      // Repeat few more times than timeout
-      const repeat = PENDING_TIMEOUT / timeout + 5;
-
-      // Call refresh
-      const execRefresh = () => {
-        if (totalCalls < repeat) {
-          totalCalls += 1;
-          clearTimeout(timeoutHandle);
-          timeoutHandle = setTimeout(() => {
-            refresh();
-            execRefresh();
-          }, timeout);
-        }
-      };
-
-      execRefresh();
-
-      return () => {
-        clearTimeout(timeoutHandle);
-      };
+    if (hasProPlan === false) {
+      setHasSelectedDomains(true);
+      return;
     }
-  }, [isPublishing, refresh]);
+    const form = buttonRef.current?.closest("form");
 
-  const isPublishInProgress = publishState !== "idle" || isPublishing;
+    if (form == null) {
+      return;
+    }
+
+    const handleFormInput = () => {
+      const formData = new FormData(form);
+      const domainsSelected = formData.getAll(domainToPublishName).length;
+      setHasSelectedDomains(domainsSelected > 0);
+    };
+
+    const observer = new MutationObserver(() => {
+      handleFormInput();
+    });
+
+    observer.observe(form, {
+      attributes: true,
+      childList: true,
+      subtree: true,
+      attributeFilter: ["value", "checked"],
+    });
+
+    handleFormInput();
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [hasProPlan]);
+
+  const handlePublish = async (formData: FormData) => {
+    setPublishError(undefined);
+    setIsPublishing(true);
+
+    const domains = hasProPlan
+      ? formData
+          .getAll(domainToPublishName)
+          .map((domainEntry) => domainEntry.toString())
+      : [
+          project.domain,
+          ...project.domainsVirtual
+            .filter((domain) => domain.verified && domain.status === "ACTIVE")
+            .map((domain) => domain.domain),
+        ];
+
+    if (domains.length === 0) {
+      toast.error("Please select at least one domain to publish");
+      return;
+    }
+
+    const publishResult = await nativeClient.domain.publish.mutate({
+      projectId: project.id,
+      domains,
+      destination: "saas",
+    });
+
+    if (publishResult.success === false) {
+      console.error(publishResult.error);
+
+      let error: JSX.Element | string = publishResult.error;
+      if (publishResult.error === "NOT_IMPLEMENTED") {
+        error = (
+          <>
+            Build data for publishing has been successfully created. Use{" "}
+            <Link href="https://docs.webstudio.is/university/self-hosting/cli">
+              Webstudio&nbsp;CLI
+            </Link>{" "}
+            to generate the code.
+          </>
+        );
+      }
+      setPublishError(error);
+      if (publishResult.error === "NOT_IMPLEMENTED") {
+        toast.info(error);
+      } else {
+        toast.error(error);
+      }
+
+      if (process.env.NODE_ENV === "development") {
+        // Refresh locally as it's always an error
+        await refresh();
+      }
+
+      return;
+    }
+
+    let sleepTime = 15000;
+    const timeToFinish = Date.now() + PENDING_TIMEOUT + 2 * sleepTime;
+
+    // Wait until project is published or failed
+    while (Date.now() < timeToFinish) {
+      await refresh();
+
+      const project = $project.get();
+
+      if (project == null) {
+        throw new Error("Project not found");
+      }
+
+      const { statusText, status } =
+        project.latestBuildVirtual != null
+          ? getPublishStatusAndText(project.latestBuildVirtual)
+          : {
+              statusText: "Not published",
+              status: "PENDING" as const,
+            };
+
+      if (status === "PUBLISHED") {
+        break;
+      }
+
+      if (status === "FAILED") {
+        toast.error(statusText);
+        setPublishError(statusText);
+        break;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, sleepTime));
+
+      sleepTime = Math.max(5000, sleepTime - 5000);
+    }
+  };
+
+  const hasPendingState = project.latestBuildVirtual
+    ? getPublishStatusAndText(project.latestBuildVirtual).status === "PENDING"
+    : false;
+
+  const isPublishInProgress = isPublishing || hasPendingState;
 
   return (
-    <Flex
-      css={{
-        paddingLeft: theme.spacing[9],
-        paddingRight: theme.spacing[9],
-        paddingBottom: theme.spacing[9],
-        paddingTop: theme.spacing[5],
-      }}
-      gap={2}
-      shrink={false}
-      direction={"column"}
-    >
-      {publishSystemError !== undefined && (
-        <Text color="destructive">{publishSystemError}</Text>
-      )}
-
-      {publishData?.success === false && (
-        <Text color="destructive">{publishData.error}</Text>
-      )}
+    <Flex gap={2} shrink={false} direction={"column"}>
+      {publishError && <Text color="destructive">{publishError}</Text>}
 
       <Tooltip
         content={
-          isPublishInProgress ? "Publish process in progress" : undefined
+          isPublishInProgress
+            ? "Publish process in progress"
+            : hasSelectedDomains
+              ? undefined
+              : "Select at least one domain to publish"
         }
       >
         <Button
+          ref={buttonRef}
+          formAction={handlePublish}
           color="positive"
           state={isPublishInProgress ? "pending" : undefined}
-          onClick={() => {
-            setIsPublishing(true);
-
-            publish(
-              {
-                projectId: project.id,
-                domains: domainsToPublish.map(
-                  (projectDomain) => projectDomain.domain.domain
-                ),
-              },
-              () => {
-                refresh();
-              }
-            );
-          }}
+          disabled={hasSelectedDomains === false}
         >
           Publish
         </Button>
@@ -332,164 +375,294 @@ const Publish = ({
   );
 };
 
-const ErrorText = ({ children }: { children: string }) => (
-  <Flex
-    css={{
-      m: theme.spacing[9],
-      overflowWrap: "anywhere",
-    }}
-    gap={2}
-    direction={"column"}
-  >
-    <Text color="destructive">{children}</Text>
-    <Text color="subtle">Please try again later</Text>
-  </Flex>
-);
+const getStaticPublishStatusAndText = ({
+  updatedAt,
+  publishStatus,
+}: {
+  updatedAt: string;
+  publishStatus: "PENDING" | "FAILED" | "PUBLISHED";
+}) => {
+  let status = publishStatus;
+
+  const delta = Date.now() - new Date(updatedAt).getTime();
+  // Assume build failed after 3 minutes
+
+  if (publishStatus === "PENDING" && delta > PENDING_TIMEOUT) {
+    status = "FAILED";
+  }
+
+  const textStart =
+    status === "PUBLISHED"
+      ? "Downloaded"
+      : status === "FAILED"
+        ? "Download failed"
+        : "Download started";
+
+  const statusText = (
+    <>
+      {textStart} <RelativeTime time={new Date(updatedAt)} />
+    </>
+  );
+
+  return { statusText, status };
+};
+
+const PublishStatic = ({
+  projectId,
+  templates,
+}: {
+  projectId: Project["id"];
+  templates: readonly Templates[];
+}) => {
+  const project = useStore($project);
+  const [_, startTransition] = useTransition();
+
+  if (project == null) {
+    throw new Error("Project not found");
+  }
+
+  const { status, statusText } =
+    project.latestStaticBuild == null
+      ? { status: "LOADED" as const, statusText: "Not published" }
+      : getStaticPublishStatusAndText(project.latestStaticBuild);
+
+  const [isPending, setIsPendingOptimistic] = useOptimistic(false);
+
+  const isPublishInProgress = status === "PENDING" || isPending;
+
+  return (
+    <Flex gap={2} shrink={false} direction={"column"}>
+      {status === "FAILED" && <Text color="destructive">{statusText}</Text>}
+
+      <Tooltip
+        content={isPublishInProgress ? "Preparing static site" : undefined}
+      >
+        <Button
+          type="button"
+          color="positive"
+          state={isPublishInProgress ? "pending" : undefined}
+          onClick={() => {
+            startTransition(async () => {
+              try {
+                setIsPendingOptimistic(true);
+
+                const result = await nativeClient.domain.publish.mutate({
+                  projectId,
+                  destination: "static",
+                  templates: [...templates],
+                });
+
+                if (result.success === false) {
+                  toast.error(result.error);
+                  return;
+                }
+
+                const name = "name" in result ? result.name : undefined;
+
+                if (name == null) {
+                  toast.error('File name must be defined in "result"');
+                  return;
+                }
+
+                const timeout = 10000;
+
+                // Repeat few more times than timeout
+                const repeat = PENDING_TIMEOUT / timeout + 5;
+
+                for (let i = 0; i !== repeat; i++) {
+                  await new Promise((resolve) => setTimeout(resolve, timeout));
+
+                  await refreshProject();
+
+                  const latestStaticBuild = $project.get()?.latestStaticBuild;
+
+                  if (latestStaticBuild == null) {
+                    continue;
+                  }
+
+                  const { status } =
+                    getStaticPublishStatusAndText(latestStaticBuild);
+
+                  if (status !== "PENDING") {
+                    break;
+                  }
+                }
+
+                const latestStaticBuild = $project.get()?.latestStaticBuild;
+
+                if (latestStaticBuild == null) {
+                  throw new Error("Static build not found");
+                }
+
+                const { status, statusText } =
+                  getStaticPublishStatusAndText(latestStaticBuild);
+
+                if (status === "FAILED") {
+                  // Report if Export failed
+                  toast.error(statusText);
+                }
+
+                if (status === "PUBLISHED") {
+                  window.location.href = `/cgi/static/ssg/${name}`;
+                }
+              } catch (error) {
+                toast.error(
+                  error instanceof Error ? error.message : "Unknown error"
+                );
+              }
+            });
+          }}
+        >
+          Build and download static site
+        </Button>
+      </Tooltip>
+    </Flex>
+  );
+};
+
+const useCanAddDomain = () => {
+  const { load, data } = trpcClient.domain.countTotalDomains.useQuery();
+  const { maxDomainsAllowedPerUser, hasProPlan } = useStore($userPlanFeatures);
+  const project = useStore($project);
+
+  const activeDomainsCount = project?.domainsVirtual.filter(
+    (domain) => domain.status === "ACTIVE" && domain.verified
+  ).length;
+
+  useEffect(() => {
+    load();
+  }, [load, activeDomainsCount]);
+
+  if (hasProPlan) {
+    return { canAddDomain: true, maxDomainsAllowedPerUser };
+  }
+
+  if (data?.success === false) {
+    return { canAddDomain: false, maxDomainsAllowedPerUser };
+  }
+
+  const withinFreeLimit = data
+    ? data.success && data.data < maxDomainsAllowedPerUser
+    : true;
+  const canAddDomain = hasProPlan || withinFreeLimit;
+
+  return { canAddDomain, maxDomainsAllowedPerUser };
+};
+
+const refreshProject = async () => {
+  const result = await nativeClient.domain.project.query(
+    {
+      projectId: $project.get()!.id,
+    }
+    // Pass abort signal
+    // { signal: undefined }
+  );
+
+  if (result.success) {
+    $project.set(result.project);
+    return;
+  }
+
+  toast.error(result.error);
+};
 
 const Content = (props: {
   projectId: Project["id"];
   onExportClick: () => void;
 }) => {
   const [newDomains, setNewDomains] = useState(new Set<string>());
-  const {
-    data: domainsResult,
-    load: domainRefresh,
-    state: domainState,
-    error: domainSystemError,
-  } = trpc.findMany.useQuery();
 
-  const {
-    load: projectLoad,
-    data: projectData,
-    state: projectState,
-    error: projectSystemError,
-  } = trpc.project.useQuery();
+  const project = useStore($project);
 
-  useEffect(() => {
-    projectLoad({ projectId: props.projectId });
-    domainRefresh({ projectId: props.projectId });
-  }, [domainRefresh, props.projectId, projectLoad]);
+  if (project == null) {
+    throw new Error("Project not found");
+  }
+  const projectState = "idle";
 
-  const domainsToPublish = useMemo(
-    () =>
-      domainsResult?.success
-        ? domainsResult.data.filter(
-            (projectDomain) => getStatus(projectDomain) === "VERIFIED_ACTIVE"
-          )
-        : [],
-    [domainsResult]
-  );
-
-  const latestBuilds = useMemo(
-    () => [
-      projectData?.success ? projectData.project.latestBuild ?? null : null,
-      ...domainsToPublish.map((domain) => domain.latestBuid),
-    ],
-    [domainsToPublish, projectData]
-  );
-
-  const hasPendingState = useMemo(
-    () =>
-      latestBuilds.some((latestBuild) => {
-        if (latestBuild === null) {
-          return false;
-        }
-        const { status } = getPublishStatusAndText(latestBuild);
-        if (status === "PENDING") {
-          return true;
-        }
-      }),
-    [latestBuilds]
-  );
-
-  const [isPublishing, setIsPublishing] = useState(hasPendingState);
-
-  useEffect(() => {
-    setIsPublishing(hasPendingState);
-  }, [hasPendingState, setIsPublishing]);
+  const { canAddDomain, maxDomainsAllowedPerUser } = useCanAddDomain();
 
   return (
-    <>
+    <form>
       <ScrollArea>
-        {projectSystemError !== undefined && (
-          <ErrorText>{projectSystemError}</ErrorText>
+        {canAddDomain === false && (
+          <PanelBanner>
+            <Text variant="regularBold">Free domains limit reached</Text>
+            <Text variant="regular">
+              You have reached the limit of {maxDomainsAllowedPerUser} custom
+              domains on your account.{" "}
+              <Text variant="regularBold" inline>
+                Upgrade to a Pro account
+              </Text>{" "}
+              to add unlimited domains and publish to each domain individually.
+            </Text>
+            <Link
+              className={buttonStyle({ color: "gradient" })}
+              color="contrast"
+              underline="none"
+              href="https://webstudio.is/pricing"
+              target="_blank"
+            >
+              Upgrade
+            </Link>
+          </PanelBanner>
         )}
-
-        {projectData?.success && (
+        <RadioGroup name="publishDomain">
           <ChangeProjectDomain
-            projectLoad={projectLoad}
+            refresh={refreshProject}
             projectState={projectState}
-            project={projectData.project}
-            isPublishing={isPublishing}
+            project={project}
           />
-        )}
 
-        {domainsResult?.success === true && (
           <Domains
             newDomains={newDomains}
-            domains={domainsResult.data}
-            refreshDomainResult={domainRefresh}
-            domainState={domainState}
-            isPublishing={isPublishing}
+            domains={project.domainsVirtual}
+            refresh={refreshProject}
+            project={project}
           />
-        )}
-
-        {domainSystemError !== undefined && (
-          <ErrorText>{domainSystemError}</ErrorText>
-        )}
-
-        {domainsResult?.success === false && (
-          <ErrorText>{domainsResult.error}</ErrorText>
-        )}
+        </RadioGroup>
       </ScrollArea>
-
       <Flex direction="column" justify="end" css={{ height: 0 }}>
         <Separator />
       </Flex>
-
-      <AddDomain
-        projectId={props.projectId}
-        refreshDomainResult={domainRefresh}
-        domainState={domainState}
-        onCreate={(domain) => {
-          setNewDomains((prev) => {
-            return new Set([...prev, domain]);
-          });
-        }}
-        isPublishing={isPublishing}
-        onExportClick={props.onExportClick}
-      />
-
-      {projectData?.success === true ? (
-        <Publish
-          project={projectData.project}
-          domainsToPublish={domainsToPublish}
-          refresh={() => {
-            projectLoad({ projectId: props.projectId });
-            domainRefresh({ projectId: props.projectId });
+      <Flex direction="column" gap="2" css={{ padding: theme.panel.padding }}>
+        <AddDomain
+          projectId={props.projectId}
+          refresh={refreshProject}
+          onCreate={(domain) => {
+            setNewDomains((prev) => {
+              return new Set([...prev, domain]);
+            });
           }}
-          isPublishing={isPublishing}
-          setIsPublishing={setIsPublishing}
+          onExportClick={props.onExportClick}
         />
-      ) : (
-        <Box css={{ height: theme.spacing[8] }} />
-      )}
-    </>
+        <Publish project={project} refresh={refreshProject} />
+      </Flex>
+    </form>
   );
 };
 
 const deployTargets = {
+  vanilla: {
+    command: `
+      npm install
+      npm run dev
+    `,
+    docs: "https://remix.run/",
+    ssgTemplates: ["ssg"],
+  },
   vercel: {
-    command: "npx vercel",
+    command: "npx vercel@latest",
     docs: "https://vercel.com/docs/cli",
+    ssgTemplates: ["ssg-vercel"],
   },
   netlify: {
     command: `
-npx netlify-cli login
+npx netlify-cli@latest login
 npx netlify-cli sites:create
 npx netlify-cli build
 npx netlify-cli deploy`,
     docs: "https://docs.netlify.com/cli/get-started/",
+    ssgTemplates: ["ssg-netlify"],
   },
 } as const;
 
@@ -498,25 +671,75 @@ type DeployTargets = keyof typeof deployTargets;
 const isDeployTargets = (value: string): value is DeployTargets =>
   Object.keys(deployTargets).includes(value);
 
-const ExportContent = () => {
-  const npxCommand = "npx webstudio";
-  const [deployTarget, setDeployTarget] = useState<DeployTargets>("vercel");
+const ExportContent = (props: { projectId: Project["id"] }) => {
+  const npxCommand = "npx webstudio@latest";
+  const [deployTarget, setDeployTarget] = useState<DeployTargets>("vanilla");
 
   return (
-    <Grid
-      columns={1}
-      gap={3}
-      css={{
-        margin: theme.spacing[9],
-        marginTop: theme.spacing[5],
-      }}
-    >
+    <Grid columns={1} gap={3} css={{ padding: theme.panel.padding }}>
+      <Grid columns={1} gap={2}>
+        <div />
+        <Grid columns={2} gap={2} align={"center"}>
+          <Text color="main" variant="labelsTitleCase">
+            Destination
+          </Text>
+
+          <Select
+            fullWidth
+            value={deployTarget}
+            options={Object.keys(deployTargets)}
+            getLabel={(value) => humanizeString(value)}
+            onChange={(value) => {
+              if (isDeployTargets(value)) {
+                setDeployTarget(value);
+              }
+            }}
+          />
+        </Grid>
+      </Grid>
+
       <Grid columns={1} gap={1}>
+        {isFeatureEnabled("staticExport") && (
+          <>
+            <PublishStatic
+              projectId={props.projectId}
+              templates={deployTargets[deployTarget].ssgTemplates}
+            />
+            <div />
+            <Text color="subtle">
+              Learn about deploying static sites{" "}
+              <Link
+                variant="inherit"
+                color="inherit"
+                href="https://wstd.us/ssg"
+                target="_blank"
+                rel="noreferrer"
+              >
+                here
+              </Link>
+            </Text>
+
+            <div />
+            <div />
+            <Grid
+              gap={2}
+              align={"center"}
+              css={{
+                gridTemplateColumns: `1fr auto 1fr`,
+              }}
+            >
+              <Separator css={{ alignSelf: "unset" }} />
+              <Text color="main">CLI</Text>
+              <Separator css={{ alignSelf: "unset" }} />
+            </Grid>
+          </>
+        )}
+
         <Text color="main" variant="labelsTitleCase">
           Step 1
         </Text>
         <Text color="subtle">
-          Download and install Node v18+ from{" "}
+          Download and install Node v20+ from{" "}
           <Link
             variant="inherit"
             color="inherit"
@@ -554,22 +777,16 @@ const ExportContent = () => {
         <Flex gap={2}>
           <InputField
             css={{ flex: 1 }}
-            variant="mono"
+            text="mono"
             readOnly
             value={npxCommand}
           />
 
-          <Tooltip content={"Copy to clipboard"}>
-            <Button
-              color="neutral"
-              onClick={() => {
-                navigator.clipboard.writeText(npxCommand);
-              }}
-              prefix={<CopyIcon />}
-            >
+          <CopyToClipboard text={npxCommand}>
+            <Button type="button" color="neutral" prefix={<CopyIcon />}>
               Copy
             </Button>
-          </Tooltip>
+          </CopyToClipboard>
         </Flex>
       </Grid>
       <Grid columns={1} gap={2}>
@@ -591,19 +808,6 @@ const ExportContent = () => {
           </Text>
         </Grid>
 
-        <Select
-          fullWidth
-          css={{ zIndex: theme.zIndices[2] }}
-          value={deployTarget}
-          options={Object.keys(deployTargets)}
-          getLabel={(value) => humanizeString(value)}
-          onChange={(value) => {
-            if (isDeployTargets(value)) {
-              setDeployTarget(value);
-            }
-          }}
-        />
-
         <Flex gap={2} align="end">
           <TextArea
             css={{ flex: 1 }}
@@ -613,20 +817,17 @@ const ExportContent = () => {
               .trimStart()
               .replace(/ +$/, "")}
           />
-          <Tooltip content={"Copy to clipboard"}>
+
+          <CopyToClipboard text={deployTargets[deployTarget].command}>
             <Button
+              type="button"
               css={{ flexShrink: 0 }}
               color="neutral"
-              onClick={() => {
-                navigator.clipboard.writeText(
-                  deployTargets[deployTarget].command
-                );
-              }}
               prefix={<CopyIcon />}
             >
               Copy
             </Button>
-          </Tooltip>
+          </CopyToClipboard>
         </Flex>
       </Grid>
       <Grid columns={1} gap={1}>
@@ -635,7 +836,7 @@ const ExportContent = () => {
           <Link
             variant="inherit"
             color="inherit"
-            href="https://github.com/webstudio-is/webstudio/tree/main/packages/cli"
+            href="https://wstd.us/cli"
             target="_blank"
             rel="noreferrer"
           >
@@ -652,64 +853,81 @@ type PublishProps = {
 };
 
 export const PublishButton = ({ projectId }: PublishProps) => {
-  const [isOpen, setIsOpen] = useIsPublishDialogOpen();
-  const authPermit = useStore($authPermit);
-  const [dialogContentType, setDialogContentType] = useState<
-    "publish" | "export"
-  >("publish");
-
-  const isPublishEnabled = authPermit === "own" || authPermit === "admin";
+  const publishDialog = useStore($publishDialog);
+  const authTokenPermissions = useStore($authTokenPermissions);
+  const isPublishEnabled = authTokenPermissions.canPublish;
 
   const tooltipContent = isPublishEnabled
     ? undefined
-    : "Only owner or admin can publish projects";
+    : "Only the owner, an admin, or content editors with publish permissions can publish projects";
 
   const handleExportClick = () => {
-    setDialogContentType("export");
+    $publishDialog.set("export");
   };
 
   const handleOpenChange = (isOpen: boolean) => {
-    if (isOpen === false) {
-      setDialogContentType("publish");
-    }
-    setIsOpen(isOpen);
+    $publishDialog.set(isOpen ? "publish" : "none");
   };
 
   return (
-    <FloatingPanelPopover modal open={isOpen} onOpenChange={handleOpenChange}>
-      <FloatingPanelAnchor>
-        <Tooltip side="bottom" content={tooltipContent}>
-          <FloatingPanelPopoverTrigger asChild>
-            <Button disabled={isPublishEnabled === false} color="positive">
-              Publish
-            </Button>
-          </FloatingPanelPopoverTrigger>
-        </Tooltip>
-      </FloatingPanelAnchor>
+    <Popover
+      modal
+      open={publishDialog !== "none"}
+      onOpenChange={handleOpenChange}
+    >
+      <Tooltip
+        side="bottom"
+        content={tooltipContent ?? "Publish to Webstudio Cloud"}
+        sideOffset={Number.parseFloat(rawTheme.spacing[5])}
+      >
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            disabled={isPublishEnabled === false}
+            color="positive"
+          >
+            Publish
+          </Button>
+        </PopoverTrigger>
+      </Tooltip>
 
-      <FloatingPanelPopoverContent
-        sideOffset={parseFloat(rawTheme.spacing[8])}
+      <PopoverContent
+        sideOffset={Number.parseFloat(rawTheme.spacing[8])}
         css={{
-          zIndex: theme.zIndices[1],
           width: theme.spacing[33],
           maxWidth: theme.spacing[33],
           marginRight: theme.spacing[3],
         }}
       >
-        {dialogContentType === "export" && (
+        {publishDialog === "export" && (
           <>
-            <FloatingPanelPopoverTitle>Export</FloatingPanelPopoverTitle>
-            <ExportContent />
+            <PopoverTitle>Export</PopoverTitle>
+            <ExportContent projectId={projectId} />
           </>
         )}
 
-        {dialogContentType === "publish" && (
+        {publishDialog === "publish" && (
           <>
-            <FloatingPanelPopoverTitle>Publish</FloatingPanelPopoverTitle>
+            <PopoverTitle
+              suffix={
+                <PopoverTitleActions>
+                  <IconButton
+                    onClick={() => {
+                      $openProjectSettings.set("publish");
+                    }}
+                  >
+                    <GearIcon />
+                  </IconButton>
+                  <PopoverClose />
+                </PopoverTitleActions>
+              }
+            >
+              Publish
+            </PopoverTitle>
             <Content projectId={projectId} onExportClick={handleExportClick} />
           </>
         )}
-      </FloatingPanelPopoverContent>
-    </FloatingPanelPopover>
+      </PopoverContent>
+    </Popover>
   );
 };

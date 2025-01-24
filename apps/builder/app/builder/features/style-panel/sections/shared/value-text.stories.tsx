@@ -1,4 +1,4 @@
-import type { ComponentMeta } from "@storybook/react";
+import type { Meta } from "@storybook/react";
 import { type ComponentProps, useState } from "react";
 import { parseCssValue } from "@webstudio-is/css-data";
 import { SpaceLayout } from "../space/layout";
@@ -12,7 +12,7 @@ export const ValueText = (
     <SpaceLayout
       onHover={setHovered}
       onClick={() => null}
-      renderCell={({ property }) => <ValueTextComponent {...args} />}
+      renderCell={() => <ValueTextComponent {...args} />}
     />
   );
 };
@@ -21,6 +21,18 @@ ValueText.args = {
   source: "local",
   value: { type: "unit", value: 100, unit: "px" },
 };
+
+const valueOptions = [
+  "0",
+  "10rem",
+  "100rem",
+  "100px",
+  "1000px",
+  "10000px",
+  "100000px",
+  "auto",
+  "revert-layer",
+];
 
 export default {
   title: "Space/ValueText",
@@ -32,19 +44,10 @@ export default {
     },
     value: {
       control: "select",
-      options: Object.fromEntries(
-        [
-          "0",
-          "10rem",
-          "100rem",
-          "100px",
-          "1000px",
-          "10000px",
-          "100000px",
-          "auto",
-          "revert-layer",
-        ].map((value) => [value, parseCssValue("marginTop", value)])
+      options: valueOptions,
+      labels: Object.fromEntries(
+        valueOptions.map((value) => [value, parseCssValue("marginTop", value)])
       ),
     },
   },
-} as ComponentMeta<typeof ValueText>;
+} as Meta<typeof ValueText>;

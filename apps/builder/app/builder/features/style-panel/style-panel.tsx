@@ -6,26 +6,30 @@ import {
   Separator,
   ScrollArea,
 } from "@webstudio-is/design-system";
-import type { Instance } from "@webstudio-is/sdk";
-
-import { useStyleData } from "./shared/use-style-data";
-import { StyleSettings } from "./style-settings";
-
+import { useStore } from "@nanostores/react";
+import { computed } from "nanostores";
 import { StyleSourcesSection } from "./style-source-section";
 import { $selectedInstanceRenderState } from "~/shared/nano-states";
-import { useStore } from "@nanostores/react";
+import { sections } from "./sections";
+import { toValue } from "@webstudio-is/css-engine";
+import { $instanceTags, useParentComputedStyleDecl } from "./shared/model";
+import { $selectedInstance } from "~/shared/awareness";
 
-type StylePanelProps = {
-  selectedInstance: Instance;
-};
+const $selectedInstanceTag = computed(
+  [$selectedInstance, $instanceTags],
+  (selectedInstance, instanceTags) => {
+    if (selectedInstance === undefined) {
+      return;
+    }
+    return instanceTags.get(selectedInstance.id);
+  }
+);
 
-export const StylePanel = ({ selectedInstance }: StylePanelProps) => {
-  const { currentStyle, setProperty, deleteProperty, createBatchUpdate } =
-    useStyleData({
-      selectedInstance,
-    });
-
+export const StylePanel = () => {
   const selectedInstanceRenderState = useStore($selectedInstanceRenderState);
+  const tag = useStore($selectedInstanceTag);
+  const display = useParentComputedStyleDecl("display");
+  const displayValue = toValue(display.computedValue);
 
   // If selected instance is not rendered on the canvas,
   // style panel will not work, because it needs the element in DOM in order to work.
@@ -40,28 +44,35 @@ export const StylePanel = ({ selectedInstance }: StylePanelProps) => {
     );
   }
 
+  const all = [];
+
+  for (const [category, { Section }] of sections.entries()) {
+    // show flex child UI only when parent is flex or inline-flex
+    if (category === "flexChild" && displayValue.includes("flex") === false) {
+      continue;
+    }
+    // allow customizing list item type only for list and list item
+    if (
+      category === "listItem" &&
+      tag !== "ul" &&
+      tag !== "ol" &&
+      tag !== "li"
+    ) {
+      continue;
+    }
+    all.push(<Section key={category} />);
+  }
+
   return (
     <>
-      <Box
-        css={{
-          px: theme.spacing[9],
-          pb: theme.spacing[9],
-        }}
-      >
-        <Text css={{ py: theme.spacing[7] }} variant="titles">
+      <Box css={{ padding: theme.panel.padding }}>
+        <Text variant="titles" css={{ paddingBlock: theme.panel.paddingBlock }}>
           Style Sources
         </Text>
         <StyleSourcesSection />
       </Box>
       <Separator />
-      <ScrollArea>
-        <StyleSettings
-          currentStyle={currentStyle}
-          setProperty={setProperty}
-          deleteProperty={deleteProperty}
-          createBatchUpdate={createBatchUpdate}
-        />
-      </ScrollArea>
+      <ScrollArea>{all}</ScrollArea>
     </>
   );
 };

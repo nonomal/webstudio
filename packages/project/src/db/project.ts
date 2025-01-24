@@ -1,22 +1,47 @@
-import { v4 as uuid } from "uuid";
-import { prisma, Prisma } from "@webstudio-is/prisma-client";
-import { cloneAssets } from "@webstudio-is/asset-uploader/index.server";
+import { nanoid } from "nanoid";
 import {
   authorizeProject,
   type AppContext,
   AuthorizationError,
 } from "@webstudio-is/trpc-interface/index.server";
-import {
-  createBuild,
-  cloneBuild,
-} from "@webstudio-is/project-build/index.server";
-import { Project, Title } from "../shared/schema";
+import { createBuild } from "@webstudio-is/project-build/index.server";
+import { MarketplaceApprovalStatus, Title } from "../shared/schema";
 import { generateDomain, validateProjectDomain } from "./project-domain";
+import type { SetNonNullable } from "type-fest";
 
-export const loadById = async (
-  projectId: Project["id"],
+export const findProjectIdsByUserId = async (
+  userId: string,
   context: AppContext
 ) => {
+  if (context.authorization.type !== "user") {
+    throw new AuthorizationError(
+      "Only logged in users can view the project list"
+    );
+  }
+
+  if (userId !== context.authorization.userId) {
+    throw new AuthorizationError(
+      "Only the project owner can view the project list"
+    );
+  }
+
+  const result = await context.postgrest.client
+    .from("Project")
+    .select("id")
+    .eq("userId", userId)
+    .eq("isDeleted", false)
+    .order("id");
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  return result.data;
+};
+
+export type Project = Awaited<ReturnType<typeof loadById>>;
+
+export const loadById = async (projectId: string, context: AppContext) => {
   const canRead = await authorizeProject.hasProjectPermit(
     { projectId, permit: "view" },
     context
@@ -26,19 +51,34 @@ export const loadById = async (
     throw new AuthorizationError("You don't have access to this project");
   }
 
-  const data = await prisma.project.findUnique({
-    where: { id_isDeleted: { id: projectId, isDeleted: false } },
-    include: {
-      latestBuild: true,
-      previewImageAsset: true,
-    },
-  });
+  const data = await context.postgrest.client
+    .from("Project")
+    .select(
+      `
+        *,
+        previewImageAsset:Asset (*),
+        latestBuildVirtual(*),
+        latestStaticBuild:LatestStaticBuildPerProject (*),
+        domainsVirtual(*, latestBuildVirtual(*))
+      `
+    )
+    .eq("id", projectId)
+    .eq("isDeleted", false)
+    .single();
 
-  if (data === null) {
-    throw new Error(`Project ${projectId} not found`);
+  if (data.error) {
+    throw data.error;
   }
+  const { latestStaticBuild, ...project } = data.data;
 
-  return Project.parse(data);
+  return {
+    ...project,
+    // postgres marks all view fields as nullable
+    // workaround this by casting to non nullable
+    latestStaticBuild: (latestStaticBuild[0] ?? null) as null | SetNonNullable<
+      NonNullable<(typeof latestStaticBuild)[0]>
+    >,
+  };
 };
 
 export const create = async (
@@ -47,31 +87,43 @@ export const create = async (
 ) => {
   Title.parse(title);
 
+  if (context.authorization.type !== "user") {
+    throw new AuthorizationError("Only logged in users can create a project");
+  }
+
   const userId = context.authorization.userId;
 
   if (userId === undefined) {
     throw new Error("The user must be authenticated to create a project");
   }
 
-  const projectId = uuid();
-  await authorizeProject.registerProjectOwner({ projectId }, context);
+  const projectId = crypto.randomUUID();
 
-  const project = await prisma.$transaction(async (client) => {
-    const project = await client.project.create({
-      data: {
-        id: projectId,
-        userId,
-        title,
-        domain: generateDomain(title),
-      },
-    });
-
-    await createBuild({ projectId: project.id }, context, client);
-
-    return project;
+  // create project without user first
+  // and set user only after build is successfully created
+  // this way to make project creation transactional
+  // for user
+  const newProject = await context.postgrest.client.from("Project").insert({
+    id: projectId,
+    title,
+    domain: generateDomain(title),
   });
+  if (newProject.error) {
+    throw newProject.error;
+  }
 
-  return project;
+  await createBuild({ projectId }, context);
+
+  const updatedProject = await context.postgrest.client
+    .from("Project")
+    .update({ userId })
+    .eq("id", projectId)
+    .select("*")
+    .single();
+  if (updatedProject.error) {
+    throw updatedProject.error;
+  }
+  return updatedProject.data;
 };
 
 export const markAsDeleted = async (
@@ -87,10 +139,17 @@ export const markAsDeleted = async (
     return { errors: "Only the owner can delete the project" };
   }
 
-  return await prisma.project.update({
-    where: { id: projectId },
-    data: { isDeleted: true },
-  });
+  const deletedProject = await context.postgrest.client
+    .from("Project")
+    .update({
+      isDeleted: true,
+      // Free up the subdomain
+      domain: nanoid(),
+    })
+    .eq("id", projectId);
+  if (deletedProject.error) {
+    throw deletedProject.error;
+  }
 };
 
 const assertEditPermission = async (projectId: string, context: AppContext) => {
@@ -120,10 +179,13 @@ export const rename = async (
 
   await assertEditPermission(projectId, context);
 
-  return await prisma.project.update({
-    where: { id: projectId },
-    data: { title },
-  });
+  const renamedProject = await context.postgrest.client
+    .from("Project")
+    .update({ title })
+    .eq("id", projectId);
+  if (renamedProject.error) {
+    throw renamedProject.error;
+  }
 };
 
 export const updatePreviewImage = async (
@@ -138,79 +200,16 @@ export const updatePreviewImage = async (
 ) => {
   await assertEditPermission(projectId, context);
 
-  return await prisma.project.update({
-    where: { id: projectId },
-    data: { previewImageAssetId: assetId },
-  });
-};
-
-const clone = async (
-  {
-    project,
-    title,
-    env = "dev",
-  }: {
-    project: Project;
-    title?: string;
-    env?: "dev" | "prod";
-  },
-  context: AppContext
-) => {
-  const userId = context.authorization.userId;
-
-  if (userId === undefined) {
-    throw new Error("The user must be authenticated to clone the project");
+  const updatedProject = await context.postgrest.client
+    .from("Project")
+    .update({ previewImageAssetId: assetId })
+    .eq("id", projectId);
+  if (updatedProject.error) {
+    throw updatedProject.error;
   }
-
-  const newProjectId = uuid();
-  await authorizeProject.registerProjectOwner(
-    { projectId: newProjectId },
-    context
-  );
-
-  const clonedProject = await prisma.$transaction(async (client) => {
-    const clonedProject = await client.project.create({
-      data: {
-        id: newProjectId,
-        userId: userId,
-        title: title ?? project.title,
-        domain: generateDomain(project.title),
-        previewImageAssetId: project.previewImageAsset?.id,
-      },
-      include: {
-        previewImageAsset: true,
-      },
-    });
-
-    await cloneBuild(
-      {
-        fromProjectId: project.id,
-        toProjectId: newProjectId,
-        deployment: undefined,
-      },
-      context,
-      client
-    );
-
-    await cloneAssets(
-      {
-        fromProjectId: project.id,
-        toProjectId: newProjectId,
-
-        // Permission check on newProjectId will fail until this transaction is committed.
-        // We have to skip it, but it's ok because registerProjectOwner is right above
-        dontCheckEditPermission: true,
-      },
-      context
-    );
-
-    return clonedProject;
-  });
-
-  return Project.parse(clonedProject);
 };
 
-export const duplicate = async (
+export const clone = async (
   {
     projectId,
     title,
@@ -218,19 +217,39 @@ export const duplicate = async (
     projectId: string;
     title?: string | undefined;
   },
-  context: AppContext
+  destinationContext: AppContext,
+  sourceContext: AppContext
 ) => {
-  const project = await loadById(projectId, context);
+  const project = await loadById(projectId, sourceContext);
   if (project === null) {
     throw new Error(`Not found project "${projectId}"`);
   }
-  return await clone(
+
+  if (destinationContext.authorization.type !== "user") {
+    throw new AuthorizationError("Only logged in users can clone a project");
+  }
+
+  const { userId } = destinationContext.authorization;
+  if (userId === undefined) {
+    throw new Error("The user must be authenticated to clone the project");
+  }
+
+  // Should be some mixed context in case of RLS
+  const clonedProject = await destinationContext.postgrest.client.rpc(
+    "clone_project",
     {
-      project,
+      project_id: projectId,
+      user_id: userId,
       title: title ?? `${project.title} (copy)`,
-    },
-    context
+      domain: generateDomain(project.title),
+    }
   );
+
+  if (clonedProject.error) {
+    throw clonedProject.error;
+  }
+
+  return { id: clonedProject.data.id };
 };
 
 export const updateDomain = async (
@@ -250,19 +269,44 @@ export const updateDomain = async (
 
   await assertEditPermission(input.id, context);
 
-  try {
-    const project = await prisma.project.update({
-      data: { domain },
-      where: { id: input.id },
-    });
-    return project;
-  } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
+  const updatedProject = await context.postgrest.client
+    .from("Project")
+    .update({ domain })
+    .eq("id", input.id);
+  if (updatedProject.error) {
+    if (updatedProject.error.code === "23505") {
       throw new Error(`Domain "${domain}" is already used`);
     }
-    throw error;
+    throw updatedProject.error;
   }
+};
+
+export const setMarketplaceApprovalStatus = async (
+  {
+    projectId,
+    marketplaceApprovalStatus,
+  }: {
+    projectId: Project["id"];
+    marketplaceApprovalStatus: MarketplaceApprovalStatus;
+  },
+  context: AppContext
+) => {
+  if (
+    marketplaceApprovalStatus === "APPROVED" ||
+    marketplaceApprovalStatus === "REJECTED"
+  ) {
+    throw new Error("User can't approve or reject");
+  }
+  await assertEditPermission(projectId, context);
+
+  const updatedProject = await context.postgrest.client
+    .from("Project")
+    .update({ marketplaceApprovalStatus })
+    .eq("id", projectId)
+    .select()
+    .single();
+  if (updatedProject.error) {
+    throw updatedProject.error;
+  }
+  return updatedProject.data;
 };

@@ -1,41 +1,41 @@
-import type { Style } from "../schema";
 import {
   FontFaceRule,
   MediaRule,
+  MixinRule,
+  NestingRule,
   PlaintextRule,
   type FontFaceOptions,
   type MediaRuleOptions,
 } from "./rules";
 import { compareMedia } from "./compare-media";
 import { StyleElement } from "./style-element";
-
-export type CssRule = {
-  style: Style;
-  breakpoint?: string;
-};
+import type { TransformValue } from "./to-value";
 
 export class StyleSheet {
   #cssText = "";
   #mediaRules: Map<string, MediaRule> = new Map();
   #plainRules: Map<string, PlaintextRule> = new Map();
+  #mixinRules: Map<string, MixinRule> = new Map();
+  nestingRules: Map<string, NestingRule> = new Map();
   #fontFaceRules: Array<FontFaceRule> = [];
-  #isDirty = false;
+  #transformValue?: TransformValue;
   #element: StyleElement;
   constructor(element: StyleElement) {
     this.#element = element;
   }
+  setTransformer(transformValue: TransformValue) {
+    this.#transformValue = transformValue;
+  }
   addMediaRule(id: string, options?: MediaRuleOptions) {
     let mediaRule = this.#mediaRules.get(id);
     if (mediaRule === undefined) {
-      mediaRule = new MediaRule(options);
+      mediaRule = new MediaRule(id, options);
       this.#mediaRules.set(id, mediaRule);
-      this.#isDirty = true;
       return mediaRule;
     }
 
     if (options) {
       mediaRule.options = options;
-      this.#isDirty = true;
     }
 
     if (mediaRule === undefined) {
@@ -50,21 +50,35 @@ export class StyleSheet {
     if (rule !== undefined) {
       return rule;
     }
-    this.#isDirty = true;
     return this.#plainRules.set(cssText, new PlaintextRule(cssText));
   }
+  addMixinRule(name: string) {
+    let rule = this.#mixinRules.get(name);
+    if (rule === undefined) {
+      rule = new MixinRule();
+      this.#mixinRules.set(name, rule);
+    }
+    return rule;
+  }
+  addNestingRule(selector: string, descendantSuffix: string = "") {
+    const key = selector + descendantSuffix;
+    let rule = this.nestingRules.get(key);
+    if (rule === undefined) {
+      rule = new NestingRule(this.#mixinRules, selector, descendantSuffix);
+      this.nestingRules.set(key, rule);
+    }
+    return rule;
+  }
   addFontFaceRule(options: FontFaceOptions) {
-    this.#isDirty = true;
     return this.#fontFaceRules.push(new FontFaceRule(options));
   }
-  markAsDirty() {
-    this.#isDirty = true;
-  }
-  get cssText() {
-    if (this.#isDirty === false) {
-      return this.#cssText;
-    }
-    this.#isDirty = false;
+  generateWith({
+    nestingRules,
+    transformValue,
+  }: {
+    nestingRules: NestingRule[];
+    transformValue?: TransformValue;
+  }) {
     const css: Array<string> = [];
 
     css.push(...this.#fontFaceRules.map((rule) => rule.cssText));
@@ -76,19 +90,33 @@ export class StyleSheet {
       (ruleA, ruleB) => compareMedia(ruleA.options, ruleB.options)
     );
     for (const mediaRule of sortedMediaRules) {
-      const { cssText } = mediaRule;
+      const cssText = mediaRule.generateRule({
+        nestingRules,
+        transformValue,
+      });
       if (cssText !== "") {
         css.push(cssText);
       }
     }
+    // reset invalidation from mixins after rendering
+    for (const rule of this.#mixinRules.values()) {
+      rule.clearBreakpoints();
+    }
     this.#cssText = css.join("\n");
     return this.#cssText;
   }
+  get cssText() {
+    return this.generateWith({
+      nestingRules: Array.from(this.nestingRules.values()),
+      transformValue: this.#transformValue,
+    });
+  }
   clear() {
     this.#mediaRules.clear();
+    this.#mixinRules.clear();
+    this.nestingRules.clear();
     this.#plainRules.clear();
     this.#fontFaceRules = [];
-    this.#isDirty = true;
   }
   render() {
     this.#element.mount();

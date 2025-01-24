@@ -21,17 +21,21 @@ const chevronStyle = css({ color: `var(${chevronColor})` });
 
 const style = css({
   all: "unset", // reset <button>
-  height: theme.spacing[12],
+  minWidth: 0,
+  height: theme.sizes.controlHeight,
   boxSizing: "border-box",
   display: "flex",
   alignItems: "center",
   background: theme.colors.backgroundControls,
-  border: `1px solid ${theme.colors.borderMain}`,
+  border: `1px solid transparent`,
   borderRadius: theme.borderRadius[4],
   paddingRight: theme.spacing[1],
   paddingLeft: theme.spacing[1],
   color: theme.colors.foregroundMain,
   [chevronColor]: theme.colors.foregroundSubtle,
+  "&:hover": {
+    borderColor: theme.colors.borderMain,
+  },
   "&[data-placeholder]:not([data-state=open], :hover, :disabled)": {
     color: theme.colors.foregroundSubtle,
   },
@@ -45,7 +49,6 @@ const style = css({
   },
   "&:focus-visible": {
     borderColor: theme.colors.borderFocus,
-    outline: `1px solid ${theme.colors.borderFocus}`,
   },
   variants: {
     fullWidth: { true: { width: "100%" } },

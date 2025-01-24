@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useEffectEvent } from "./effect-event";
+import { useEffectEvent } from "~/shared/hook-utils/effect-event";
 
 // https://github.com/openai/whisper/discussions/870
 const DEFAULT_OPTIONS: MediaRecorderOptions = {
@@ -14,7 +14,7 @@ export const useMediaRecorder = (
   },
   options = DEFAULT_OPTIONS
 ) => {
-  const disposeRef = useRef<() => void>();
+  const disposeRef = useRef<undefined | (() => void)>(undefined);
 
   const cancelRef = useRef(false);
   const isActiveRef = useRef<boolean>(false);

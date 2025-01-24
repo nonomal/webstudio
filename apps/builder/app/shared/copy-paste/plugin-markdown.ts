@@ -8,18 +8,12 @@ import type {
   WebstudioFragment,
 } from "@webstudio-is/sdk";
 import {
-  computeInstancesConstraints,
-  findClosestDroppableTarget,
-  insertTemplateData,
+  findClosestInsertable,
+  insertWebstudioFragmentAt,
 } from "../instance-utils";
-import {
-  $breakpoints,
-  $instances,
-  $registeredComponentMetas,
-  $selectedInstanceSelector,
-  $selectedPage,
-} from "../nano-states";
+import { $breakpoints } from "../nano-states";
 import { isBaseBreakpoint } from "../breakpoints";
+import { denormalizeSrcProps } from "./asset-upload";
 
 const micromarkOptions = {
   extensions: [gfm()],
@@ -113,8 +107,11 @@ const toInstanceData = (
       });
     }
     if (child.type === "inlineCode") {
-      instance.children.push({
-        type: "text",
+      props.push({
+        id: generateId(),
+        type: "string",
+        name: "code",
+        instanceId,
         value: child.value,
       });
       const styleSourceId = generateId();
@@ -128,8 +125,11 @@ const toInstanceData = (
       });
     }
     if (child.type === "code") {
-      instance.children.push({
-        type: "text",
+      props.push({
+        id: generateId(),
+        type: "string",
+        name: "code",
+        instanceId,
         value: child.value,
       });
       if (child.lang) {
@@ -186,7 +186,7 @@ const toInstanceData = (
   return children;
 };
 
-export const parse = (clipboardData: string, options?: Options) => {
+const parse = (clipboardData: string, options?: Options) => {
   const ast = fromMarkdown(clipboardData, micromarkOptions);
   if (ast.children.length === 0) {
     return;
@@ -213,32 +213,20 @@ export const parse = (clipboardData: string, options?: Options) => {
   return data;
 };
 
-export const onPaste = (clipboardData: string): boolean => {
-  const data = parse(clipboardData);
-  const selectedPage = $selectedPage.get();
-  if (data === undefined || selectedPage === undefined) {
+export const onPaste = async (clipboardData: string) => {
+  let fragment = parse(clipboardData);
+  if (fragment === undefined) {
     return false;
   }
-  const metas = $registeredComponentMetas.get();
-  const newInstances = new Map(
-    data.instances.map((instance) => [instance.id, instance])
-  );
-  const rootInstanceIds = data.children
-    .filter((child) => child.type === "id")
-    .map((child) => child.value);
-  // paste to the root if nothing is selected
-  const instanceSelector = $selectedInstanceSelector.get() ?? [
-    selectedPage.rootInstanceId,
-  ];
-  const dropTarget = findClosestDroppableTarget(
-    metas,
-    $instances.get(),
-    instanceSelector,
-    computeInstancesConstraints(metas, newInstances, rootInstanceIds)
-  );
-  if (dropTarget === undefined) {
+  fragment = await denormalizeSrcProps(fragment);
+  const insertable = findClosestInsertable(fragment);
+  if (insertable === undefined) {
     return false;
   }
-  insertTemplateData(data, dropTarget);
+  insertWebstudioFragmentAt(fragment, insertable);
   return true;
+};
+
+export const __testing__ = {
+  parse,
 };

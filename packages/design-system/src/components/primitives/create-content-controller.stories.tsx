@@ -7,7 +7,7 @@ const useContentController = ({
   write,
   callback,
 }: {
-  ref: RefObject<HTMLInputElement>;
+  ref: RefObject<HTMLInputElement | null>;
   read: (value: HTMLInputElement) => string;
   write: (target: HTMLInputElement, value: string) => void;
   callback: (value: { name: string; value: string }) => void;
@@ -24,7 +24,8 @@ const useContentController = ({
         },
         {
           name: "number",
-          match: (value: string) => Number.isNaN(parseFloat(value)) === false,
+          match: (value: string) =>
+            Number.isNaN(Number.parseFloat(value)) === false,
         },
         { name: "unknown", match: (value: string) => Boolean(value) },
       ],

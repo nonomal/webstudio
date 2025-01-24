@@ -1,22 +1,27 @@
-import {
-  type WsComponentMeta,
-  type WsComponentPropsMeta,
-} from "@webstudio-is/react-sdk";
-import {
-  propsOverrides as imagePropsOverrides,
-  propsMeta as imagePropsMeta,
-  meta as imageMeta,
-} from "./image.ws";
+import type { WsComponentMeta, WsComponentPropsMeta } from "@webstudio-is/sdk";
+import { propsMeta as imagePropsMeta, meta as imageMeta } from "./image.ws";
 import { props } from "./__generated__/vimeo-preview-image.props";
 
 export const meta: WsComponentMeta = {
   ...imageMeta,
   category: "hidden",
   label: "Preview Image",
-  requiredAncestors: ["Vimeo"],
+  constraints: {
+    relation: "ancestor",
+    component: { $in: ["Vimeo", "YouTube"] },
+  },
 };
 
 export const propsMeta: WsComponentPropsMeta = {
-  props: { ...props, ...imagePropsOverrides },
+  props: {
+    ...props,
+    // Automatically generated props don't have the right control.
+    src: {
+      type: "string",
+      control: "file",
+      label: "Source",
+      required: false,
+    },
+  },
   initialProps: imagePropsMeta.initialProps,
 };

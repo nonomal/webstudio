@@ -1,7 +1,7 @@
-import { describe, expect, test } from "@jest/globals";
-import { EmbedTemplateProp, WsEmbedTemplate } from "@webstudio-is/react-sdk";
+import { describe, expect, test } from "vitest";
+import { EmbedTemplateProp, WsEmbedTemplate } from "@webstudio-is/sdk";
 import { jsxToWSEmbedTemplate } from "./jsx";
-import { traverseTemplate } from ".";
+import { traverseTemplate } from "./traverse-template";
 
 describe("jsx", () => {
   test("valid template", async () => {
@@ -129,3 +129,40 @@ const jsx = `
   Hello from Webstudio
 </Box>
 `;
+
+test("automatically wrap with fragment unwrapped jsx elements", async () => {
+  const jsx = `
+    <Box>Box 1</Box>
+    <Box>Box 2</Box>
+  `;
+  const parsed = await jsxToWSEmbedTemplate(jsx.trim());
+  expect(() => WsEmbedTemplate.parse(parsed)).not.toThrow();
+  expect(parsed).toMatchInlineSnapshot(`
+[
+  {
+    "children": [
+      {
+        "type": "text",
+        "value": "Box 1",
+      },
+    ],
+    "component": "Box",
+    "props": [],
+    "styles": [],
+    "type": "instance",
+  },
+  {
+    "children": [
+      {
+        "type": "text",
+        "value": "Box 2",
+      },
+    ],
+    "component": "Box",
+    "props": [],
+    "styles": [],
+    "type": "instance",
+  },
+]
+`);
+});

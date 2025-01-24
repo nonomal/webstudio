@@ -1,5 +1,5 @@
 import type { PropItem } from "react-docgen-typescript";
-import { PropMeta } from "@webstudio-is/react-sdk";
+import { PropMeta } from "@webstudio-is/sdk";
 
 export type FilterPredicate = (prop: PropItem) => boolean;
 
@@ -15,8 +15,16 @@ export const propsToArgTypes = (
       })
       // Exclude webstudio builder props see react-sdk/src/tree/webstudio-component.tsx
       .filter(([propName]) => propName.startsWith("data-ws-") === false)
+      .filter(([propName]) => propName.startsWith("$webstudio") === false)
       // Exclude props that are in the exclude list
       .filter(([propName]) => exclude.includes(propName) === false)
+      .map(([propName, propItem]) => {
+        // Remove @see and @deprecated from description also {@link ...} is removed as it always go after @see
+        propItem.description = propItem.description
+          .split("\n@see")[0]
+          .split("\n@deprecated")[0];
+        return [propName, propItem] as const;
+      })
       .reduce(
         (result, current) => {
           const [propName, prop] = current;
@@ -40,7 +48,7 @@ const matchers = {
 export const getArgType = (propItem: PropItem): PropMeta | undefined => {
   const { type, name, description, defaultValue } = propItem;
 
-  // eslint-disable-next-line @typescript-eslint/ban-types
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   const makePropMeta = (type: string, control: string, extra?: {}) => {
     let value = defaultValue?.value;
     // react-docgen-typescript incorrectly parse jsdoc default values as strings
@@ -80,6 +88,8 @@ export const getArgType = (propItem: PropItem): PropMeta | undefined => {
         return makePropMeta("number", "number");
       case "string":
         return makePropMeta("string", "text");
+      case "string | number | readonly string[]":
+        return makePropMeta("string", "text");
       case "string | number":
       case "number | string":
         if (defaultValue?.value === "") {
@@ -115,8 +125,7 @@ export const getArgType = (propItem: PropItem): PropMeta | undefined => {
         return;
     }
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.log("Error while parsing prop:", propItem);
+    console.info("Error while parsing prop:", propItem);
     throw error;
   }
 };

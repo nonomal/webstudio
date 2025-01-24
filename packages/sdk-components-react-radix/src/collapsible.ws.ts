@@ -3,95 +3,51 @@ import {
   TriggerIcon,
   ContentIcon,
 } from "@webstudio-is/icons/svg";
-import type {
-  PresetStyle,
-  WsComponentMeta,
-  WsComponentPropsMeta,
-} from "@webstudio-is/react-sdk";
-import { div } from "@webstudio-is/react-sdk/css-normalize";
+import type { WsComponentMeta, WsComponentPropsMeta } from "@webstudio-is/sdk";
+import { div } from "@webstudio-is/sdk/normalize.css";
 import {
   propsCollapsible,
   propsCollapsibleContent,
   propsCollapsibleTrigger,
 } from "./__generated__/collapsible.props";
-import { getButtonStyles } from "./theme/styles";
-
-const presetStyle = {
-  div,
-} satisfies PresetStyle<"div">;
 
 export const metaCollapsible: WsComponentMeta = {
-  category: "radix",
-  order: 5,
   type: "container",
-  presetStyle,
-  icon: CollapsibleIcon,
-  description:
-    "An interactive component which expands and collapses some content, triggered by a button.",
-  template: [
+  constraints: [
     {
-      type: "instance",
-      component: "Collapsible",
-      variables: {
-        collapsibleOpen: { initialValue: false },
-      },
-      props: [
-        {
-          type: "expression",
-          name: "open",
-          code: "collapsibleOpen",
-        },
-        {
-          name: "onOpenChange",
-          type: "action",
-          value: [
-            { type: "execute", args: ["open"], code: `collapsibleOpen = open` },
-          ],
-        },
-      ],
-      children: [
-        {
-          type: "instance",
-          component: "CollapsibleTrigger",
-          children: [
-            {
-              type: "instance",
-              component: "Button",
-              styles: getButtonStyles("outline"),
-              children: [{ type: "text", value: "Click to toggle content" }],
-            },
-          ],
-        },
-        {
-          type: "instance",
-          component: "CollapsibleContent",
-          children: [
-            {
-              type: "instance",
-              component: "Text",
-              children: [{ type: "text", value: "Collapsible Content" }],
-            },
-          ],
-        },
-      ],
+      relation: "descendant",
+      component: { $eq: "CollapsibleTrigger" },
+    },
+    {
+      relation: "descendant",
+      component: { $eq: "CollapsibleContent" },
     },
   ],
+  presetStyle: {
+    div,
+  },
+  icon: CollapsibleIcon,
 };
 
 export const metaCollapsibleTrigger: WsComponentMeta = {
-  category: "hidden",
   type: "container",
   icon: TriggerIcon,
-  stylable: false,
-  detachable: false,
+  constraints: {
+    relation: "ancestor",
+    component: { $eq: "Collapsible" },
+  },
 };
 
 export const metaCollapsibleContent: WsComponentMeta = {
-  category: "hidden",
   type: "container",
-  presetStyle,
+  presetStyle: {
+    div,
+  },
   icon: ContentIcon,
-  detachable: false,
+  constraints: {
+    relation: "ancestor",
+    component: { $eq: "Collapsible" },
+  },
 };
 
 export const propsMetaCollapsible: WsComponentPropsMeta = {

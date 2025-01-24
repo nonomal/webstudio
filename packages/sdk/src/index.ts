@@ -10,8 +10,15 @@ export * from "./schema/style-source-selections";
 export * from "./schema/styles";
 export * from "./schema/deployment";
 export * from "./schema/webstudio";
+export * from "./schema/prop-meta";
+export * from "./schema/embed-template";
+export * from "./schema/component-meta";
 
+export * from "./core-metas";
 export * from "./instances-utils";
 export * from "./page-utils";
 export * from "./scope";
-export * from "./resource-loader";
+export * from "./expression";
+export * from "./resources-generator";
+export * from "./page-meta-generator";
+export * from "./url-pattern";

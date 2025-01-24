@@ -1,11 +1,10 @@
-/* eslint-disable react/display-name */
-// We can't use .displayName until this is merged https://github.com/styleguidist/react-docgen-typescript/pull/449
-
 import {
   type ForwardRefExoticComponent,
-  type ComponentPropsWithRef,
+  type ComponentProps,
   type ComponentPropsWithoutRef,
   forwardRef,
+  type RefAttributes,
+  useContext,
 } from "react";
 import {
   Root,
@@ -18,19 +17,33 @@ import {
   Portal,
   Viewport,
 } from "@radix-ui/react-select";
-import { type Hook, getClosestInstance } from "@webstudio-is/react-sdk";
+import {
+  type Hook,
+  getClosestInstance,
+  ReactSdkContext,
+} from "@webstudio-is/react-sdk/runtime";
 
-// wrap in forwardRef because Root is functional component without ref
-export const Select = forwardRef<
-  HTMLDivElement,
-  ComponentPropsWithoutRef<typeof Root>
->((props, _ref) => {
-  return <Root {...props} />;
+export const Select = forwardRef<HTMLDivElement, ComponentProps<typeof Root>>(
+  ({ value, defaultValue, ...props }, _ref) => {
+    return <Root {...props} defaultValue={value ?? defaultValue} />;
+  }
+);
+
+export const SelectTrigger = forwardRef<
+  HTMLButtonElement,
+  ComponentPropsWithoutRef<typeof Trigger>
+>((props, ref) => {
+  const { renderer } = useContext(ReactSdkContext);
+
+  const onPointerDown =
+    renderer === "canvas"
+      ? (event: React.PointerEvent) => {
+          event.preventDefault();
+        }
+      : undefined;
+
+  return <Trigger onPointerDown={onPointerDown} ref={ref} {...props} />;
 });
-
-export const SelectTrigger: ForwardRefExoticComponent<
-  ComponentPropsWithRef<typeof Trigger>
-> = Trigger;
 
 export const SelectValue = forwardRef<
   HTMLDivElement,
@@ -53,19 +66,19 @@ export const SelectContent = forwardRef<
 });
 
 export const SelectViewport: ForwardRefExoticComponent<
-  ComponentPropsWithRef<typeof Viewport>
+  ComponentProps<typeof Viewport> & RefAttributes<HTMLDivElement>
 > = Viewport;
 
 export const SelectItem: ForwardRefExoticComponent<
-  ComponentPropsWithRef<typeof Item>
+  ComponentProps<typeof Item> & RefAttributes<HTMLDivElement>
 > = Item;
 
 export const SelectItemIndicator: ForwardRefExoticComponent<
-  ComponentPropsWithRef<typeof ItemIndicator>
+  ComponentProps<typeof ItemIndicator> & RefAttributes<HTMLSpanElement>
 > = ItemIndicator;
 
 export const SelectItemText: ForwardRefExoticComponent<
-  ComponentPropsWithRef<typeof ItemText>
+  ComponentProps<typeof ItemText> & RefAttributes<HTMLSpanElement>
 > = ItemText;
 
 /* BUILDER HOOKS */
@@ -85,7 +98,7 @@ export const hooksSelect: Hook = {
           `${namespace}:Select`
         );
         if (select) {
-          context.setPropVariable(select.id, "open", false);
+          context.setMemoryProp(select, "open", undefined);
         }
       }
     }
@@ -99,7 +112,7 @@ export const hooksSelect: Hook = {
           `${namespace}:Select`
         );
         if (select) {
-          context.setPropVariable(select.id, "open", true);
+          context.setMemoryProp(select, "open", true);
         }
       }
     }

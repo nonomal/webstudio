@@ -1,145 +1,142 @@
-import { useEffect, useRef } from "react";
 import {
-  Annotation,
-  EditorState,
-  StateEffect,
-  type Extension,
-} from "@codemirror/state";
-import { EditorView } from "@codemirror/view";
-import { theme, textVariants, css } from "@webstudio-is/design-system";
+  forwardRef,
+  useMemo,
+  type ComponentProps,
+  useEffect,
+  type ReactNode,
+} from "react";
+import { styleTags, tags } from "@lezer/highlight";
+import {
+  keymap,
+  tooltips,
+  highlightSpecialChars,
+  highlightActiveLine,
+} from "@codemirror/view";
+import { bracketMatching, indentOnInput } from "@codemirror/language";
+import {
+  autocompletion,
+  closeBrackets,
+  closeBracketsKeymap,
+  completionKeymap,
+} from "@codemirror/autocomplete";
+import { html } from "@codemirror/lang-html";
+import { markdown } from "@codemirror/lang-markdown";
+import { css } from "@webstudio-is/design-system";
+import {
+  EditorContent,
+  EditorDialog,
+  EditorDialogButton,
+  EditorDialogControl,
+  foldGutterExtension,
+  getMinMaxHeightVars,
+} from "./code-editor-base";
 
-const ExternalChange = Annotation.define<boolean>();
-
-const rootStyle = css({
-  ...textVariants.mono,
-  boxSizing: "border-box",
-  color: theme.colors.foregroundMain,
-  borderRadius: theme.borderRadius[4],
-  border: `1px solid ${theme.colors.borderMain}`,
-  background: theme.colors.backgroundControls,
-  paddingTop: 6,
-  paddingBottom: 4,
-  paddingRight: theme.spacing[2],
-  paddingLeft: theme.spacing[3],
-  "&:focus-within": {
-    borderColor: theme.colors.borderFocus,
-    outline: `1px solid ${theme.colors.borderFocus}`,
-  },
-  "& .cm-focused": {
-    outline: "none",
-  },
-  // fix scrolls appear on mount
-  "& .cm-scroller": {
-    overflowX: "hidden",
-  },
-  "& .cm-content": {
-    padding: 0,
-  },
-  "& .cm-line": {
-    padding: 0,
-  },
+const wrapperStyle = css({
+  position: "relative",
+  // 1 line is 16px
+  // set min 10 lines and max 20 lines
+  ...getMinMaxHeightVars({ minHeight: "160px", maxHeight: "320px" }),
 });
 
-export const CodeEditor = ({
-  extensions,
-  className,
-  readOnly = false,
-  autoFocus = false,
-  value,
-  onChange,
-  onBlur,
-}: {
-  extensions: Extension[];
-  className?: string;
-  readOnly?: boolean;
-  autoFocus?: boolean;
-  value: string;
-  onChange: (newValue: string) => void;
-  onBlur?: () => void;
-}) => {
-  const editorRef = useRef<null | HTMLDivElement>(null);
-  const viewRef = useRef<undefined | EditorView>();
+const getHtmlExtensions = () => [
+  highlightActiveLine(),
+  highlightSpecialChars(),
+  indentOnInput(),
+  html({}),
+  bracketMatching(),
+  closeBrackets(),
+  // render autocomplete in body
+  // to prevent popover scroll overflow
+  tooltips({ parent: document.body }),
+  autocompletion({ icons: false }),
+  keymap.of([...closeBracketsKeymap, ...completionKeymap]),
+];
 
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
-  const onBlurRef = useRef(onBlur);
-  onBlurRef.current = onBlur;
+const getMarkdownExtensions = () => [
+  highlightActiveLine(),
+  highlightSpecialChars(),
+  indentOnInput(),
+  markdown({
+    extensions: [
+      {
+        props: [
+          styleTags({
+            HorizontalRule: tags.separator,
+            HeaderMark: tags.annotation,
+            QuoteMark: tags.annotation,
+            ListMark: tags.annotation,
+            LinkMark: tags.annotation,
+            EmphasisMark: tags.annotation,
+            CodeMark: tags.annotation,
+            InlineCode: tags.string,
+            URL: tags.url,
+          }),
+        ],
+      },
+    ],
+  }),
+  bracketMatching(),
+  closeBrackets(),
+  keymap.of(closeBracketsKeymap),
+];
 
-  // setup editor
-
-  useEffect(() => {
-    if (editorRef.current === null) {
-      return;
-    }
-    const view = new EditorView({
-      doc: "",
-      parent: editorRef.current,
-    });
-    if (autoFocus) {
-      view.focus();
-    }
-    viewRef.current = view;
-    return () => {
-      view.destroy();
-    };
-  }, [autoFocus]);
-
-  // update extensions whenever variables data is changed
-
-  useEffect(() => {
-    const view = viewRef.current;
-    if (view === undefined) {
-      return;
-    }
-    view.dispatch({
-      effects: StateEffect.reconfigure.of([
-        ...extensions,
-        EditorView.lineWrapping,
-        EditorView.editable.of(readOnly === false),
-        EditorState.readOnly.of(readOnly === true),
-        // https://github.com/uiwjs/react-codemirror/blob/5d7a37245ce70e61f215b77dc42a7eaf295c46e7/core/src/useCodeMirror.ts#L57-L70
-        EditorView.updateListener.of((update) => {
-          if (
-            // prevent invoking callback when focus or selection is changed
-            update.docChanged &&
-            // prevent invoking callback when the change came from react value
-            update.transactions.some((trx) =>
-              trx.annotation(ExternalChange)
-            ) === false
-          ) {
-            onChangeRef.current(update.state.doc.toString());
-          }
-        }),
-        EditorView.domEventHandlers({
-          blur: () => {
-            onBlurRef.current?.();
-          },
-        }),
-      ]),
-    });
-  }, [readOnly, extensions]);
-
-  // update editor with react value
-  // https://github.com/uiwjs/react-codemirror/blob/5d7a37245ce70e61f215b77dc42a7eaf295c46e7/core/src/useCodeMirror.ts#L158-L169
-  useEffect(() => {
-    const view = viewRef.current;
-    if (view === undefined) {
-      return;
-    }
-    // prevent updating when editor has the same state
-    // and can be the source of new value
-    if (value === view.state.doc.toString()) {
-      return;
-    }
-    view.dispatch({
-      changes: { from: 0, to: view.state.doc.length, insert: value },
-      annotations: [ExternalChange.of(true)],
-    });
-  }, [value]);
-
-  let rootClassName = rootStyle.toString();
-  if (className) {
-    rootClassName += ` ${className}`;
+export const CodeEditor = forwardRef<
+  HTMLDivElement,
+  Omit<ComponentProps<typeof EditorContent>, "extensions"> & {
+    lang?: "html" | "markdown";
+    title?: ReactNode;
   }
-  return <div className={rootClassName} ref={editorRef}></div>;
-};
+>(({ lang, title, ...editorContentProps }, ref) => {
+  const extensions = useMemo(() => {
+    if (lang === "html") {
+      return getHtmlExtensions();
+    }
+    if (lang === "markdown") {
+      return getMarkdownExtensions();
+    }
+    return [];
+  }, [lang]);
+
+  const dialogExtensions = useMemo(
+    () => [...extensions, foldGutterExtension],
+    [extensions]
+  );
+
+  // prevent clicking on autocomplete options propagating to body
+  // and closing dialogs and popovers
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.closest(".cm-tooltip-autocomplete")
+      ) {
+        event.stopPropagation();
+      }
+    };
+    const options = { capture: true };
+    document.addEventListener("pointerdown", handlePointerDown, options);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown, options);
+    };
+  }, []);
+  return (
+    <div className={wrapperStyle()} ref={ref}>
+      <EditorDialogControl>
+        <EditorContent {...editorContentProps} extensions={extensions} />
+        <EditorDialog
+          title={title}
+          content={
+            <EditorContent
+              {...editorContentProps}
+              extensions={dialogExtensions}
+            />
+          }
+        >
+          <EditorDialogButton />
+        </EditorDialog>
+      </EditorDialogControl>
+    </div>
+  );
+});
+
+CodeEditor.displayName = "CodeEditor";
