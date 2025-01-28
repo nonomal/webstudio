@@ -7,13 +7,13 @@ import {
 } from "~/builder/shared/binding-popover";
 import {
   type ControlProps,
-  getLabel,
   useLocalValue,
   ResponsiveLayout,
   Label,
   updateExpressionValue,
   $selectedInstanceScope,
   useBindingState,
+  humanizeAttribute,
 } from "../shared";
 
 export const NumberControl = ({
@@ -45,7 +45,7 @@ export const NumberControl = ({
     }
   );
 
-  const label = getLabel(meta, propName);
+  const label = humanizeAttribute(meta.label || propName);
   const { scope, aliases } = useStore($selectedInstanceScope);
   const expression =
     prop?.type === "expression" ? prop.value : JSON.stringify(computedValue);

@@ -2,19 +2,43 @@
 // We want to preserve semantics of the migrations folder and the _prisma_migrations table.
 // https://github.com/prisma/prisma-engines/blob/4.3.0/migration-engine/ARCHITECTURE.md
 
-import { $ } from "execa";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
-import { prisma } from "../src";
+import { x } from "tinyexec";
+import { createPrisma } from "../src/prisma";
 import { UserError } from "./errors";
+import { PrismaClient } from "../src/__generated__";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const prismaDir = path.resolve(__dirname, "..", "prisma");
 export const schemaFilePath = path.join(prismaDir, "schema.prisma");
 export const migrationsDir = path.join(prismaDir, "migrations");
+
+let prisma_: PrismaClient | undefined;
+
+const context = {
+  // delay prisma initialization until it's actually needed
+  // this is needed as we read dotenv in the main file
+  get prisma() {
+    if (process.env.DIRECT_URL === undefined) {
+      throw new Error("DIRECT_URL is not set");
+    }
+
+    prisma_ =
+      prisma_ ??
+      createPrisma({
+        datasourceUrl: process.env.DIRECT_URL,
+        // 10 minutes
+        timeout: 10 * 60 * 1000,
+        maxWait: 5000,
+      });
+
+    return prisma_;
+  },
+};
 
 export const getMigrationFilePath = (
   migrationName: string,
@@ -24,7 +48,8 @@ export const getMigrationFilePath = (
 export const ensureMigrationTable = async () => {
   // https://github.com/prisma/prisma-engines/blob/4.3.0/migration-engine/ARCHITECTURE.md#the-_prisma_migrations-table
   // https://github.com/prisma/prisma-engines/blob/88f6ab88e559ef52ab26bc98f1da15200e0c25b4/migration-engine/connectors/sql-migration-connector/src/flavour/postgres.rs#L211-L226
-  await prisma.$executeRaw`CREATE TABLE IF NOT EXISTS _prisma_migrations (
+  await context.prisma
+    .$executeRaw`CREATE TABLE IF NOT EXISTS _prisma_migrations (
     id                      VARCHAR(36) PRIMARY KEY NOT NULL,
     checksum                VARCHAR(64) NOT NULL,
     finished_at             TIMESTAMPTZ,
@@ -72,7 +97,7 @@ export type PrismaMigration = {
 export const getMigrations = async () => {
   await ensureMigrationTable();
 
-  return prisma.$queryRaw<
+  return context.prisma.$queryRaw<
     PrismaMigration[]
   >`select * from _prisma_migrations order by migration_name`;
 };
@@ -82,7 +107,7 @@ const getByName = async (
 ): Promise<PrismaMigration | undefined> => {
   await ensureMigrationTable();
 
-  const migrations = await prisma.$queryRaw<
+  const migrations = await context.prisma.$queryRaw<
     PrismaMigration[]
   >`select * from _prisma_migrations where migration_name = ${migrationName}`;
   return migrations[0];
@@ -97,11 +122,11 @@ export const getFileChecksum = (filePath: string) => {
 export const setStarted = async (migrationName: string, filePath: string) => {
   await ensureMigrationTable();
 
-  await prisma.$executeRaw`delete from _prisma_migrations 
+  await context.prisma.$executeRaw`delete from _prisma_migrations
                             where id in (
-                              select id from _prisma_migrations 
-                              where migration_name = ${migrationName} 
-                              and rolled_back_at is not null 
+                              select id from _prisma_migrations
+                              where migration_name = ${migrationName}
+                              and rolled_back_at is not null
                               limit 1
                             )`;
 
@@ -116,13 +141,13 @@ export const setStarted = async (migrationName: string, filePath: string) => {
 
   const checksum = getFileChecksum(filePath);
 
-  await prisma.$executeRaw`insert into _prisma_migrations (
-                            id, 
-                            checksum, 
+  await context.prisma.$executeRaw`insert into _prisma_migrations (
+                            id,
+                            checksum,
                             migration_name
                           ) values (
-                            gen_random_uuid()::text, 
-                            ${checksum}, 
+                            gen_random_uuid()::text,
+                            ${checksum},
                             ${migrationName}
                           )`;
 };
@@ -145,7 +170,7 @@ export const setFailed = async (migrationName: string, error: string) => {
     );
   }
 
-  await prisma.$executeRaw`update _prisma_migrations set logs = ${error} 
+  await context.prisma.$executeRaw`update _prisma_migrations set logs = ${error}
                             where migration_name = ${migrationName}`;
 };
 
@@ -169,9 +194,9 @@ export const setApplied = async (migrationName: string) => {
   }
 
   // https://github.com/prisma/prisma-engines/blob/88f6ab88e559ef52ab26bc98f1da15200e0c25b4/migration-engine/core/src/commands/apply_migrations.rs#L72-L73
-  await prisma.$executeRaw`update _prisma_migrations set 
-                            finished_at = now(), 
-                            applied_steps_count = applied_steps_count + 1 
+  await context.prisma.$executeRaw`update _prisma_migrations set
+                            finished_at = now(),
+                            applied_steps_count = applied_steps_count + 1
                           where migration_name = ${migrationName}`;
 };
 
@@ -187,7 +212,8 @@ export const setRolledBack = async (migrationName: string) => {
     );
   }
 
-  await prisma.$executeRaw`update _prisma_migrations set rolled_back_at = now() 
+  await context.prisma
+    .$executeRaw`update _prisma_migrations set rolled_back_at = now()
                             where migration_name = ${migrationName}`;
 };
 
@@ -222,27 +248,33 @@ export const generateMigrationName = (baseName: string) => {
   return `${prefix}_${baseName}`.slice(0, 254);
 };
 
-export const resetDatabase = async () => {
-  const { stdout: sqlToDeleteEverything } =
-    await $`"prisma migrate diff --from-schema-datasource ${schemaFilePath} --to-empty --script`;
-
-  await $({
-    input: sqlToDeleteEverything,
-  })`prisma db execute --stdin --schema ${schemaFilePath}`;
-
-  await prisma.$executeRaw`DROP TABLE IF EXISTS _prisma_migrations`;
-};
-
 // https://www.prisma.io/docs/reference/api-reference/command-reference#migrate-diff
 export const cliDiff = async () => {
-  const { stdout } =
-    await $`prisma migrate diff --from-schema-datasource ${schemaFilePath} --to-schema-datamodel ${schemaFilePath} --script`;
+  const { stdout } = await x(
+    "prisma",
+    [
+      "migrate",
+      "diff",
+      `--from-schema-datasource=${schemaFilePath}`,
+      `--to-schema-datamodel=${schemaFilePath}`,
+      "--script",
+    ],
+    {
+      nodeOptions: { cwd: prismaDir },
+    }
+  );
   return stdout;
 };
 
 // https://www.prisma.io/docs/reference/api-reference/command-reference#db-execute
 export const cliExecute = async (filePath: string) => {
-  await $`prisma db execute --file ${filePath} --schema ${schemaFilePath}`;
+  await x(
+    "prisma",
+    ["db", "execute", `--file=${filePath}`, `--schema=${schemaFilePath}`],
+    {
+      nodeOptions: { cwd: prismaDir },
+    }
+  );
 };
 
 export const generateMigrationClient = async (migrationName: string) => {
@@ -266,5 +298,7 @@ export const generateMigrationClient = async (migrationName: string) => {
   }
 
   // https://www.prisma.io/docs/reference/api-reference/command-reference#generate
-  await $`prisma generate --schema ${schemaPath}`;
+  await x("prisma", ["generate", `--schema=${schemaPath}`], {
+    nodeOptions: { cwd: prismaDir },
+  });
 };

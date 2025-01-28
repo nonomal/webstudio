@@ -1,6 +1,18 @@
-import { findPageByIdOrPath } from "@webstudio-is/sdk";
-import { $isPreviewMode, $pages } from "~/shared/nano-states";
-import { switchPage } from "~/shared/pages";
+import { getPagePath, type System } from "@webstudio-is/sdk";
+import {
+  compilePathnamePattern,
+  matchPathnamePattern,
+  tokenizePathnamePattern,
+} from "~/builder/shared/url-pattern";
+import { $selectedPage, selectPage } from "~/shared/awareness";
+import {
+  $dataSourceVariables,
+  $isPreviewMode,
+  $pages,
+  $selectedPageHash,
+  updateSystem,
+} from "~/shared/nano-states";
+import { savePathInHistory } from "~/shared/pages";
 
 const isAbsoluteUrl = (href: string) => {
   try {
@@ -11,28 +23,63 @@ const isAbsoluteUrl = (href: string) => {
   }
 };
 
-const handleLinkClick = (element: HTMLAnchorElement) => {
+const getSelectedPagePathname = () => {
   const pages = $pages.get();
-  const href = element.getAttribute("href");
-  if (href === null || pages === undefined) {
+  const page = $selectedPage.get();
+  const dataSourceVariables = $dataSourceVariables.get();
+  if (page && pages) {
+    const system = dataSourceVariables.get(page.systemDataSourceId) as
+      | undefined
+      | System;
+    const tokens = tokenizePathnamePattern(getPagePath(page.id, pages));
+    return compilePathnamePattern(tokens, system?.params ?? {});
+  }
+};
+
+const switchPageAndUpdateSystem = (href: string, formData?: FormData) => {
+  const pages = $pages.get();
+  if (pages === undefined) {
     return;
   }
-
-  if (isAbsoluteUrl(href)) {
-    window.open(href, "_blank");
-    return;
+  // preserve pathname when not specified in href/action
+  if (href === "" || href.startsWith("?") || href.startsWith("#")) {
+    const pathname = getSelectedPagePathname();
+    if (pathname) {
+      href = pathname + href;
+    }
   }
-
   const pageHref = new URL(href, "https://any-valid.url");
-  const page = findPageByIdOrPath(pageHref.pathname, pages);
-  if (page) {
-    switchPage(page.id, pageHref.hash);
-    return;
+  for (const page of [pages.homePage, ...pages.pages]) {
+    const pagePath = getPagePath(page.id, pages);
+    const params = matchPathnamePattern(pagePath, pageHref.pathname);
+    if (params) {
+      // populate search params with form data values if available
+      if (formData) {
+        for (const [key, value] of formData.entries()) {
+          pageHref.searchParams.set(key, value.toString());
+        }
+      }
+      const search = Object.fromEntries(pageHref.searchParams);
+      $selectedPageHash.set({ hash: pageHref.hash });
+      selectPage(page.id);
+      updateSystem(page, { params, search });
+      savePathInHistory(page.id, pageHref.pathname);
+      break;
+    }
   }
 };
 
 export const subscribeInterceptedEvents = () => {
   const handleClick = (event: MouseEvent) => {
+    // Prevent forwarding the click event on an input element when the associated label has a "for" attribute
+    if (
+      event.target instanceof Element &&
+      event.target.closest("label[for]") &&
+      !$isPreviewMode.get()
+    ) {
+      event.preventDefault();
+    }
+
     if (
       event.target instanceof HTMLElement ||
       event.target instanceof SVGElement
@@ -41,15 +88,53 @@ export const subscribeInterceptedEvents = () => {
       if (a) {
         event.preventDefault();
         if ($isPreviewMode.get()) {
-          handleLinkClick(a);
+          // use attribute instead of a.href to get raw unresolved value
+          const href = a.getAttribute("href") ?? "";
+          if (isAbsoluteUrl(href)) {
+            window.open(href, "_blank");
+          } else {
+            switchPageAndUpdateSystem(href);
+          }
         }
+      }
+      // prevent invoking submit with buttons in canvas mode
+      // because form with prevented submit still invokes validation
+      if (event.target.closest("button") && $isPreviewMode.get() === false) {
+        event.preventDefault();
       }
     }
   };
+
+  const handlePointerDown = (event: PointerEvent) => {
+    if (false === event.target instanceof HTMLElement) {
+      return;
+    }
+
+    if (event.target.closest("select") && $isPreviewMode.get() === false) {
+      event.preventDefault();
+    }
+  };
+
   const handleSubmit = (event: SubmitEvent) => {
+    if ($isPreviewMode.get()) {
+      const form =
+        event.target instanceof HTMLFormElement ? event.target : undefined;
+      if (form === undefined) {
+        return;
+      }
+      // use attribute instead of form.action to get raw unresolved value
+      // https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#dom-fs-action
+      const action = form.getAttribute("action") ?? "";
+      // lower case just for safety
+      const method = form.method.toLowerCase();
+      if (method === "get" && isAbsoluteUrl(action) === false) {
+        switchPageAndUpdateSystem(action, new FormData(form));
+      }
+    }
     // prevent submitting the form when clicking a button type submit
     event.preventDefault();
   };
+
   const handleKeydown = (event: KeyboardEvent) => {
     if ($isPreviewMode.get()) {
       return;
@@ -75,7 +160,14 @@ export const subscribeInterceptedEvents = () => {
   });
 
   document.documentElement.addEventListener("keydown", handleKeydown);
+
+  document.documentElement.addEventListener("pointerdown", handlePointerDown);
+
   return () => {
+    document.documentElement.removeEventListener(
+      "pointerdown",
+      handlePointerDown
+    );
     document.documentElement.removeEventListener("click", handleClick, {
       capture: true,
     });

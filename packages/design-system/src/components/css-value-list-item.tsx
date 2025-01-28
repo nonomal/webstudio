@@ -13,10 +13,11 @@ import { theme } from "../stitches.config";
 import { DragHandleIcon } from "@webstudio-is/icons";
 import { ArrowFocus } from "./primitives/arrow-focus";
 
-const LIST_ITEM_ATTRIBUTE = "data-list-item";
-const listItemAttributes = { [LIST_ITEM_ATTRIBUTE]: true };
+const listItemAttribute = "data-list-item";
+const listItemAttributes = { [listItemAttribute]: true };
 
 const DragHandleIconStyled = styled(DragHandleIcon, {
+  width: theme.spacing[7],
   visibility: "hidden",
   cursor: "grab",
   color: theme.colors.foregroundSubtle,
@@ -24,15 +25,13 @@ const DragHandleIconStyled = styled(DragHandleIcon, {
 });
 
 const ThumbHolder = styled("div", {
-  width: theme.spacing[10],
-  height: theme.spacing[10],
   flexShrink: 0,
 });
 
 /**
  * We draw button above rela button positions, therefore we need to have same padding
  */
-const sharedPaddingRight = theme.spacing[9];
+const sharedPaddingRight = theme.spacing[7];
 
 const IconButtonsWrapper = styled(Flex, {
   position: "absolute",
@@ -40,10 +39,12 @@ const IconButtonsWrapper = styled(Flex, {
   top: 0,
   bottom: 0,
   paddingRight: sharedPaddingRight,
+  display: "none",
 });
 
 const FakeIconButtonsWrapper = styled(Flex, {
   paddingLeft: theme.spacing[5],
+  display: "none",
 });
 
 /**
@@ -57,25 +58,21 @@ const ItemButton = styled("button", {
   alignItems: "center",
   justifyContent: "start",
   userSelect: "none",
-  backgroundColor: theme.colors.backgroundPanel,
+  backgroundColor: "inherit",
   padding: 0,
 
   paddingRight: sharedPaddingRight,
 
-  height: theme.spacing[13],
+  height: theme.spacing[11],
   position: "relative",
 
   "&:focus-visible, &[data-focused=true], &[data-state=open]": {
-    "&:after": {
-      borderRadius: theme.borderRadius[3],
-      outline: `2px solid ${theme.colors.borderFocus}`,
-      outlineOffset: "-2px",
-      position: "absolute",
-      content: '""',
-      inset: "0 2px",
-      pointerEvents: "none",
+    [`& ${FakeIconButtonsWrapper}`]: {
+      display: "flex",
     },
-
+    [`~ ${IconButtonsWrapper}`]: {
+      display: "flex",
+    },
     outline: "none",
     backgroundColor: theme.colors.backgroundHover,
   },
@@ -110,12 +107,18 @@ type Props = ComponentProps<typeof ItemButton> & {
 const ItemWrapper = styled("div", {
   position: "relative",
   width: "100%",
-  "&:hover, &[data-active=true]": {
+  "&:hover, &:focus-within, &[data-active=true]": {
     [`& ${ItemButton}`]: {
       backgroundColor: theme.colors.backgroundHover,
       [`&[data-draggable=true] ${DragHandleIconStyled}`]: {
         visibility: "visible",
       },
+    },
+    [`& ${IconButtonsWrapper}`]: {
+      display: "flex",
+    },
+    [`& ${FakeIconButtonsWrapper}`]: {
+      display: "flex",
     },
   },
 });
@@ -177,30 +180,30 @@ export const CssValueListItem = forwardRef(
               {...listItemAttributes}
               {...rest}
               hidden={hidden}
-              disabled={hidden === true}
+              disabled={hidden === true || rest.disabled}
             >
               <DragHandleIconStyled />
 
-              <Flex gap={2} shrink>
+              <Flex shrink align="center">
                 {thumbnail ? <ThumbHolder>{thumbnail}</ThumbHolder> : null}
                 {label}
               </Flex>
 
               <Flex grow={true} />
 
-              {/*
-            We place fake divs with same dimensions as small buttons here to avoid following warning:
-            Warning: validateDOMNesting(...): <button> cannot appear as a descendant of <button>
-            Real buttons will be placed on top of fake buttons
-          */}
+              {
+                // We place fake divs with same dimensions as small buttons here to avoid following warning:
+                // Warning: validateDOMNesting(...): <button> cannot appear as a descendant of <button>
+                // Real buttons will be placed on top of fake buttons
+              }
               <FakeIconButtonsWrapper shrink={false} gap={2}>
                 {fakeButtons}
               </FakeIconButtonsWrapper>
             </ItemButton>
 
-            {/*
-          Real buttons are placed above ItemButton to avoid <button> cannot appear as a descendant of <button> warning
-        */}
+            {
+              // Real buttons are placed above ItemButton to avoid <button> cannot appear as a descendant of <button> warning
+            }
             <IconButtonsWrapper gap={2} align="center">
               {buttons}
             </IconButtonsWrapper>
@@ -234,7 +237,7 @@ export const CssValueListArrowFocus = ({
             if (event.key === "ArrowUp" || event.key === "ArrowDown") {
               handleKeyDown(event, {
                 accept: (element) =>
-                  element.getAttribute(LIST_ITEM_ATTRIBUTE) === "true",
+                  element.getAttribute(listItemAttribute) === "true",
               });
             }
           }}
@@ -244,4 +247,8 @@ export const CssValueListArrowFocus = ({
       )}
     />
   );
+};
+
+export const __testing__ = {
+  listItemAttributes,
 };

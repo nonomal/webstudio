@@ -1,8 +1,10 @@
-import { describe, test, expect } from "@jest/globals";
-import { parse } from "./plugin-markdown";
+import { describe, test, expect } from "vitest";
+import { __testing__ } from "./plugin-markdown";
 import { $breakpoints } from "../nano-states";
 
 const options = { generateId: () => "123" };
+
+const { parse } = __testing__;
 
 $breakpoints.set(new Map([["0", { id: "0", label: "base" }]]));
 
@@ -571,12 +573,7 @@ baz",
   "dataSources": [],
   "instances": [
     {
-      "children": [
-        {
-          "type": "text",
-          "value": "foo",
-        },
-      ],
+      "children": [],
       "component": "CodeText",
       "id": "123",
       "type": "instance",
@@ -593,7 +590,15 @@ baz",
       "type": "instance",
     },
   ],
-  "props": [],
+  "props": [
+    {
+      "id": "123",
+      "instanceId": "123",
+      "name": "code",
+      "type": "string",
+      "value": "foo",
+    },
+  ],
   "resources": [],
   "styleSourceSelections": [
     {
@@ -638,18 +643,20 @@ baz",
   "dataSources": [],
   "instances": [
     {
-      "children": [
-        {
-          "type": "text",
-          "value": "foo",
-        },
-      ],
+      "children": [],
       "component": "CodeText",
       "id": "123",
       "type": "instance",
     },
   ],
   "props": [
+    {
+      "id": "123",
+      "instanceId": "123",
+      "name": "code",
+      "type": "string",
+      "value": "foo",
+    },
     {
       "id": "123",
       "instanceId": "123",

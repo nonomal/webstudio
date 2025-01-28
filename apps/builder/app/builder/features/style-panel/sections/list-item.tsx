@@ -1,39 +1,23 @@
+import { propertyDescriptions } from "@webstudio-is/css-data";
 import type { StyleProperty } from "@webstudio-is/css-engine";
 import { Grid, theme } from "@webstudio-is/design-system";
-import { styleConfigByName } from "../shared/configs";
-import type { RenderCategoryProps } from "../style-sections";
-import { PropertyName } from "../shared/property-name";
 import { SelectControl } from "../controls";
+import { StyleSection } from "../shared/style-section";
+import { PropertyLabel } from "../property-label";
 
-import { CollapsibleSection } from "../shared/collapsible-section";
+export const properties = ["listStyleType"] satisfies Array<StyleProperty>;
 
-const properties: StyleProperty[] = ["listStyleType"];
-
-export const ListItemSection = ({
-  currentStyle: style,
-  setProperty,
-  deleteProperty,
-}: RenderCategoryProps) => {
+export const Section = () => {
   return (
-    <CollapsibleSection
-      label="List Item"
-      currentStyle={style}
-      properties={properties}
-    >
+    <StyleSection label="List Item" properties={properties}>
       <Grid gap={2} css={{ gridTemplateColumns: `1fr ${theme.spacing[21]}` }}>
-        <PropertyName
-          label={styleConfigByName("listStyleType").label}
+        <PropertyLabel
+          label="List Style Type"
+          description={propertyDescriptions.listStyleType}
           properties={["listStyleType"]}
-          style={style}
-          onReset={() => deleteProperty("listStyleType")}
         />
-        <SelectControl
-          property={"listStyleType"}
-          currentStyle={style}
-          setProperty={setProperty}
-          deleteProperty={deleteProperty}
-        />
+        <SelectControl property="listStyleType" />
       </Grid>
-    </CollapsibleSection>
+    </StyleSection>
   );
 };

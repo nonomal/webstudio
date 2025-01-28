@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Flex, DeprecatedTextField } from "@webstudio-is/design-system";
+import { Flex, InputField } from "@webstudio-is/design-system";
 import type { StyleValue } from "@webstudio-is/css-engine";
 import { CssValueInput, type IntermediateStyleValue } from "./css-value-input";
 import { action } from "@storybook/addon-actions";
@@ -26,7 +26,7 @@ export const WithKeywords = () => {
       property="width"
       value={value}
       intermediateValue={intermediateValue}
-      keywords={[
+      getOptions={() => [
         { type: "keyword", value: "auto" },
         { type: "keyword", value: "min-content" },
         { type: "keyword", value: "max-content" },
@@ -46,6 +46,9 @@ export const WithKeywords = () => {
       }}
       onAbort={() => {
         action("onAbort")();
+      }}
+      onReset={() => {
+        action("onReset")();
       }}
     />
   );
@@ -67,7 +70,7 @@ export const WithIcons = () => {
       property="alignItems"
       value={value}
       intermediateValue={intermediateValue}
-      keywords={[
+      getOptions={() => [
         { type: "keyword", value: "normal" },
         { type: "keyword", value: "start" },
         { type: "keyword", value: "end" },
@@ -91,6 +94,9 @@ export const WithIcons = () => {
       onAbort={() => {
         action("onAbort")();
       }}
+      onReset={() => {
+        action("onReset")();
+      }}
     />
   );
 };
@@ -113,7 +119,7 @@ export const WithUnits = () => {
         property="rowGap"
         value={value}
         intermediateValue={intermediateValue}
-        keywords={[
+        getOptions={() => [
           { type: "keyword", value: "auto" },
           { type: "keyword", value: "min-content" },
           { type: "keyword", value: "max-content" },
@@ -134,8 +140,11 @@ export const WithUnits = () => {
         onAbort={() => {
           action("onAbort")();
         }}
+        onReset={() => {
+          action("onReset")();
+        }}
       />
-      <DeprecatedTextField
+      <InputField
         readOnly
         value={
           value
@@ -144,6 +153,46 @@ export const WithUnits = () => {
               : toValue(value)
             : ""
         }
+      />
+    </Flex>
+  );
+};
+
+export const Oversized = () => {
+  const [value, setValue] = React.useState<StyleValue>({
+    type: "var",
+    value: "start-test-test-test-test-test-test-test-end",
+  });
+
+  const [intermediateValue, setIntermediateValue] = React.useState<
+    StyleValue | IntermediateStyleValue
+  >();
+
+  return (
+    <Flex css={{ width: 100 }}>
+      <CssValueInput
+        styleSource="preset"
+        property="alignItems"
+        value={value}
+        intermediateValue={intermediateValue}
+        onChange={(newValue) => {
+          setIntermediateValue(newValue);
+        }}
+        onHighlight={(value) => {
+          action("onHighlight")(value);
+        }}
+        onChangeComplete={({ value }) => {
+          // on blur, select, enter etc.
+          setValue(value);
+          setIntermediateValue(undefined);
+          action("onChangeComplete")(value);
+        }}
+        onAbort={() => {
+          action("onAbort")();
+        }}
+        onReset={() => {
+          action("onReset")();
+        }}
       />
     </Flex>
   );

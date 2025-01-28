@@ -1,17 +1,14 @@
-html {
-  margin: 0;
-  display: grid;
-  min-height: 100%;
-}
 @media all {
-  body:where([data-ws-component="Body"]) {
-    margin-top: 0;
-    margin-right: 0;
-    margin-bottom: 0;
-    margin-left: 0;
+  :root {
+    display: grid;
+    min-height: 100%;
     font-family: Arial, Roboto, sans-serif;
     font-size: 16px;
     line-height: 1.2;
+    white-space: pre-wrap;
+    white-space-collapse: preserve;
+  }
+  :where(body.w-body) {
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
@@ -19,8 +16,9 @@ html {
     border-left-width: 1px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    margin: 0;
   }
-  h1:where([data-ws-component="Heading"]) {
+  :where(h1.w-heading) {
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
@@ -28,7 +26,7 @@ html {
     border-left-width: 1px;
     outline-width: 1px;
   }
-  h2:where([data-ws-component="Heading"]) {
+  :where(h2.w-heading) {
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
@@ -36,7 +34,7 @@ html {
     border-left-width: 1px;
     outline-width: 1px;
   }
-  h3:where([data-ws-component="Heading"]) {
+  :where(h3.w-heading) {
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
@@ -44,7 +42,7 @@ html {
     border-left-width: 1px;
     outline-width: 1px;
   }
-  h4:where([data-ws-component="Heading"]) {
+  :where(h4.w-heading) {
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
@@ -52,7 +50,7 @@ html {
     border-left-width: 1px;
     outline-width: 1px;
   }
-  h5:where([data-ws-component="Heading"]) {
+  :where(h5.w-heading) {
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
@@ -60,7 +58,7 @@ html {
     border-left-width: 1px;
     outline-width: 1px;
   }
-  h6:where([data-ws-component="Heading"]) {
+  :where(h6.w-heading) {
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
@@ -68,7 +66,7 @@ html {
     border-left-width: 1px;
     outline-width: 1px;
   }
-  div:where([data-ws-component="Box"]) {
+  :where(div.w-box) {
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
@@ -76,7 +74,7 @@ html {
     border-left-width: 1px;
     outline-width: 1px;
   }
-  address:where([data-ws-component="Box"]) {
+  :where(address.w-box) {
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
@@ -84,7 +82,7 @@ html {
     border-left-width: 1px;
     outline-width: 1px;
   }
-  article:where([data-ws-component="Box"]) {
+  :where(article.w-box) {
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
@@ -92,7 +90,7 @@ html {
     border-left-width: 1px;
     outline-width: 1px;
   }
-  aside:where([data-ws-component="Box"]) {
+  :where(aside.w-box) {
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
@@ -100,7 +98,7 @@ html {
     border-left-width: 1px;
     outline-width: 1px;
   }
-  figure:where([data-ws-component="Box"]) {
+  :where(figure.w-box) {
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
@@ -108,7 +106,7 @@ html {
     border-left-width: 1px;
     outline-width: 1px;
   }
-  footer:where([data-ws-component="Box"]) {
+  :where(footer.w-box) {
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
@@ -116,7 +114,7 @@ html {
     border-left-width: 1px;
     outline-width: 1px;
   }
-  header:where([data-ws-component="Box"]) {
+  :where(header.w-box) {
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
@@ -124,7 +122,7 @@ html {
     border-left-width: 1px;
     outline-width: 1px;
   }
-  main:where([data-ws-component="Box"]) {
+  :where(main.w-box) {
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
@@ -132,7 +130,7 @@ html {
     border-left-width: 1px;
     outline-width: 1px;
   }
-  nav:where([data-ws-component="Box"]) {
+  :where(nav.w-box) {
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
@@ -140,7 +138,7 @@ html {
     border-left-width: 1px;
     outline-width: 1px;
   }
-  section:where([data-ws-component="Box"]) {
+  :where(section.w-box) {
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
@@ -148,7 +146,7 @@ html {
     border-left-width: 1px;
     outline-width: 1px;
   }
-  p:where([data-ws-component="Paragraph"]) {
+  :where(p.w-paragraph) {
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
@@ -156,7 +154,7 @@ html {
     border-left-width: 1px;
     outline-width: 1px;
   }
-  img:where([data-ws-component="Image"]) {
+  :where(img.w-image) {
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
@@ -165,18 +163,18 @@ html {
     outline-width: 1px;
     max-width: 100%;
     display: block;
+    height: auto;
   }
-  a:where([data-ws-component="Link"]) {
+  :where(a.w-link) {
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
     border-bottom-width: 1px;
     border-left-width: 1px;
     outline-width: 1px;
-    min-height: 1em;
     display: inline-block;
   }
-  div:where([data-ws-component="Text"]) {
+  :where(div.w-text) {
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
@@ -185,9 +183,7 @@ html {
     outline-width: 1px;
     min-height: 1em;
   }
-  div:where(
-      [data-ws-component="@webstudio-is/sdk-components-react-radix:Accordion"]
-    ) {
+  :where(div.w-accordion) {
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
@@ -195,9 +191,7 @@ html {
     border-left-width: 1px;
     outline-width: 1px;
   }
-  div:where(
-      [data-ws-component="@webstudio-is/sdk-components-react-radix:AccordionItem"]
-    ) {
+  :where(div.w-item) {
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
@@ -205,9 +199,7 @@ html {
     border-left-width: 1px;
     outline-width: 1px;
   }
-  h3:where(
-      [data-ws-component="@webstudio-is/sdk-components-react-radix:AccordionHeader"]
-    ) {
+  :where(h3.w-item-header) {
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
@@ -217,206 +209,206 @@ html {
     margin-top: 0px;
     margin-bottom: 0px;
   }
-  button:where(
-      [data-ws-component="@webstudio-is/sdk-components-react-radix:AccordionTrigger"]
-    ) {
+  :where(button.w-item-trigger) {
     font-family: inherit;
     font-size: 100%;
     line-height: 1.15;
-    margin-top: 0;
-    margin-right: 0;
-    margin-bottom: 0;
-    margin-left: 0;
     box-sizing: border-box;
-    border-top-width: 0px;
-    border-right-width: 0px;
-    border-bottom-width: 0px;
-    border-left-width: 0px;
     text-transform: none;
     background-color: transparent;
     background-image: none;
+    border: 0px solid rgba(226, 232, 240, 1);
+    margin: 0;
+    padding: 0px;
+  }
+  :where(div.w-html-embed) {
+    display: contents;
+    white-space: normal;
+    white-space-collapse: collapse;
+  }
+  :where(div.w-item-content) {
+    box-sizing: border-box;
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    outline-width: 1px;
+  }
+  :where(form.w-webhook-form) {
+    box-sizing: border-box;
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    outline-width: 1px;
+  }
+  :where(label.w-input-label) {
+    box-sizing: border-box;
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    outline-width: 1px;
+    display: block;
+  }
+  :where(input.w-text-input) {
+    font-family: inherit;
+    font-size: 100%;
+    line-height: 1.15;
+    box-sizing: border-box;
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
     border-top-style: solid;
     border-right-style: solid;
     border-bottom-style: solid;
     border-left-style: solid;
-    border-top-color: rgba(226, 232, 240, 1);
-    border-right-color: rgba(226, 232, 240, 1);
-    border-bottom-color: rgba(226, 232, 240, 1);
-    border-left-color: rgba(226, 232, 240, 1);
-    padding-left: 0px;
-    padding-right: 0px;
-    padding-top: 0px;
-    padding-bottom: 0px;
-  }
-  div:where(
-      [data-ws-component="@webstudio-is/sdk-components-react-radix:AccordionContent"]
-    ) {
-    box-sizing: border-box;
-    border-top-width: 1px;
-    border-right-width: 1px;
-    border-bottom-width: 1px;
-    border-left-width: 1px;
-    outline-width: 1px;
-  }
-  form:where([data-ws-component="Form"]) {
-    box-sizing: border-box;
-    border-top-width: 1px;
-    border-right-width: 1px;
-    border-bottom-width: 1px;
-    border-left-width: 1px;
-    outline-width: 1px;
-    min-height: 20px;
-  }
-  label:where([data-ws-component="Label"]) {
-    box-sizing: border-box;
-    border-top-width: 1px;
-    border-right-width: 1px;
-    border-bottom-width: 1px;
-    border-left-width: 1px;
-    outline-width: 1px;
     display: block;
+    margin: 0;
   }
-  input:where([data-ws-component="Input"]) {
+  :where(button.w-button) {
     font-family: inherit;
     font-size: 100%;
     line-height: 1.15;
-    margin-top: 0;
-    margin-right: 0;
-    margin-bottom: 0;
-    margin-left: 0;
     box-sizing: border-box;
     border-top-width: 1px;
     border-right-width: 1px;
     border-bottom-width: 1px;
     border-left-width: 1px;
-    display: block;
-  }
-  button:where([data-ws-component="Button"]) {
-    font-family: inherit;
-    font-size: 100%;
-    line-height: 1.15;
-    margin-top: 0;
-    margin-right: 0;
-    margin-bottom: 0;
-    margin-left: 0;
-    box-sizing: border-box;
-    border-top-width: 1px;
-    border-right-width: 1px;
-    border-bottom-width: 1px;
-    border-left-width: 1px;
+    border-top-style: solid;
+    border-right-style: solid;
+    border-bottom-style: solid;
+    border-left-style: solid;
     text-transform: none;
+    margin: 0;
   }
 }
 @media all {
-  .cr3bcad {
+  .ceva767 {
     font-size: 4em;
   }
-  .ct8bqew {
+  .c13v7j50 {
     display: flex;
   }
-  .c18lita3 {
+  .cqkqnmd {
     justify-content: center;
   }
-  .c1ac63p {
+  .cv6wa71 {
     align-items: start;
   }
-  .cdojbwh {
+  .c1t3ybra {
     min-width: 0px;
   }
-  .c4wr6vh {
+  .c1qxdkbn {
     flex-grow: 1;
   }
-  .cn27x24 {
+  .c1ogzcge {
     flex-shrink: 0;
   }
-  .cl3i1h5 {
+  .cv3kvac {
     flex-basis: 0px;
   }
-  .c1arp7pb {
+  .c1czoo99 {
     aspect-ratio: 1;
   }
-  .c1wfdiy8 {
-    padding-top: 16px;
+  .cielobv {
+    padding: 16px;
   }
-  .cg4dwmz {
-    padding-right: 16px;
+  .c2onvcp {
+    border-bottom: 1px solid rgba(226, 232, 240, 1);
   }
-  .c1psdgn0 {
-    padding-left: 16px;
-  }
-  .ciwrswx {
-    padding-bottom: 16px;
-  }
-  .c1lk4dyo {
-    border-bottom-width: 1px;
-  }
-  .cpa46rs {
-    border-bottom-style: solid;
-  }
-  .c1rs4a6c {
-    border-bottom-color: rgba(226, 232, 240, 1);
-  }
-  .c5exn1v {
+  .chhejm9 {
     flex-shrink: 1;
   }
-  .c6th5p4 {
+  .c13bviim {
     flex-basis: 0%;
   }
-  .c8sklb9 {
+  .cpjvam0 {
     align-items: center;
   }
-  .cozm0zy {
+  .c1tw5o2 {
     justify-content: space-between;
   }
-  .crf2knr {
+  .cqw88jp {
     padding-top: 1rem;
   }
-  .c16vf3pr {
+  .c44srea {
     padding-bottom: 1rem;
   }
-  .c1u6bhyx {
+  .c14kxsax {
     font-weight: 500;
   }
-  .cgivo88 {
+  .cg783j6 {
     --accordion-trigger-icon-transform: 0deg;
   }
-  .c1px50mc:hover {
+  .c1ad236a:hover {
     text-decoration-line: underline;
   }
-  .cnog96r[data-state="open"] {
+  .c1s4llbc[data-state="open"] {
     --accordion-trigger-icon-transform: 180deg;
   }
-  .c1chi4tu {
+  .c14hansb {
     rotate: var(--accordion-trigger-icon-transform);
   }
-  .chkajpy {
+  .c6d2sb5 {
     height: 1rem;
   }
-  .cmhi6j0 {
+  .cwwiftc {
     width: 1rem;
   }
-  .c1bn66w8 {
+  .c16vb2zi {
     flex-grow: 0;
   }
-  .cw6h46e {
+  .c1hl6g8z {
     transition-property: all;
   }
-  .c1mmsm3k {
+  .c1xm49r0 {
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
-  .c79adhm {
+  .c1vri55v {
     transition-duration: 200ms;
   }
-  .c3kadi {
-    overflow: hidden;
-  }
-  .cl1n90y {
+  .c1j0j9ep {
     font-size: 0.875rem;
   }
-  .c11hmcmb {
+  .c1gl2i2 {
     line-height: 1.25rem;
   }
-  .cnpb7qg {
+  .c1xcxvc0 {
+    overflow-x: hidden;
+  }
+  .c12ct49k {
+    overflow-y: hidden;
+  }
+  .ch2exr5 {
     display: block;
+  }
+  .cm16yxw {
+    width: 300px;
+  }
+  .ctm310 {
+    margin-top: 12px;
+  }
+  .c1jumvji {
+    margin-top: 1em;
+  }
+  .cvdtpev {
+    margin-bottom: 0em;
+  }
+  .cc5h0no {
+    font-size: 1em;
+  }
+  .coklr1z {
+    background-color: rgba(251, 247, 3, 1);
+  }
+  .c1cqkpk9 {
+    background-color: rgba(89, 250, 2, 1);
+  }
+  .ccxj65f {
+    background-color: rgba(2, 250, 168, 1);
+  }
+  .c1a2hnxl {
+    background-color: rgba(2, 139, 250, 1);
   }
 }

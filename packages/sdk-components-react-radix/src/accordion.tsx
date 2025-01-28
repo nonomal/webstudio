@@ -1,11 +1,9 @@
-/* eslint-disable react/display-name */
-// We can't use .displayName until this is merged https://github.com/styleguidist/react-docgen-typescript/pull/449
-
 import {
   type ComponentPropsWithoutRef,
   type ForwardRefExoticComponent,
-  type ComponentPropsWithRef,
   forwardRef,
+  type ComponentProps,
+  type RefAttributes,
 } from "react";
 import {
   Root,
@@ -18,17 +16,14 @@ import {
   getClosestInstance,
   getIndexWithinAncestorFromComponentProps,
   type Hook,
-} from "@webstudio-is/react-sdk";
+} from "@webstudio-is/react-sdk/runtime";
 
 export const Accordion = forwardRef<
   HTMLDivElement,
   Omit<
     Extract<ComponentPropsWithoutRef<typeof Root>, { type: "single" }>,
-    "type" | "asChild" | "defaultValue" | "value" | "onValueChange"
-  > & {
-    value: string;
-    onValueChange: (value: string) => void;
-  }
+    "type" | "asChild"
+  >
 >((props, ref) => {
   return <Root ref={ref} type="single" {...props} />;
 });
@@ -42,15 +37,18 @@ export const AccordionItem = forwardRef<
 });
 
 export const AccordionHeader: ForwardRefExoticComponent<
-  Omit<ComponentPropsWithRef<typeof Header>, "asChild">
+  Omit<ComponentProps<typeof Header>, "asChild"> &
+    RefAttributes<HTMLHeadingElement>
 > = Header;
 
 export const AccordionTrigger: ForwardRefExoticComponent<
-  Omit<ComponentPropsWithRef<typeof Trigger>, "asChild">
+  Omit<ComponentProps<typeof Trigger>, "asChild"> &
+    RefAttributes<HTMLButtonElement>
 > = Trigger;
 
 export const AccordionContent: ForwardRefExoticComponent<
-  Omit<ComponentPropsWithRef<typeof Content>, "asChild">
+  Omit<ComponentProps<typeof Content>, "asChild"> &
+    RefAttributes<HTMLDivElement>
 > = Content;
 
 /* BUILDER HOOKS */
@@ -76,10 +74,11 @@ export const hooksAccordion: Hook = {
         );
         if (accordion && item) {
           const itemValue =
-            context.getPropValue(item.id, "value") ??
+            context.getPropValue(item, "value") ??
             context.indexesWithinAncestors.get(item.id)?.toString();
+
           if (itemValue) {
-            context.setPropVariable(accordion.id, "value", itemValue);
+            context.setMemoryProp(accordion, "value", itemValue);
           }
         }
       }

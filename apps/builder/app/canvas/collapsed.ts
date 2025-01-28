@@ -1,20 +1,15 @@
+import htmlTags, { voidHtmlTags, type HtmlTags } from "html-tags";
 import { collapsedAttribute, idAttribute } from "@webstudio-is/react-sdk";
-import {
-  getCascadedBreakpointIds,
-  getCascadedInfo,
-  getInstanceComponent,
-  getPresetStyleRule,
-} from "~/builder/features/style-panel/shared/style-info";
+import { compareMedia, StyleValue } from "@webstudio-is/css-engine";
 import {
   $breakpoints,
   $instances,
   $registeredComponentMetas,
-  $selectedPage,
   $stylesIndex,
 } from "~/shared/nano-states";
 import { $selectedBreakpoint } from "~/shared/nano-states";
-import { subscribe } from "~/shared/pubsub";
-import htmlTags, { type htmlTags as HtmlTags } from "html-tags";
+import { $selectedPage } from "~/shared/awareness";
+import { serverSyncStore } from "~/shared/sync";
 
 const isHtmlTag = (tag: string): tag is HtmlTags =>
   htmlTags.includes(tag as HtmlTags);
@@ -23,29 +18,13 @@ const instanceIdSet = new Set<string>();
 
 let rafHandle: number;
 
-// Do not add collapsed paddings for void elements
-// https://developer.mozilla.org/en-US/docs/Glossary/Void_element
-const voidHtmlElements = [
-  "AREA",
-  "BASE",
-  "BR",
-  "COL",
-  "EMBED",
-  "HR",
-  "IMG",
-  "INPUT",
-  "LINK",
-  "META",
-  "SOURCE",
-  "TRACK",
-  "WBR",
-];
-
 // Do not add collapsed paddings for replaced elements as at the moment we add them they don't have real size
 // https://developer.mozilla.org/en-US/docs/Web/CSS/Replaced_element
-const replacedHtmlElements = ["IFRAME", "VIDEO", "EMBED", "IMG"];
+const replacedHtmlElements = ["iframe", "video", "embed", "img"];
 
-const skipElementsSet = new Set([...voidHtmlElements, ...replacedHtmlElements]);
+// Do not add collapsed paddings for void elements
+// https://developer.mozilla.org/en-US/docs/Glossary/Void_element
+const skipElementsSet = new Set([...voidHtmlTags, ...replacedHtmlElements]);
 
 const isSelectorSupported = (selector: string) => {
   try {
@@ -53,6 +32,22 @@ const isSelectorSupported = (selector: string) => {
   } catch {
     return false;
   }
+};
+
+// This mark helps us detect if mutations were caused by the collapse algorithm
+const markCollapsedMutationProperty = `--ws-sys-collapsed-mutation`;
+
+/**
+ * Avoid infinite loop of mutations
+ */
+export const hasCollapsedMutationRecord = (
+  mutationRecords: MutationRecord[]
+) => {
+  return mutationRecords.some((record) =>
+    record.type === "attributes"
+      ? (record.oldValue?.includes(markCollapsedMutationProperty) ?? false)
+      : false
+  );
 };
 
 const getInstanceSize = (instanceId: string, tagName: HtmlTags | undefined) => {
@@ -70,40 +65,84 @@ const getInstanceSize = (instanceId: string, tagName: HtmlTags | undefined) => {
     };
   }
 
-  const cascadedBreakpointIds = getCascadedBreakpointIds(
-    breakpoints,
-    selectedBreakpointId
-  );
+  let widthValue: undefined | StyleValue;
+  let heightValue: undefined | StyleValue;
 
-  const component = getInstanceComponent(instances, instanceId);
-  const presetStyle =
-    tagName !== undefined && component !== undefined
-      ? getPresetStyleRule(metas.get(component), tagName, new Set())
-      : undefined;
+  const component =
+    instanceId === undefined ? undefined : instances.get(instanceId)?.component;
+  if (component && tagName) {
+    const presetStyles = metas.get(component)?.presetStyle?.[tagName] ?? [];
+    for (const styleDecl of presetStyles) {
+      if (styleDecl.state === undefined) {
+        if (styleDecl.property === "width") {
+          widthValue = styleDecl.value;
+        }
+        if (styleDecl.property === "height") {
+          heightValue = styleDecl.value;
+        }
+      }
+    }
+  }
 
-  const cascadedStyle = getCascadedInfo(
-    stylesByInstanceId,
-    instanceId,
-    [...cascadedBreakpointIds, selectedBreakpointId],
-    new Set()
-  );
+  const sortedBreakpoints = Array.from(breakpoints.values()).sort(compareMedia);
+  const matchingBreakpoints: string[] = [];
+  for (const breakpoint of sortedBreakpoints) {
+    matchingBreakpoints.push(breakpoint.id);
+    if (breakpoint.id === selectedBreakpointId) {
+      break;
+    }
+  }
 
-  const widthStyle = cascadedStyle?.width?.value ?? presetStyle?.width;
-  const heightStyle = cascadedStyle?.height?.value ?? presetStyle?.height;
+  const instanceStyles = stylesByInstanceId.get(instanceId);
+  if (instanceStyles) {
+    for (const breakpointId of matchingBreakpoints) {
+      for (const styleDecl of instanceStyles) {
+        if (
+          styleDecl.breakpointId === breakpointId &&
+          styleDecl.state === undefined
+        ) {
+          if (styleDecl.property === "width") {
+            widthValue = styleDecl.value;
+          }
+          if (styleDecl.property === "height") {
+            heightValue = styleDecl.value;
+          }
+        }
+      }
+    }
+  }
 
   return {
-    width:
-      widthStyle !== undefined && widthStyle.type === "unit"
-        ? widthStyle.value
-        : undefined,
-    height:
-      heightStyle !== undefined && heightStyle.type === "unit"
-        ? heightStyle.value
-        : undefined,
+    width: widthValue?.type === "unit" ? widthValue.value : undefined,
+    height: heightValue?.type === "unit" ? heightValue.value : undefined,
   };
 };
 
 const MAX_SIZE_TO_USE_OPTIMIZATION = 50;
+
+const findFirstNonContentsParent = (element: Element) => {
+  // Start with the element's parent
+  let parent = element.parentElement;
+
+  // Continue traversing up until we find a non-contents parent or reach the top
+  while (parent) {
+    // Get the computed style of the parent
+    const computedStyle = window.getComputedStyle(parent);
+
+    const isHidden = parent.getAttribute("hidden") !== null;
+
+    // Check if the display is not 'contents'
+    if (computedStyle.display !== "contents" && !isHidden) {
+      return parent;
+    }
+
+    // Move up to the next parent
+    parent = parent.parentElement;
+  }
+
+  // Return null if no non-contents parent is found
+  return null;
+};
 
 const recalculate = () => {
   const rootInstanceId = $selectedPage.get()?.rootInstanceId;
@@ -115,8 +154,8 @@ const recalculate = () => {
     instanceIdSet.size < MAX_SIZE_TO_USE_OPTIMIZATION
       ? Array.from(instanceIdSet)
       : rootInstanceId !== undefined
-      ? [rootInstanceId]
-      : [];
+        ? [rootInstanceId]
+        : [];
 
   instanceIdSet.clear();
   if (instanceIds.length === 0) {
@@ -151,7 +190,7 @@ const recalculate = () => {
       continue;
     }
 
-    if (skipElementsSet.has(element.tagName)) {
+    if (skipElementsSet.has(element.tagName.toLowerCase())) {
       // Images should not collapse, and have a fallback.
       // The issue that unloaded image has 0 width and height until explicitly set,
       // so at the moment new Image added we detect it as collapsed.
@@ -159,22 +198,35 @@ const recalculate = () => {
       continue;
     }
 
+    const elementStyle = window.getComputedStyle(element);
+
     // Find all Leaf like elements
     // Leaf like elements are elements that have no children or all children are absolute or fixed
+    // Excluding hidden elements without size
     if (element.childElementCount === 0) {
-      elementsToRecalculate.push(element);
+      if (element.offsetParent !== null) {
+        elementsToRecalculate.push(element);
+      }
+
+      if (elementStyle.position === "fixed") {
+        elementsToRecalculate.push(element);
+      }
     }
 
-    const elementPosition = window.getComputedStyle(element).position;
+    const parentElement = findFirstNonContentsParent(element);
 
-    if (element.parentElement) {
-      if (elementPosition === "absolute" || elementPosition === "fixed") {
+    if (parentElement) {
+      if (
+        elementStyle.position === "absolute" ||
+        elementStyle.position === "fixed" ||
+        element.offsetParent == null // collapsed or none
+      ) {
         parentsWithAbsoluteChildren.set(
-          element.parentElement,
-          parentsWithAbsoluteChildren.get(element.parentElement) ?? 0
+          parentElement,
+          parentsWithAbsoluteChildren.get(parentElement) ?? 0
         );
       } else {
-        parentsWithAbsoluteChildren.set(element.parentElement, 1);
+        parentsWithAbsoluteChildren.set(parentElement, 1);
       }
     }
   }
@@ -184,11 +236,24 @@ const recalculate = () => {
     if (element.tagName === "HTML") {
       continue;
     }
+
     // All children are absolute or fixed
     if (value === 0) {
       elementsToRecalculate.push(element);
     }
   }
+
+  // If most elements are collapsed at the next step, scrollHeight becomes equal to clientHeight,
+  // which resets the scroll position. To prevent this, we set the document's height to the current scrollHeight
+  // to preserve the scroll position.
+  const preserveHeight = document.documentElement.style.height;
+
+  // Mark that we are in the process of recalculating collapsed elements
+  document.documentElement.style.setProperty(
+    markCollapsedMutationProperty,
+    `true`
+  );
+  document.documentElement.style.height = `${document.documentElement.scrollHeight}px`;
 
   // Now combine all operations in batches.
 
@@ -208,7 +273,8 @@ const recalculate = () => {
     const elementInstanceId = element.getAttribute(idAttribute);
 
     if (elementInstanceId === null) {
-      throw new Error(`Element ${idAttribute} has no instance id`);
+      // Not a webstudio controlled element, like popover portal
+      continue;
     }
 
     const tagName = element.tagName.toLowerCase();
@@ -232,6 +298,9 @@ const recalculate = () => {
   for (const [element, value] of collapsedElements.entries()) {
     element.setAttribute(collapsedAttribute, value);
   }
+
+  document.documentElement.style.height = preserveHeight;
+  document.documentElement.style.removeProperty(markCollapsedMutationProperty);
 };
 
 /**
@@ -261,8 +330,8 @@ export const setDataCollapsed = (instanceId: string, syncExec = false) => {
  * For optimisation reasons try to extract instanceId of changed elements from pubsub
  * In that case we just check the subtree of parent/common ancestor of changed elements to find collapsed elements
  **/
-export const subscribeCollapsedToPubSub = () =>
-  subscribe("sendStoreChanges", ({ changes }) => {
+export const subscribeCollapsed = () => {
+  return serverSyncStore.subscribe((_transactionId, changes) => {
     for (const change of changes) {
       if (change.namespace === "styleSourceSelections") {
         for (const patch of change.patches) {
@@ -275,3 +344,4 @@ export const subscribeCollapsedToPubSub = () =>
       }
     }
   });
+};

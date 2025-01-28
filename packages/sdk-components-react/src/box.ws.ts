@@ -5,7 +5,7 @@ import {
   type PresetStyle,
   type WsComponentMeta,
   type WsComponentPropsMeta,
-} from "@webstudio-is/react-sdk";
+} from "@webstudio-is/sdk";
 import {
   div,
   address,
@@ -17,7 +17,7 @@ import {
   main,
   nav,
   section,
-} from "@webstudio-is/react-sdk/css-normalize";
+} from "@webstudio-is/sdk/normalize.css";
 import { props } from "./__generated__/box.props";
 import type { Box } from "./box";
 
@@ -39,7 +39,6 @@ const presetStyle = {
 export const meta: WsComponentMeta = {
   category: "general",
   type: "container",
-  label: "Box",
   description:
     "A container for content. By default this is a Div, but the tag can be changed in settings.",
   icon: BoxIcon,
@@ -50,5 +49,5 @@ export const meta: WsComponentMeta = {
 
 export const propsMeta: WsComponentPropsMeta = {
   props,
-  initialProps: ["id", "tag"],
+  initialProps: ["id", "className", "tag"],
 };

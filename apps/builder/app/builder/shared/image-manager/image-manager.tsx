@@ -1,9 +1,10 @@
 import { useState, useMemo } from "react";
 import { matchSorter } from "match-sorter";
 import {
-  deprecatedFindNextListIndex,
   Grid,
+  findNextListItemIndex,
   theme,
+  useSearchFieldKeys,
 } from "@webstudio-is/design-system";
 import type { ImageAsset } from "@webstudio-is/sdk";
 import {
@@ -14,7 +15,6 @@ import {
   AssetsShell,
   type AssetContainer,
   useAssets,
-  useSearch,
   deleteAssets,
 } from "../assets";
 import { ImageThumbnail } from "./image-thumbnail";
@@ -23,15 +23,15 @@ const useLogic = ({
   onChange,
   accept,
 }: {
-  onChange?: (asset: ImageAsset) => void;
+  onChange?: (assetId: ImageAsset["id"]) => void;
   accept?: string;
 }) => {
   const { assetContainers } = useAssets("image");
 
   const [selectedIndex, setSelectedIndex] = useState(-1);
 
-  const searchProps = useSearch({
-    onSelect(direction) {
+  const searchProps = useSearchFieldKeys({
+    onMove({ direction }) {
       if (direction === "current") {
         setSelectedIndex(selectedIndex);
         const assetContainer = filteredItems[selectedIndex];
@@ -39,11 +39,11 @@ const useLogic = ({
           assetContainer.status === "uploaded" &&
           assetContainer.asset.type === "image"
         ) {
-          onChange?.(assetContainer.asset);
+          onChange?.(assetContainer.asset.id);
         }
         return;
       }
-      const nextIndex = deprecatedFindNextListIndex(
+      const nextIndex = findNextListItemIndex(
         selectedIndex,
         filteredItems.length,
         direction
@@ -85,7 +85,7 @@ const useLogic = ({
 };
 
 type ImageManagerProps = {
-  onChange?: (asset: ImageAsset) => void;
+  onChange?: (assetId: ImageAsset["id"]) => void;
   /** acceptable file types in the `<imput accept>` attribute format */
   accept?: string;
 };
@@ -106,7 +106,11 @@ export const ImageManager = ({ accept, onChange }: ImageManagerProps) => {
       type="image"
       accept={accept}
     >
-      <Grid columns={3} gap={2} css={{ px: theme.spacing[9] }}>
+      <Grid
+        columns={3}
+        gap="2"
+        css={{ paddingInline: theme.panel.paddingInline }}
+      >
         {filteredItems.map((assetContainer, index) => (
           <ImageThumbnail
             key={assetContainer.asset.id}
@@ -114,12 +118,8 @@ export const ImageManager = ({ accept, onChange }: ImageManagerProps) => {
             onDelete={handleDelete}
             onSelect={handleSelect}
             onChange={(assetContainer) => {
-              // @todo we probably should not allow select uploading images too
-              if (
-                assetContainer.status === "uploaded" &&
-                assetContainer.asset.type === "image"
-              ) {
-                onChange?.(assetContainer.asset);
+              if (assetContainer.asset.type === "image") {
+                onChange?.(assetContainer.asset.id);
               }
             }}
             state={index === selectedIndex ? "selected" : undefined}

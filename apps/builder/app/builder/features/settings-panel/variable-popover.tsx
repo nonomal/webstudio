@@ -1,4 +1,6 @@
+import { z } from "zod";
 import { nanoid } from "nanoid";
+import { computed } from "nanostores";
 import { useStore } from "@nanostores/react";
 import {
   type ReactNode,
@@ -10,31 +12,38 @@ import {
   useImperativeHandle,
   useRef,
   createContext,
-  useContext,
+  useEffect,
+  useCallback,
 } from "react";
-import { mergeRefs } from "@react-aria/utils";
-import { RefreshIcon } from "@webstudio-is/icons";
+import { CopyIcon, RefreshIcon, UpgradeIcon } from "@webstudio-is/icons";
 import {
   Box,
   Button,
+  DialogClose,
+  DialogTitle,
+  DialogTitleActions,
   Flex,
-  FloatingPanelPopover,
-  FloatingPanelPopoverContent,
-  FloatingPanelPopoverTitle,
-  FloatingPanelPopoverTrigger,
+  FloatingPanel,
+  Grid,
   InputErrorsTooltip,
   InputField,
   Label,
+  Link,
+  PanelBanner,
   ProBadge,
   ScrollArea,
   Select,
-  SelectItem,
   Switch,
+  Text,
+  TextArea,
   Tooltip,
   theme,
 } from "@webstudio-is/design-system";
-import { validateExpression } from "@webstudio-is/react-sdk";
-import type { DataSource } from "@webstudio-is/sdk";
+import {
+  type DataSource,
+  transpileExpression,
+  lintExpression,
+} from "@webstudio-is/sdk";
 import {
   ExpressionEditor,
   formatValue,
@@ -43,84 +52,206 @@ import {
   $dataSources,
   $resources,
   $areResourcesLoading,
-  $selectedInstanceSelector,
   invalidateResource,
+  getComputedResource,
+  $userPlanFeatures,
 } from "~/shared/nano-states";
 import { serverSyncStore } from "~/shared/sync";
-import { humanizeString } from "~/shared/string-utils";
-import {
-  useField,
-  type Field,
-  composeFields,
-  type ComposedFields,
-} from "~/shared/form-utils";
-import { $userPlanFeatures } from "~/builder/shared/nano-states";
+import { $selectedInstance } from "~/shared/awareness";
 import { BindingPopoverProvider } from "~/builder/shared/binding-popover";
-import { useSideOffset } from "~/builder/shared/floating-panel";
-import { ResourceForm } from "./resource-panel";
+import {
+  EditorDialog,
+  EditorDialogButton,
+  EditorDialogControl,
+} from "~/builder/shared/code-editor-base";
+import {
+  GraphqlResourceForm,
+  ResourceForm,
+  SystemResourceForm,
+} from "./resource-panel";
+import { generateCurl } from "./curl";
 
-/**
- * convert value expression to js value
- * validating out accessing any identifier
- */
-const parseJsonValue = (code: string) => {
-  const result: { value?: unknown; error?: string } = {};
-  const ids = new Set<string>();
-  if (code.trim().length === 0) {
-    result.error = "Value is required";
-    return result;
-  }
-  try {
-    code = validateExpression(code, {
-      optional: true,
-      transformIdentifier: (id) => {
-        ids.add(id);
-        return id;
-      },
-    });
-  } catch (error) {
-    result.error = (error as Error).message;
-    return result;
-  }
-  if (ids.size === 0) {
-    try {
-      // wrap with parentheses to treat {} as object instead of block
-      result.value = eval(`(${code})`);
-    } catch (error) {
-      result.error = `Parse Error: ${(error as Error).message}`;
+const $variablesByName = computed(
+  [$selectedInstance, $dataSources],
+  (instance, dataSources) => {
+    const variablesByName = new Map<DataSource["name"], DataSource["id"]>();
+    for (const dataSource of dataSources.values()) {
+      if (dataSource.scopeInstanceId === instance?.id) {
+        variablesByName.set(dataSource.name, dataSource.id);
+      }
     }
-  } else {
-    const idsList = Array.from(ids).join(", ");
-    result.error = `Cannot use variables ${idsList} as variable value`;
+    return variablesByName;
   }
-  return result;
+);
+
+const NameField = ({
+  variableId,
+  defaultValue,
+}: {
+  variableId: undefined | DataSource["id"];
+  defaultValue: string;
+}) => {
+  const ref = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState("");
+  const nameId = useId();
+  const variablesByName = useStore($variablesByName);
+  const validateName = useCallback(
+    (value: string) => {
+      if (
+        variablesByName.has(value) &&
+        variablesByName.get(value) !== variableId
+      ) {
+        return "Name is already used by another variable on this instance";
+      }
+      if (value.trim().length === 0) {
+        return "Name is required";
+      }
+      return "";
+    },
+    [variablesByName, variableId]
+  );
+  useEffect(() => {
+    ref.current?.setCustomValidity(validateName(defaultValue));
+  }, [defaultValue, validateName]);
+  return (
+    <Grid gap={1}>
+      <Label htmlFor={nameId}>Name</Label>
+      <InputErrorsTooltip errors={error ? [error] : undefined}>
+        <InputField
+          inputRef={ref}
+          name="name"
+          id={nameId}
+          autoComplete="off"
+          color={error ? "error" : undefined}
+          defaultValue={defaultValue}
+          onChange={(event) => {
+            event.target.setCustomValidity(validateName(event.target.value));
+            setError("");
+          }}
+          onBlur={() => ref.current?.checkValidity()}
+          onInvalid={(event) => setError(event.currentTarget.validationMessage)}
+        />
+      </InputErrorsTooltip>
+    </Grid>
+  );
 };
 
 type VariableType =
+  | "parameter"
   | "string"
   | "number"
   | "boolean"
   | "json"
   | "resource"
-  | "parameter";
+  | "graphql-resource"
+  | "system-resource";
 
-type PanelApi = ComposedFields & {
-  save: () => void;
+const TypeField = ({
+  value,
+  onChange,
+}: {
+  value: VariableType;
+  onChange: (value: VariableType) => void;
+}) => {
+  const { allowDynamicData } = useStore($userPlanFeatures);
+  const optionsList: Array<{
+    value: VariableType;
+    disabled?: boolean;
+    label: ReactNode;
+    description: string;
+  }> = [
+    {
+      value: "string",
+      label: "String",
+      description: "Any alphanumeric text.",
+    },
+    {
+      value: "number",
+      label: "Number",
+      description: "Any number, can be used in math expressions.",
+    },
+    {
+      value: "boolean",
+      label: "Boolean",
+      description: "A boolean is a true/false switch.",
+    },
+    {
+      value: "json",
+      label: "JSON",
+      description: "Any JSON value",
+    },
+    {
+      value: "resource",
+      label: (
+        <Flex direction="row" gap="2" align="center">
+          Resource
+          {allowDynamicData === false && <ProBadge>Pro</ProBadge>}
+        </Flex>
+      ),
+      description:
+        "A Resource is a configuration for secure data fetching. You can safely use secrets in any field.",
+    },
+    {
+      value: "graphql-resource",
+      label: (
+        <Flex direction="row" gap="2" align="center">
+          GraphQL
+          {allowDynamicData === false && <ProBadge>Pro</ProBadge>}
+        </Flex>
+      ),
+      description:
+        "A Resource is a configuration for secure data fetching. You can safely use secrets in any field.",
+    },
+    {
+      value: "system-resource",
+      label: (
+        <Flex direction="row" gap="2" align="center">
+          System Resource
+          {allowDynamicData === false && <ProBadge>Pro</ProBadge>}
+        </Flex>
+      ),
+      description: "A System Resource is a configuration for Webstudio data.",
+    },
+  ];
+  const options = new Map(optionsList.map((option) => [option.value, option]));
+
+  return (
+    <Grid gap="1">
+      <Label>Type</Label>
+      <Select
+        options={Array.from(options.keys())}
+        getLabel={(option: VariableType) => options.get(option)?.label}
+        getItemProps={(option) => ({
+          disabled: options.get(option)?.disabled,
+        })}
+        getDescription={(option) => (
+          <Box css={{ width: theme.spacing[27] }}>
+            {options.get(option)?.description}
+          </Box>
+        )}
+        value={value}
+        name="type"
+        onChange={onChange}
+      />
+    </Grid>
+  );
+};
+
+type PanelApi = {
+  save: (formData: FormData) => void;
 };
 
 const ParameterForm = forwardRef<
   undefined | PanelApi,
-  { variable?: DataSource; nameField: Field<string> }
->(({ variable, nameField }, ref) => {
-  const form = composeFields(nameField);
+  { variable?: DataSource }
+>(({ variable }, ref) => {
   useImperativeHandle(ref, () => ({
-    ...form,
-    save: () => {
+    save: (formData) => {
       // only existing parameter variables can be renamed
       if (variable === undefined) {
         return;
       }
-      const name = nameField.value;
+      const name = z.string().parse(formData.get("name"));
       serverSyncStore.createTransaction([$dataSources], (dataSources) => {
         dataSources.set(variable.id, { ...variable, name });
       });
@@ -133,27 +264,22 @@ ParameterForm.displayName = "ParameterForm";
 const useValuePanelRef = ({
   ref,
   variable,
-  form,
-  name,
   variableValue,
 }: {
   ref: Ref<undefined | PanelApi>;
   variable?: DataSource;
-  form: ComposedFields;
-  name: string;
   variableValue: Extract<DataSource, { type: "variable" }>["value"];
 }) => {
   useImperativeHandle(ref, () => ({
-    ...form,
-    save: () => {
-      const instanceSelector = $selectedInstanceSelector.get();
-      if (instanceSelector === undefined) {
+    save: (formData) => {
+      const instanceId = $selectedInstance.get()?.id;
+      if (instanceId === undefined) {
         return;
       }
-      const [instanceId] = instanceSelector;
       const dataSourceId = variable?.id ?? nanoid();
       // preserve existing instance scope when edit
       const scopeInstanceId = variable?.scopeInstanceId ?? instanceId;
+      const name = z.string().parse(formData.get("name"));
       serverSyncStore.createTransaction(
         [$dataSources, $resources],
         (dataSources, resources) => {
@@ -176,154 +302,209 @@ const useValuePanelRef = ({
 
 const StringForm = forwardRef<
   undefined | PanelApi,
-  { variable?: DataSource; nameField: Field<string> }
->(({ variable, nameField }, ref) => {
+  {
+    variable?: DataSource;
+  }
+>(({ variable }, ref) => {
   const [value, setValue] = useState(
     variable?.type === "variable" && variable.value.type === "string"
       ? variable.value.value
       : ""
   );
-  const form = composeFields(nameField);
   useValuePanelRef({
     ref,
     variable,
-    form,
-    name: nameField.value,
     variableValue: { type: "string", value },
   });
   const valueId = useId();
   return (
-    <Flex direction="column" css={{ gap: theme.spacing[3] }}>
-      <Label htmlFor={valueId}>Value</Label>
-      <InputField
-        id={valueId}
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-      />
-    </Flex>
+    <>
+      <Flex direction="column" css={{ gap: theme.spacing[3] }}>
+        <Label htmlFor={valueId}>Value</Label>
+        <EditorDialogControl>
+          <TextArea
+            name="value"
+            rows={1}
+            maxRows={10}
+            autoGrow={true}
+            id={valueId}
+            value={value}
+            onChange={setValue}
+          />
+          <EditorDialog
+            title="Variable value"
+            content={
+              <TextArea
+                grow={true}
+                id={valueId}
+                value={value}
+                onChange={setValue}
+              />
+            }
+          >
+            <EditorDialogButton />
+          </EditorDialog>
+        </EditorDialogControl>
+      </Flex>
+    </>
   );
 });
 StringForm.displayName = "StringForm";
 
+const validateNumberValue = (value: string | number) => {
+  if (typeof value === "string" && value.length === 0) {
+    return "Value expects a number";
+  }
+  const number = Number(value);
+  return Number.isNaN(number) ? "Invalid number" : "";
+};
+
 const NumberForm = forwardRef<
   undefined | PanelApi,
-  { variable?: DataSource; nameField: Field<string> }
->(({ variable, nameField }, ref) => {
-  const valueField = useField<number | string>({
-    initialValue:
-      variable?.type === "variable" && variable.value.type === "number"
-        ? variable.value.value
-        : "",
-    validate: (value) => {
-      if (typeof value === "string" && value.length === 0) {
-        return "Value expects a number";
-      }
-      const number = Number(value);
-      return Number.isNaN(number) ? "Invalid number" : undefined;
-    },
-  });
-  const form = composeFields(nameField, valueField);
+  {
+    variable?: DataSource;
+  }
+>(({ variable }, ref) => {
+  const [value, setValue] = useState(
+    variable?.type === "variable" && variable.value.type === "number"
+      ? variable.value.value
+      : ""
+  );
+  const [valueError, setValueError] = useState("");
+  const valueRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    valueRef.current?.setCustomValidity(validateNumberValue(value));
+    setValueError("");
+  }, [value]);
   useValuePanelRef({
     ref,
     variable,
-    form,
-    name: nameField.value,
-    variableValue: { type: "number", value: Number(valueField.value) },
+    variableValue: { type: "number", value: Number(value) },
   });
   const valueId = useId();
   return (
-    <Flex direction="column" css={{ gap: theme.spacing[3] }}>
-      <Label htmlFor={valueId}>Value</Label>
-      <InputErrorsTooltip
-        errors={valueField.error ? [valueField.error] : undefined}
-      >
-        <InputField
-          id={valueId}
-          type="number"
-          color={valueField.error ? "error" : undefined}
-          value={valueField.value}
-          onChange={(event) => {
-            valueField.onChange(
-              Number.isNaN(event.target.valueAsNumber)
-                ? event.target.value
-                : event.target.valueAsNumber
-            );
-          }}
-          onBlur={valueField.onBlur}
-        />
-      </InputErrorsTooltip>
-    </Flex>
+    <>
+      <Flex direction="column" css={{ gap: theme.spacing[3] }}>
+        <Label htmlFor={valueId}>Value</Label>
+        <InputErrorsTooltip errors={valueError ? [valueError] : undefined}>
+          <InputField
+            inputRef={valueRef}
+            name="value"
+            id={valueId}
+            inputMode="numeric"
+            color={valueError ? "error" : undefined}
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            onBlur={() => valueRef.current?.checkValidity()}
+            onInvalid={(event) =>
+              setValueError(event.currentTarget.validationMessage)
+            }
+          />
+        </InputErrorsTooltip>
+      </Flex>
+    </>
   );
 });
 NumberForm.displayName = "NumberForm";
 
 const BooleanForm = forwardRef<
   undefined | PanelApi,
-  { variable?: DataSource; nameField: Field<string> }
->(({ variable, nameField }, ref) => {
+  {
+    variable?: DataSource;
+  }
+>(({ variable }, ref) => {
   const [value, setValue] = useState(
     variable?.type === "variable" && variable.value.type === "boolean"
       ? variable.value.value
       : false
   );
-  const form = composeFields(nameField);
   useValuePanelRef({
     ref,
     variable,
-    form,
-    name: nameField.value,
     variableValue: { type: "boolean", value },
   });
   const valueId = useId();
   return (
-    <Flex direction="column" css={{ gap: theme.spacing[3] }}>
-      <Label htmlFor={valueId}>Value</Label>
-      <Switch id={valueId} checked={value} onCheckedChange={setValue} />
-    </Flex>
+    <>
+      <Flex direction="column" css={{ gap: theme.spacing[3] }}>
+        <Label htmlFor={valueId}>Value</Label>
+        <Switch
+          name="value"
+          id={valueId}
+          checked={value}
+          onCheckedChange={setValue}
+        />
+      </Flex>
+    </>
   );
 });
 BooleanForm.displayName = "BooleanForm";
 
+const validateJsonValue = (expression: string) => {
+  const diagnostics = lintExpression({ expression });
+  // prevent saving with any message including unset variable
+  return diagnostics.length > 0 ? "error" : "";
+};
+
+const parseJsonValue = (expression: string) => {
+  try {
+    expression = transpileExpression({ expression, executable: true });
+    // wrap with parentheses to treat {} as object instead of block
+    return eval(`(${expression})`);
+  } catch {
+    // empty block
+  }
+};
+
 const JsonForm = forwardRef<
   undefined | PanelApi,
-  { variable?: DataSource; nameField: Field<string> }
->(({ variable, nameField }, ref) => {
-  const valueField = useField<string>({
-    initialValue:
-      variable?.type === "variable" &&
+  {
+    variable?: DataSource;
+  }
+>(({ variable }, ref) => {
+  const [value, setValue] = useState<string>(
+    variable?.type === "variable" &&
       (variable.value.type === "json" || variable.value.type === "string[]")
-        ? formatValue(variable.value.value)
-        : ``,
-    validate: (value) => parseJsonValue(value).error,
-  });
-  const form = composeFields(nameField, valueField);
+      ? formatValue(variable.value.value)
+      : ``
+  );
+  const [valueError, setValueError] = useState("");
+  const valueRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    valueRef.current?.setCustomValidity(validateJsonValue(value));
+    setValueError("");
+  }, [value]);
   useValuePanelRef({
     ref,
     variable,
-    form,
-    name: nameField.value,
     variableValue: {
       type: "json",
-      value: parseJsonValue(valueField.value).value,
+      value: parseJsonValue(value),
     },
   });
   return (
-    <Flex direction="column" css={{ gap: theme.spacing[3] }}>
-      <Label>Value</Label>
-      <InputErrorsTooltip
-        errors={valueField.error ? [valueField.error] : undefined}
-      >
-        {/* use div to position tooltip */}
-        <div>
-          <ExpressionEditor
-            color={valueField.error ? "error" : undefined}
-            value={valueField.value}
-            onChange={valueField.onChange}
-            onBlur={valueField.onBlur}
-          />
-        </div>
-      </InputErrorsTooltip>
-    </Flex>
+    <>
+      <input
+        ref={valueRef}
+        style={{ display: "none" }}
+        name="value"
+        data-color={valueError ? "error" : undefined}
+        value={value}
+        onChange={() => {}}
+        onInvalid={(event) =>
+          setValueError(event.currentTarget.validationMessage)
+        }
+      />
+      <Flex direction="column" css={{ gap: theme.spacing[3] }}>
+        <Label>Value</Label>
+        <ExpressionEditor
+          color={valueError ? "error" : undefined}
+          value={value}
+          onChange={setValue}
+          onChangeComplete={() => valueRef.current?.checkValidity()}
+        />
+      </Flex>
+    </>
   );
 });
 JsonForm.displayName = "JsonForm";
@@ -334,33 +515,20 @@ const VariablePanel = forwardRef<
     variable?: DataSource;
   }
 >(({ variable }, ref) => {
-  const { allowResourceVariables } = useStore($userPlanFeatures);
+  const resources = useStore($resources);
 
-  const nameField = useField({
-    initialValue: variable?.name ?? "",
-    validate: (value) =>
-      value.trim().length === 0 ? "Name is required" : undefined,
-  });
-  const nameId = useId();
-  const nameFieldElement = (
-    <Flex direction="column" css={{ gap: theme.spacing[3] }}>
-      <Label htmlFor={nameId}>Name</Label>
-      <InputErrorsTooltip
-        errors={nameField.error ? [nameField.error] : undefined}
-      >
-        <InputField
-          id={nameId}
-          color={nameField.error ? "error" : undefined}
-          value={nameField.value}
-          onChange={(event) => nameField.onChange(event.target.value)}
-          onBlur={nameField.onBlur}
-        />
-      </InputErrorsTooltip>
-    </Flex>
-  );
-
-  const [type, setType] = useState<VariableType>(() => {
-    if (variable?.type === "parameter" || variable?.type === "resource") {
+  const [variableType, setVariableType] = useState<VariableType>(() => {
+    if (variable?.type === "resource") {
+      const resource = resources.get(variable.resourceId);
+      if (resource?.control === "system") {
+        return "system-resource";
+      }
+      if (resource?.control === "graphql") {
+        return "graphql-resource";
+      }
+      return "resource";
+    }
+    if (variable?.type === "parameter") {
       return variable.type;
     }
     if (variable?.type === "variable") {
@@ -372,148 +540,231 @@ const VariablePanel = forwardRef<
     }
     return "string";
   });
-  const typeOptions: VariableType[] = [
-    "string",
-    "number",
-    "boolean",
-    "json",
-    "resource",
-  ];
-  const getTypeLabel = (value: VariableType) =>
-    value === "json" ? "JSON" : humanizeString(value);
-  const typeFieldElement = (
-    <Flex direction="column" css={{ gap: theme.spacing[3] }}>
-      <Label>Type</Label>
-      <Select<VariableType>
-        options={typeOptions}
-        getLabel={getTypeLabel}
-        value={type}
-        onChange={setType}
-      >
-        {typeOptions.map((option) => (
-          <SelectItem
-            key={option}
-            value={option}
-            textValue={getTypeLabel(option)}
-            disabled={option === "resource" && allowResourceVariables === false}
-          >
-            {getTypeLabel(option)}
-            {option === "resource" && allowResourceVariables === false && (
-              <Box css={{ display: "inline-block", ml: theme.spacing[3] }}>
-                <ProBadge>Pro</ProBadge>
-              </Box>
-            )}
-          </SelectItem>
-        ))}
-      </Select>
-    </Flex>
-  );
 
-  if (type === "parameter") {
+  if (variableType === "parameter") {
     return (
       <>
-        {nameFieldElement}
-        <ParameterForm ref={ref} variable={variable} nameField={nameField} />
+        <NameField
+          variableId={variable?.id}
+          defaultValue={variable?.name ?? ""}
+        />
+        <ParameterForm ref={ref} variable={variable} />
       </>
     );
   }
-  if (type === "string") {
+  if (variableType === "string") {
     return (
       <>
-        {nameFieldElement}
-        {typeFieldElement}
-        <StringForm ref={ref} variable={variable} nameField={nameField} />
+        <NameField
+          variableId={variable?.id}
+          defaultValue={variable?.name ?? ""}
+        />
+        <TypeField value={variableType} onChange={setVariableType} />
+        <StringForm ref={ref} variable={variable} />
       </>
     );
   }
-  if (type === "number") {
+  if (variableType === "number") {
     return (
       <>
-        {nameFieldElement}
-        {typeFieldElement}
-        <NumberForm ref={ref} variable={variable} nameField={nameField} />
+        <NameField
+          variableId={variable?.id}
+          defaultValue={variable?.name ?? ""}
+        />
+        <TypeField value={variableType} onChange={setVariableType} />
+        <NumberForm ref={ref} variable={variable} />
       </>
     );
   }
-  if (type === "boolean") {
+  if (variableType === "boolean") {
     return (
       <>
-        {nameFieldElement}
-        {typeFieldElement}
-        <BooleanForm ref={ref} variable={variable} nameField={nameField} />
+        <NameField
+          variableId={variable?.id}
+          defaultValue={variable?.name ?? ""}
+        />
+        <TypeField value={variableType} onChange={setVariableType} />
+        <BooleanForm ref={ref} variable={variable} />
       </>
     );
   }
-  if (type === "json") {
+  if (variableType === "json") {
     return (
       <>
-        {nameFieldElement}
-        {typeFieldElement}
-        <JsonForm ref={ref} variable={variable} nameField={nameField} />
+        <NameField
+          variableId={variable?.id}
+          defaultValue={variable?.name ?? ""}
+        />
+        <TypeField value={variableType} onChange={setVariableType} />
+        <JsonForm ref={ref} variable={variable} />
       </>
     );
   }
-  if (type === "resource") {
+
+  if (variableType === "resource") {
     return (
       <>
-        {nameFieldElement}
-        {typeFieldElement}
-        <ResourceForm ref={ref} variable={variable} nameField={nameField} />
+        <NameField
+          variableId={variable?.id}
+          defaultValue={variable?.name ?? ""}
+        />
+        <TypeField value={variableType} onChange={setVariableType} />
+        <ResourceForm ref={ref} variable={variable} />
       </>
     );
   }
+
+  if (variableType === "graphql-resource") {
+    return (
+      <>
+        <NameField
+          variableId={variable?.id}
+          defaultValue={variable?.name ?? ""}
+        />
+        <TypeField value={variableType} onChange={setVariableType} />
+        <GraphqlResourceForm ref={ref} variable={variable} />
+      </>
+    );
+  }
+
+  if (variableType === "system-resource") {
+    return (
+      <>
+        <NameField
+          variableId={variable?.id}
+          defaultValue={variable?.name ?? ""}
+        />
+        <TypeField value={variableType} onChange={setVariableType} />
+        <SystemResourceForm ref={ref} variable={variable} />
+      </>
+    );
+  }
+
+  variableType satisfies never;
 });
 VariablePanel.displayName = "VariablePanel";
 
 const VariablePopoverContext = createContext<{
-  containerRef?: RefObject<HTMLElement>;
+  containerRef?: RefObject<null | HTMLElement>;
 }>({});
 
 export const VariablePopoverProvider = VariablePopoverContext.Provider;
 
-export const VariablePopoverTrigger = forwardRef<
-  HTMLButtonElement,
-  { variable?: DataSource; children: ReactNode }
->(({ variable, children }, ref) => {
-  const areResourcesLoading = useStore($areResourcesLoading);
-  const [isOpen, setOpen] = useState(false);
-  const { containerRef } = useContext(VariablePopoverContext);
-  const [triggerRef, sideOffsset] = useSideOffset({ isOpen, containerRef });
-  const bindingPopoverContainerRef = useRef<HTMLDivElement>(null);
-  const panelRef = useRef<undefined | PanelApi>();
-  const saveAndClose = () => {
-    if (panelRef.current) {
-      if (panelRef.current.allErrorsVisible === false) {
-        panelRef.current.showAllErrors();
-        return;
-      }
-      if (panelRef.current.valid) {
-        panelRef.current.save();
+const areAllFormErrorsVisible = (form: null | HTMLFormElement) => {
+  if (form === null) {
+    return true;
+  }
+  // check all errors in form fields are visible
+  for (const element of form.elements) {
+    if (
+      element instanceof HTMLInputElement ||
+      element instanceof HTMLTextAreaElement
+    ) {
+      // field is invalid and the error is not visible
+      if (
+        element.validity.valid === false &&
+        // rely on data-color=error convention in webstudio design system
+        element.getAttribute("data-color") !== "error"
+      ) {
+        return false;
       }
     }
-    setOpen(false);
-  };
+  }
+  return true;
+};
+
+export const VariablePopoverTrigger = ({
+  variable,
+  children,
+}: {
+  variable?: DataSource;
+  children: ReactNode;
+}) => {
+  const areResourcesLoading = useStore($areResourcesLoading);
+  const [isOpen, setOpen] = useState(false);
+  const bindingPopoverContainerRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<undefined | PanelApi>(undefined);
+  const formRef = useRef<HTMLFormElement>(null);
+  const resources = useStore($resources);
+  const { allowDynamicData } = useStore($userPlanFeatures);
+  const [isResource, setIsResource] = useState(variable?.type === "resource");
+  const requiresUpgrade = allowDynamicData === false && isResource;
+
   return (
-    <FloatingPanelPopover
-      modal
+    <FloatingPanel
       open={isOpen}
       onOpenChange={(newOpen) => {
-        if (newOpen === false) {
-          saveAndClose();
+        if (newOpen) {
+          setOpen(true);
           return;
         }
-        setOpen(newOpen);
+        // attempt to save form on close
+        if (areAllFormErrorsVisible(formRef.current)) {
+          formRef.current?.requestSubmit();
+          setOpen(false);
+        } else {
+          formRef.current?.checkValidity();
+          // prevent closing when not all errors are shown to user
+        }
       }}
-    >
-      <FloatingPanelPopoverTrigger ref={mergeRefs(ref, triggerRef)} asChild>
-        {children}
-      </FloatingPanelPopoverTrigger>
-      <FloatingPanelPopoverContent
-        ref={bindingPopoverContainerRef}
-        sideOffset={sideOffsset}
-        side="left"
-        align="start"
-      >
+      title={
+        variable === undefined ? (
+          <DialogTitle>New Variable</DialogTitle>
+        ) : (
+          <DialogTitle
+            suffix={
+              <DialogTitleActions>
+                {variable?.type === "resource" && (
+                  <>
+                    {/* allow to copy curl only for default and graphql resource controls */}
+                    {resources.get(variable.resourceId)?.control !==
+                      "system" && (
+                      <Tooltip
+                        content="Copy resource as cURL command"
+                        side="bottom"
+                      >
+                        <Button
+                          aria-label="Copy resource as cURL command"
+                          prefix={<CopyIcon />}
+                          color="ghost"
+                          onClick={() => {
+                            const resourceRequest = getComputedResource(
+                              variable.resourceId
+                            );
+                            if (resourceRequest) {
+                              navigator.clipboard.writeText(
+                                generateCurl(resourceRequest)
+                              );
+                            }
+                          }}
+                        />
+                      </Tooltip>
+                    )}
+                    <Tooltip content="Refresh resource data" side="bottom">
+                      <Button
+                        aria-label="Refresh resource data"
+                        prefix={<RefreshIcon />}
+                        color="ghost"
+                        disabled={areResourcesLoading}
+                        onClick={() => {
+                          formRef.current?.requestSubmit();
+                          if (formRef.current?.checkValidity()) {
+                            invalidateResource(variable.resourceId);
+                          }
+                        }}
+                      />
+                    </Tooltip>
+                  </>
+                )}
+                <DialogClose />
+              </DialogTitleActions>
+            }
+          >
+            Edit Variable
+          </DialogTitle>
+        )
+      }
+      content={
         <ScrollArea
           css={{
             // flex fixes content overflowing artificial scroll area
@@ -526,22 +777,62 @@ export const VariablePopoverTrigger = forwardRef<
             direction="column"
             css={{
               overflow: "hidden",
-              gap: theme.spacing[9],
-              pt: theme.spacing[5],
-              px: theme.spacing[9],
-              pb: theme.spacing[9],
+              gap: theme.spacing[7],
+              p: theme.panel.padding,
             }}
           >
+            {requiresUpgrade && (
+              <PanelBanner>
+                <Text>Resource fetching is part of the CMS functionality.</Text>
+                <Flex align="center" gap={1}>
+                  <UpgradeIcon />
+                  <Link
+                    color="inherit"
+                    target="_blank"
+                    href="https://webstudio.is/pricing"
+                  >
+                    Upgrade to Pro
+                  </Link>
+                </Flex>
+              </PanelBanner>
+            )}
             <form
+              ref={formRef}
+              noValidate={true}
               // exclude from the flow
               style={{ display: "contents" }}
+              onChange={(event) => {
+                const { name, value } = event.target as HTMLSelectElement;
+                // When type is changing, we need to show the upgrade banner.
+                if (name === "type") {
+                  setIsResource(value.includes("resource"));
+                }
+              }}
               onSubmit={(event) => {
                 event.preventDefault();
-                saveAndClose();
+                if (requiresUpgrade) {
+                  return;
+                }
+                const nameElement =
+                  event.currentTarget.elements.namedItem("name");
+                // make sure only name is valid and allow to save everything else
+                // to avoid loosing complex configuration when closed accidentally
+                if (
+                  nameElement instanceof HTMLInputElement &&
+                  nameElement.checkValidity()
+                ) {
+                  const formData = new FormData(event.currentTarget);
+                  panelRef.current?.save(formData);
+                  // close popover whenever new variable is created
+                  // to prevent creating duplicated variable
+                  if (variable === undefined) {
+                    setOpen(false);
+                  }
+                }
               }}
             >
               {/* submit is not triggered when press enter on input without submit button */}
-              <button style={{ display: "none" }}>submit</button>
+              <button hidden></button>
               <BindingPopoverProvider
                 value={{ containerRef: bindingPopoverContainerRef }}
               >
@@ -550,31 +841,11 @@ export const VariablePopoverTrigger = forwardRef<
             </form>
           </Flex>
         </ScrollArea>
-        {/* put after content to avoid auto focusing "Close" button */}
-        {variable === undefined ? (
-          <FloatingPanelPopoverTitle>New Variable</FloatingPanelPopoverTitle>
-        ) : (
-          <FloatingPanelPopoverTitle
-            actions={
-              variable.type === "resource" && (
-                <Tooltip content="Refresh resource data" side="bottom">
-                  <Button
-                    aria-label="Refresh resource data"
-                    prefix={<RefreshIcon />}
-                    color="ghost"
-                    disabled={areResourcesLoading}
-                    onClick={() => invalidateResource(variable.resourceId)}
-                  />
-                </Tooltip>
-              )
-            }
-          >
-            Edit Variable
-          </FloatingPanelPopoverTitle>
-        )}
-      </FloatingPanelPopoverContent>
-    </FloatingPanelPopover>
+      }
+    >
+      {children}
+    </FloatingPanel>
   );
-});
+};
 
 VariablePopoverTrigger.displayName = "VariablePopoverTrigger";

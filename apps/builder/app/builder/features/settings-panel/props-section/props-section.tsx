@@ -1,222 +1,231 @@
+import { computed } from "nanostores";
 import { useState } from "react";
 import { useStore } from "@nanostores/react";
-import type { Instance } from "@webstudio-is/sdk";
+import { matchSorter } from "match-sorter";
+import { type Instance, descendantComponent } from "@webstudio-is/sdk";
 import {
   theme,
-  useCombobox,
   Combobox,
-  ComboboxContent,
-  ComboboxAnchor,
-  ComboboxListbox,
-  ComboboxListboxItem,
   Separator,
   Flex,
-  InputField,
-  NestedInputButton,
+  Box,
+  Grid,
 } from "@webstudio-is/design-system";
+import { isAttributeNameSafe } from "@webstudio-is/react-sdk";
 import {
   $propValuesByInstanceSelector,
   $propsIndex,
   $props,
-  $selectedInstanceSelector,
+  $isDesignMode,
+  $isContentMode,
 } from "~/shared/nano-states";
 import { CollapsibleSectionWithAddButton } from "~/builder/shared/collapsible-section";
-import {
-  useStyleData,
-  type SetProperty as SetCssProperty,
-} from "~/builder/features/style-panel/shared/use-style-data";
 import { renderControl } from "../controls/combined";
-import {
-  usePropsLogic,
-  type NameAndLabel,
-  type PropAndMeta,
-} from "./use-props-logic";
-import { Row, getLabel } from "../shared";
+import { usePropsLogic, type PropAndMeta } from "./use-props-logic";
 import { serverSyncStore } from "~/shared/sync";
+import { $selectedInstanceKey } from "~/shared/awareness";
 
-const itemToString = (item: NameAndLabel | null) =>
-  item ? getLabel(item, item.name) : "";
+type Item = {
+  name: string;
+  label?: string;
+  description?: string;
+};
 
-const PropsCombobox = ({
-  items,
-  onItemSelect,
-}: {
-  items: NameAndLabel[];
-  onItemSelect: (item: NameAndLabel) => void;
-}) => {
-  const [inputValue, setInputValue] = useState("");
+const itemToString = (item: Item | null) => item?.label || item?.name || "";
 
-  const combobox = useCombobox<NameAndLabel>({
-    items,
-    itemToString,
-    onItemSelect,
-    selectedItem: undefined,
-
-    // this weird handling of value is needed to work around a limitation in useCombobox
-    // where it doesn't allow to leave both `value` and `selectedItem` empty/uncontrolled
-    value: { name: "", label: inputValue },
-    onInputChange: (value) => setInputValue(value ?? ""),
+const matchOrSuggestToCreate = (
+  search: string,
+  items: Array<Item>,
+  itemToString: (item: Item) => string
+): Array<Item> => {
+  const matched = matchSorter(items, search, {
+    keys: [itemToString],
   });
 
-  return (
-    <Combobox>
-      <div {...combobox.getComboboxProps()}>
-        <ComboboxAnchor>
-          <InputField
-            autoFocus
-            {...combobox.getInputProps()}
-            placeholder="New Property"
-            suffix={<NestedInputButton {...combobox.getToggleButtonProps()} />}
-          />
-        </ComboboxAnchor>
-        <ComboboxContent align="end" sideOffset={5}>
-          <ComboboxListbox {...combobox.getMenuProps()}>
-            {combobox.isOpen &&
-              combobox.items.map((item, index) => (
-                <ComboboxListboxItem
-                  key={item.name}
-                  selectable={false}
-                  {...combobox.getItemProps({ item, index })}
-                >
-                  {itemToString(item)}
-                </ComboboxListboxItem>
-              ))}
-          </ComboboxListbox>
-        </ComboboxContent>
-      </div>
-    </Combobox>
-  );
+  if (
+    search.trim() !== "" &&
+    itemToString(matched[0]).toLocaleLowerCase() !==
+      search.toLocaleLowerCase().trim()
+  ) {
+    matched.unshift({
+      name: search.trim(),
+      label: `Create attribute: "${search.trim()}"`,
+    });
+  }
+  return matched;
 };
 
 const renderProperty = (
-  {
-    propsLogic: logic,
-    propValues,
-    setCssProperty,
-    component,
-    instanceId,
-  }: PropsSectionProps,
+  { propsLogic: logic, propValues, component, instanceId }: PropsSectionProps,
   { prop, propName, meta }: PropAndMeta,
-  deletable?: boolean
+  { deletable, autoFocus }: { deletable?: boolean; autoFocus?: boolean } = {}
 ) =>
   renderControl({
+    autoFocus,
     key: propName,
     instanceId,
     meta,
     prop,
     computedValue: propValues.get(propName) ?? meta.defaultValue,
     propName,
-    deletable: deletable ?? false,
+    deletable:
+      deletable ??
+      ((meta.defaultValue === undefined || meta.defaultValue !== prop?.value) &&
+        meta.required === false &&
+        prop !== undefined),
     onDelete: () => {
       if (prop) {
         logic.handleDelete(prop);
+        if (component === "Image" && propName === "src") {
+          logic.handleDeleteByPropName("width");
+          logic.handleDeleteByPropName("height");
+        }
       }
     },
-    onChange: (propValue, asset) => {
+    onChange: (propValue) => {
       logic.handleChange({ prop, propName }, propValue);
 
-      // @todo: better way to do this?
       if (
         component === "Image" &&
         propName === "src" &&
-        asset &&
-        "width" in asset.meta &&
-        "height" in asset.meta
+        propValue.type === "asset"
       ) {
-        logic.handleChangeByPropName("width", {
-          value: asset.meta.width,
-          type: "number",
-        });
-        logic.handleChangeByPropName("height", {
-          value: asset.meta.height,
-          type: "number",
-        });
-
-        setCssProperty("height")({
-          type: "keyword",
-          value: "fit-content",
-        });
+        logic.handleChangeByPropName("width", propValue);
+        logic.handleChangeByPropName("height", propValue);
       }
     },
   });
 
-const AddPropertyForm = ({
+const forbiddenProperties = new Set(["style", "class", "className"]);
+
+const AddPropertyOrAttribute = ({
   availableProps,
   onPropSelected,
 }: {
-  availableProps: NameAndLabel[];
+  availableProps: Item[];
   onPropSelected: (propName: string) => void;
-}) => (
-  <Flex css={{ height: theme.spacing[13] }} direction="column" justify="center">
-    <PropsCombobox
-      items={availableProps}
-      onItemSelect={(item) => onPropSelected(item.name)}
-    />
-  </Flex>
-);
+}) => {
+  const [value, setValue] = useState("");
+  const [isValid, setIsValid] = useState(true);
+  return (
+    <Flex
+      css={{ height: theme.spacing[13] }}
+      direction="column"
+      justify="center"
+    >
+      <Combobox<Item>
+        defaultHighlightedIndex={0}
+        autoFocus
+        color={isValid ? undefined : "error"}
+        placeholder="Select or create"
+        getItems={() => availableProps}
+        itemToString={itemToString}
+        onItemSelect={(item) => {
+          if (
+            forbiddenProperties.has(item.name) ||
+            isAttributeNameSafe(item.name) === false
+          ) {
+            setIsValid(false);
+            return;
+          }
+          setIsValid(true);
+          onPropSelected(item.name);
+        }}
+        match={matchOrSuggestToCreate}
+        value={{ name: "", label: value }}
+        onChange={(value) => {
+          setValue(value ?? "");
+        }}
+        getDescription={(item) => {
+          return (
+            <Box css={{ width: theme.spacing[28] }}>
+              {item?.description ?? "No description available"}
+            </Box>
+          );
+        }}
+      />
+    </Flex>
+  );
+};
 
 type PropsSectionProps = {
   propsLogic: ReturnType<typeof usePropsLogic>;
   propValues: Map<string, unknown>;
   component: Instance["component"];
   instanceId: string;
-  setCssProperty: SetCssProperty;
 };
 
 // A UI componet with minimum logic that can be demoed in Storybook etc.
 export const PropsSection = (props: PropsSectionProps) => {
   const { propsLogic: logic } = props;
-
   const [addingProp, setAddingProp] = useState(false);
+  const isDesignMode = useStore($isDesignMode);
+  const isContentMode = useStore($isContentMode);
 
   const hasItems =
     logic.addedProps.length > 0 || addingProp || logic.initialProps.length > 0;
 
+  const showPropertiesSection =
+    isDesignMode || (isContentMode && logic.initialProps.length > 0);
+
   return (
     <>
-      <Row css={{ py: theme.spacing[3] }}>
-        {logic.systemProps.map((item) => renderProperty(props, item))}
-      </Row>
+      <Grid
+        css={{
+          paddingBottom: theme.panel.paddingBlock,
+        }}
+      >
+        {logic.systemProps.map((item) => (
+          <Box
+            key={item.propName}
+            css={{ paddingInline: theme.panel.paddingInline }}
+          >
+            {renderProperty(props, item)}
+          </Box>
+        ))}
+      </Grid>
 
       <Separator />
-
-      <CollapsibleSectionWithAddButton
-        label="Properties"
-        onAdd={() => setAddingProp(true)}
-        hasItems={hasItems}
-      >
-        <Flex gap="1" direction="column">
-          {addingProp && (
-            <AddPropertyForm
-              availableProps={logic.availableProps}
-              onPropSelected={(propName) => {
-                setAddingProp(false);
-                logic.handleAdd(propName);
-              }}
-            />
-          )}
-          {logic.addedProps.map((item) => renderProperty(props, item, true))}
-          {logic.initialProps.map((item) => renderProperty(props, item))}
-        </Flex>
-      </CollapsibleSectionWithAddButton>
+      {showPropertiesSection && (
+        <CollapsibleSectionWithAddButton
+          label="Properties & Attributes"
+          onAdd={isDesignMode ? () => setAddingProp(true) : undefined}
+          hasItems={hasItems}
+        >
+          <Flex gap="1" direction="column">
+            {addingProp && (
+              <AddPropertyOrAttribute
+                availableProps={logic.availableProps}
+                onPropSelected={(propName) => {
+                  setAddingProp(false);
+                  logic.handleAdd(propName);
+                }}
+              />
+            )}
+            {logic.addedProps.map((item) =>
+              renderProperty(props, item, { deletable: true })
+            )}
+            {logic.initialProps.map((item) => renderProperty(props, item))}
+          </Flex>
+        </CollapsibleSectionWithAddButton>
+      )}
     </>
   );
 };
+
+const $propValues = computed(
+  [$propValuesByInstanceSelector, $selectedInstanceKey],
+  (propValuesByInstanceSelector, instanceKey) =>
+    propValuesByInstanceSelector.get(instanceKey ?? "")
+);
 
 export const PropsSectionContainer = ({
   selectedInstance: instance,
 }: {
   selectedInstance: Instance;
 }) => {
-  const { setProperty: setCssProperty } = useStyleData({
-    selectedInstance: instance,
-  });
   const { propsByInstanceId } = useStore($propsIndex);
-  const propValuesByInstanceSelector = useStore($propValuesByInstanceSelector);
-  const instanceSelector = useStore($selectedInstanceSelector);
-  const propValues = propValuesByInstanceSelector.get(
-    JSON.stringify(instanceSelector)
-  );
+  const propValues = useStore($propValues);
 
   const logic = usePropsLogic({
     instance,
@@ -252,12 +261,16 @@ export const PropsSectionContainer = ({
   }
 
   return (
-    <PropsSection
-      propsLogic={logic}
-      propValues={propValues ?? new Map()}
-      component={instance.component}
-      instanceId={instance.id}
-      setCssProperty={setCssProperty}
-    />
+    <fieldset
+      style={{ display: "contents" }}
+      disabled={instance.component === descendantComponent}
+    >
+      <PropsSection
+        propsLogic={logic}
+        propValues={propValues ?? new Map()}
+        component={instance.component}
+        instanceId={instance.id}
+      />
+    </fieldset>
   );
 };

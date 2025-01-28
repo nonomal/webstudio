@@ -1,11 +1,11 @@
-import { styled, useId } from "@webstudio-is/design-system";
-import { forwardRef } from "react";
+import { styled } from "@webstudio-is/design-system";
+import { forwardRef, useId } from "react";
 import type { ComponentProps, Ref } from "react";
 import type { HoverTarget, SpaceStyleProperty } from "./types";
-import { spacePropertiesNames } from "./types";
+import { spaceProperties } from "./properties";
 import { theme } from "@webstudio-is/design-system";
 
-const VALUE_WIDTH = 34;
+const VALUE_WIDTH = 36;
 const VALUE_HEIGHT = 24;
 
 const BORDER = 1;
@@ -41,15 +41,25 @@ const emulateInnerStroke = ({
 });
 
 const ValueArea = styled("path", {
-  fill: theme.colors.slate2,
+  fill: theme.colors.backgroundSpacingTopBottom,
   variants: {
     side: {
       top: { cursor: "n-resize" },
       bottom: { cursor: "s-resize" },
-      right: { cursor: "e-resize", fill: theme.colors.slate3 },
-      left: { cursor: "w-resize", fill: theme.colors.slate3 },
+      right: {
+        cursor: "e-resize",
+        fill: theme.colors.backgroundSpacingLeftRight,
+      },
+      left: {
+        cursor: "w-resize",
+        fill: theme.colors.backgroundSpacingLeftRight,
+      },
     },
-    isActive: { true: { fill: theme.colors.slate5 } },
+    isActive: {
+      true: {
+        fill: theme.colors.backgroundSpacingHover,
+      },
+    },
   },
 });
 
@@ -66,7 +76,7 @@ const OuterRect = styled(
       {...props}
     />
   ),
-  { stroke: theme.colors.slate8 }
+  { stroke: theme.colors.borderMain }
 );
 
 const InnerOuterRect = styled(
@@ -86,7 +96,7 @@ const InnerOuterRect = styled(
       />
     );
   },
-  { stroke: theme.colors.slate8, fill: theme.colors.loContrast }
+  { stroke: theme.colors.borderMain, fill: theme.colors.backgroundControls }
 );
 
 const InnerRect = styled(
@@ -102,7 +112,7 @@ const InnerRect = styled(
       {...props}
     />
   ),
-  { stroke: theme.colors.slate8 }
+  { stroke: theme.colors.borderMain }
 );
 
 const MostInnerRect = styled(
@@ -120,7 +130,7 @@ const MostInnerRect = styled(
       />
     );
   },
-  { stroke: theme.colors.slate8, fill: theme.colors.loContrast }
+  { stroke: theme.colors.borderMain, fill: theme.colors.backgroundControls }
 );
 
 const gap = `${INNER_MARGIN + BORDER}px`;
@@ -150,7 +160,7 @@ const Container = styled("div", {
   // (both in z-order and in top/left)
   [`&:focus-visible > ${Grid}`]: {
     borderRadius: theme.borderRadius[3],
-    outline: `2px solid ${theme.colors.blue10}`,
+    outline: `1px solid ${theme.colors.borderFocus}`,
   },
 });
 
@@ -176,7 +186,7 @@ const Cell = styled("div", {
 });
 
 const Label = styled("div", {
-  color: theme.colors.slate11,
+  color: theme.colors.foregroundTextSubtle,
   textTransform: "uppercase",
   fontSize: theme.deprecatedFontSize[1],
   lineHeight: 1,
@@ -324,7 +334,7 @@ export const SpaceLayout = forwardRef(
           <Label>Margin</Label>
           <Label inner>Padding</Label>
 
-          {spacePropertiesNames.map((property) => (
+          {spaceProperties.map((property) => (
             <Cell property={property} key={property}>
               {renderCell({ property })}
             </Cell>

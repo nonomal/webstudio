@@ -24,11 +24,14 @@ import {
 } from "@radix-ui/react-dropdown-menu";
 import { CheckMarkIcon, DotIcon } from "@webstudio-is/icons";
 import type { ComponentProps } from "react";
+import { truncate } from "../utilities";
 
 export const labelCss = css(textVariants.titles, {
   color: theme.colors.foregroundMain,
   mx: theme.spacing[3],
   padding: theme.spacing[3],
+  order: 1,
+  ...truncate(),
 });
 
 const indicatorSize = theme.spacing[9];
@@ -45,11 +48,12 @@ export const menuItemIndicatorCss = css({
 export const MenuItemIndicator = styled("span", menuItemIndicatorCss);
 
 const itemMargin = theme.spacing[3];
-export const menuItemCss = css(textVariants.labelsTitleCase, {
+export const menuItemCss = css({
   outline: "none",
   cursor: "default",
   position: "relative",
   display: "flex",
+  order: 1,
   alignItems: "center",
   color: theme.colors.foregroundMain,
   mx: itemMargin,
@@ -57,13 +61,18 @@ export const menuItemCss = css(textVariants.labelsTitleCase, {
   borderRadius: theme.borderRadius[3],
   // override button default styles
   backgroundColor: "transparent",
-  "&:focus, &[data-found], &[aria-selected=true], &[data-state=open]": {
-    backgroundColor: theme.colors.backgroundItemMenuItemHover,
-  },
+  "&:focus, &[data-found], &[aria-selected=true], &[data-state=open], &[data-state=checked]":
+    {
+      backgroundColor: theme.colors.backgroundItemMenuItemHover,
+    },
   "&[data-disabled], &[aria-disabled], &[disabled]": {
     color: theme.colors.foregroundDisabled,
   },
   variants: {
+    text: {
+      title: textVariants.labelsTitleCase,
+      sentence: textVariants.labelsSentenceCase,
+    },
     withIndicator: {
       true: {
         paddingLeft: `calc(${theme.spacing[3]} + ${indicatorSize} + ${theme.spacing[3]})`,
@@ -74,7 +83,26 @@ export const menuItemCss = css(textVariants.labelsTitleCase, {
         color: theme.colors.foregroundDestructive,
       },
     },
+    hint: {
+      true: {
+        ...textVariants.labelsSentenceCase,
+        px: theme.spacing[5],
+        background: theme.colors.backgroundMenuHint,
+        borderRadius: theme.borderRadius[2],
+        overflow: "hidden",
+        "&::before": {
+          position: "absolute",
+          top: 0,
+          left: 0,
+          content: '""',
+          width: 2,
+          height: "100%",
+          background: theme.colors.backgroundGradientVertical,
+        },
+      },
+    },
   },
+  defaultVariants: { text: "title" },
 });
 
 // To use outside of any menu context, e.g. in a Popover
@@ -90,8 +118,10 @@ export const MenuItemButton = styled("button", menuItemCss, {
 
 export const separatorCss = css({
   height: 1,
+  minHeight: 1,
   my: theme.spacing[3],
   backgroundColor: theme.colors.borderMain,
+  order: 1,
 });
 
 const menuPadding = theme.spacing[3];
@@ -146,7 +176,7 @@ const setIconStyle = css({
 });
 
 // Icon for the "checked" state from Figma
-export const MenuCheckedIcon = () => <CheckMarkIcon />;
+export const MenuCheckedIcon = () => <CheckMarkIcon size={12} />;
 
 // Icon for the "checked and set" state from Figma
 export const MenuCheckedAndSetIcon = () => (

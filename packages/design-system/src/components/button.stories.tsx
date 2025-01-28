@@ -1,14 +1,10 @@
 import type { ComponentProps } from "react";
-import { MenuIcon, CrossIcon, TrashIcon } from "@webstudio-is/icons";
+import { EllipsesIcon, XIcon, TrashIcon } from "@webstudio-is/icons";
 import { Button as ButtonComponent } from "./button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  PopoverContentContainer,
-} from "./popover";
+import { Popover, PopoverContent, PopoverTrigger } from "./popover";
 import { Text } from "./text";
 import { StorySection, StoryGrid } from "./storybook";
+import { theme } from "../stitches.config";
 
 export default {
   title: "Library/Button",
@@ -16,8 +12,8 @@ export default {
 
 const iconsMap = {
   undefined: undefined,
-  "<MenuIcon>": <MenuIcon />,
-  "<CrossIcon>": <CrossIcon />,
+  "<EllipsesIcon>": <EllipsesIcon />,
+  "<XIcon>": <XIcon />,
   "<TrashIcon>": <TrashIcon />,
 } as const;
 
@@ -83,6 +79,11 @@ export const Button = ({
             <ButtonComponent prefix={<TrashIcon />} color={color} disabled>
               {color} disabled
             </ButtonComponent>
+            <fieldset style={{ display: "contents" }} disabled>
+              <ButtonComponent prefix={<TrashIcon />} color={color}>
+                {color} disabled by fieldset
+              </ButtonComponent>
+            </fieldset>
           </StoryGrid>
         ))}
       </StoryGrid>
@@ -114,10 +115,8 @@ export const Button = ({
         <PopoverTrigger asChild>
           <ButtonComponent prefix={<TrashIcon />}>Open</ButtonComponent>
         </PopoverTrigger>
-        <PopoverContent>
-          <PopoverContentContainer>
-            <Text>Some content</Text>
-          </PopoverContentContainer>
+        <PopoverContent css={{ padding: theme.panel.padding }}>
+          <Text>Some content</Text>
         </PopoverContent>
       </Popover>
     </StorySection>

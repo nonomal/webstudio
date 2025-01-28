@@ -11,13 +11,13 @@ import {
 } from "~/builder/shared/binding-popover";
 import {
   type ControlProps,
-  getLabel,
   useLocalValue,
   VerticalLayout,
   $selectedInstanceScope,
   Label,
   updateExpressionValue,
   useBindingState,
+  humanizeAttribute,
 } from "../shared";
 
 const useInstance = (instanceId: Instance["id"]) => {
@@ -58,7 +58,7 @@ export const TextContent = ({
     }
   });
   const id = useId();
-  const label = getLabel(meta, propName);
+  const label = humanizeAttribute(meta.label || propName);
 
   const { scope, aliases } = useStore($selectedInstanceScope);
   let expression: undefined | string;

@@ -1,19 +1,19 @@
+import { useEffect, useId, useRef } from "react";
 import { useStore } from "@nanostores/react";
-import { useId, TextArea } from "@webstudio-is/design-system";
+import { TextArea } from "@webstudio-is/design-system";
 import {
   BindingControl,
   BindingPopover,
 } from "~/builder/shared/binding-popover";
 import {
   type ControlProps,
-  getLabel,
   useLocalValue,
-  VerticalLayout,
   ResponsiveLayout,
   Label,
   updateExpressionValue,
   $selectedInstanceScope,
   useBindingState,
+  humanizeAttribute,
 } from "../shared";
 
 export const TextControl = ({
@@ -22,6 +22,7 @@ export const TextControl = ({
   propName,
   deletable,
   computedValue,
+  autoFocus,
   onChange,
   onDelete,
 }: ControlProps<"text">) => {
@@ -33,10 +34,8 @@ export const TextControl = ({
     }
   });
   const id = useId();
-  const label = getLabel(meta, propName);
-  const rows = meta.rows ?? 1;
-  const isTwoColumnLayout = rows < 2;
-
+  const label = humanizeAttribute(meta.label || propName);
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const { scope, aliases } = useStore($selectedInstanceScope);
   const expression =
     prop?.type === "expression" ? prop.value : JSON.stringify(computedValue);
@@ -44,9 +43,16 @@ export const TextControl = ({
     prop?.type === "expression" ? prop.value : undefined
   );
 
+  useEffect(() => {
+    if (autoFocus) {
+      textAreaRef.current?.focus();
+    }
+  }, [autoFocus]);
+
   const input = (
     <BindingControl>
       <TextArea
+        ref={textAreaRef}
         id={id}
         disabled={overwritable === false}
         autoGrow
@@ -58,6 +64,7 @@ export const TextControl = ({
         onBlur={localValue.save}
         onSubmit={localValue.save}
       />
+
       <BindingPopover
         scope={scope}
         aliases={aliases}
@@ -88,25 +95,13 @@ export const TextControl = ({
     </Label>
   );
 
-  if (isTwoColumnLayout) {
-    return (
-      <ResponsiveLayout
-        label={labelElement}
-        deletable={deletable}
-        onDelete={onDelete}
-      >
-        {input}
-      </ResponsiveLayout>
-    );
-  }
-
   return (
-    <VerticalLayout
+    <ResponsiveLayout
       label={labelElement}
       deletable={deletable}
       onDelete={onDelete}
     >
       {input}
-    </VerticalLayout>
+    </ResponsiveLayout>
   );
 };

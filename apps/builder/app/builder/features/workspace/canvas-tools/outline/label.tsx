@@ -56,39 +56,58 @@ const LabelContainer = styled(
     lineHeight: 1,
     minWidth: theme.spacing[13],
     whiteSpace: "nowrap",
-    backgroundColor: theme.colors.blue9,
   },
   {
     variants: {
       position: {
         top: {
+          left: -1,
           top: `-${theme.spacing[10]}`,
+          borderTopLeftRadius: theme.borderRadius[4],
+          borderTopRightRadius: theme.borderRadius[4],
         },
         inside: {
           top: 0,
+          borderBottomLeftRadius: theme.borderRadius[4],
+          borderBottomRightRadius: theme.borderRadius[4],
         },
         bottom: {
+          left: -1,
           bottom: `-${theme.spacing[10]}`,
+          borderBottomLeftRadius: theme.borderRadius[4],
+          borderBottomRightRadius: theme.borderRadius[4],
+        },
+      },
+      variant: {
+        default: {
+          backgroundColor: theme.colors.backgroundPrimary,
+        },
+        slot: {
+          backgroundColor: theme.colors.foregroundReusable,
         },
       },
     },
+    defaultVariants: { variant: "default" },
   }
 );
 
 type LabelProps = {
   instance: { label?: string; component: Instance["component"] };
   instanceRect: Rect;
+  variant?: "default" | "slot";
 };
 
-export const Label = ({ instance, instanceRect }: LabelProps) => {
+export const Label = ({ instance, instanceRect, variant }: LabelProps) => {
   const [labelRef, position] = useLabelPosition(instanceRect);
   const metas = useStore($registeredComponentMetas);
   const meta = metas.get(instance.component);
+
   if (meta === undefined) {
     return <></>;
   }
+
   return (
-    <LabelContainer position={position} ref={labelRef}>
+    <LabelContainer position={position} variant={variant} ref={labelRef}>
       <MetaIcon size="1em" icon={meta.icon} />
       {getInstanceLabel(instance, meta)}
     </LabelContainer>

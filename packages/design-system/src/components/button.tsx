@@ -54,10 +54,6 @@ const foregrounds: Record<ButtonColor, string> = {
   "dark-ghost": theme.colors.foregroundContrastMain,
 };
 
-// CSS supports multiple gradients as backgrounds but not multiple colors
-const backgroundColors = (base: string, overlay: string) =>
-  `linear-gradient(${overlay}, ${overlay}), linear-gradient(${base}, ${base})`;
-
 const perColorStyle = (variant: ButtonColor) => ({
   background:
     variant === "ghost" || variant === "dark-ghost"
@@ -73,15 +69,12 @@ const perColorStyle = (variant: ButtonColor) => ({
     background:
       variant === "gradient"
         ? `linear-gradient(${theme.colors.backgroundButtonHover}, ${theme.colors.backgroundButtonHover}), ${backgrounds[variant]}`
-        : backgroundColors(
-            backgrounds[variant],
-            theme.colors.backgroundButtonHover
-          ),
+        : `oklch(from ${backgrounds[variant]} l c h / 0.8)`,
   },
 
   "&[data-state=auto]:focus-visible, &[data-state=focus]": {
     color: foregrounds[variant],
-    outline: `2px solid ${theme.colors.borderFocus}`,
+    outline: `1px solid ${theme.colors.borderFocus}`,
     outlineOffset: "1px",
   },
 
@@ -90,16 +83,14 @@ const perColorStyle = (variant: ButtonColor) => ({
     background:
       variant === "gradient"
         ? `linear-gradient(${theme.colors.backgroundButtonPressed}, ${theme.colors.backgroundButtonPressed}), ${backgrounds[variant]}`
-        : backgroundColors(
-            backgrounds[variant],
-            theme.colors.backgroundButtonPressed
-          ),
+        : `oklch(from ${backgrounds[variant]} l c h / 0.8)`,
   },
 
-  "&[data-state=disabled]": {
-    background: theme.colors.backgroundButtonDisabled,
-    color: theme.colors.foregroundDisabled,
-  },
+  "&:disabled:not([data-state=pending]), &[data-state=disabled], &[aria-disabled=true], &[aria-disabled=true]:hover, &[aria-disabled=true]:visited":
+    {
+      background: theme.colors.backgroundButtonDisabled,
+      color: theme.colors.foregroundDisabled,
+    },
 
   "&[data-state=pending]": {
     cursor: "wait",
@@ -115,8 +106,8 @@ export const buttonStyle = css({
   alignItems: "center",
   justifyContent: "center",
   gap: theme.spacing[2],
-  padding: `0 ${theme.spacing[4]}`,
-  height: theme.spacing[12],
+  padding: `0 ${theme.spacing[3]}`,
+  height: theme.sizes.controlHeight,
   borderRadius: theme.borderRadius[4],
   whiteSpace: "nowrap",
 
@@ -224,7 +215,7 @@ export const Button = forwardRef(
                 justify={"center"}
                 align={"center"}
               >
-                <LoadingDotsIcon size={28} />
+                <LoadingDotsIcon size={28} fill="currentColor" />
               </Flex>
             )}
           </TextContainer>

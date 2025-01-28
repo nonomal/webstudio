@@ -12,22 +12,38 @@ import {
   Switch,
   theme,
   Tooltip,
-  useId,
   Collapsible,
   keyframes,
   Text,
   InputField,
-  PopoverPortal,
   Link,
   buttonStyle,
+  IconButton,
+  Checkbox,
+  Grid,
 } from "@webstudio-is/design-system";
-import { CopyIcon, MenuIcon, PlusIcon, HelpIcon } from "@webstudio-is/icons";
-import { Fragment, useState, type ComponentProps, type ReactNode } from "react";
+import {
+  CopyIcon,
+  EllipsesIcon,
+  PlusIcon,
+  InfoCircleIcon,
+} from "@webstudio-is/icons";
+import {
+  Fragment,
+  useId,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
+import { useIds } from "../form-utils";
+import { CopyToClipboard } from "~/builder/shared/copy-to-clipboard";
+import { isFeatureEnabled } from "@webstudio-is/feature-flags";
+import type { BuilderMode } from "../nano-states";
 
 const Item = (props: ComponentProps<typeof Flex>) => (
   <Flex
     direction="column"
-    css={{ px: theme.spacing[7], py: theme.spacing[5] }}
+    css={{ padding: theme.panel.padding }}
     gap="1"
     {...props}
   />
@@ -68,34 +84,28 @@ const Permission = ({
         {title}
       </Label>
       <Tooltip content={tooltipContent} variant="wrapped">
-        <HelpIcon color={rawTheme.colors.foregroundSubtle} tabIndex={0} />
+        <InfoCircleIcon color={rawTheme.colors.foregroundSubtle} tabIndex={0} />
       </Tooltip>
     </Flex>
   );
 };
 
 type MenuProps = {
-  relation: Relation;
   name: string;
+  value: LinkOptions;
   hasProPlan: boolean;
-  onChangePermission: (relation: Relation) => void;
-  onChangeName: (name: string) => void;
+  onChange: (value: LinkOptions) => void;
   onDelete: () => void;
 };
 
-const Menu = ({
-  hasProPlan,
-  relation,
-  name,
-  onChangePermission,
-  onChangeName,
-  onDelete,
-}: MenuProps) => {
+const Menu = ({ name, hasProPlan, value, onChange, onDelete }: MenuProps) => {
+  const ids = useIds(["name", "canClone", "canCopy", "canPublish"]);
   const [isOpen, setIsOpen] = useState(false);
   const [customLinkName, setCustomLinkName] = useState<string>(name);
+
   const handleCheckedChange = (relation: Relation) => (checked: boolean) => {
     if (checked) {
-      onChangePermission(relation);
+      onChange({ ...value, relation });
     }
   };
 
@@ -104,114 +114,248 @@ const Menu = ({
       return;
     }
 
-    onChangeName(customLinkName);
-    setIsOpen(false);
+    onChange({ ...value, name: customLinkName.trim() });
   };
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button
-          prefix={<MenuIcon />}
+          prefix={<EllipsesIcon />}
           color="ghost"
           aria-label="Menu Button for options"
         ></Button>
       </PopoverTrigger>
-      <PopoverPortal>
-        <PopoverContent
-          css={{
-            padding: 0,
-            width: theme.spacing[24],
-          }}
-          sideOffset={0}
-        >
-          <Item>
-            <Label>Name</Label>
-            <InputField
-              color={customLinkName.length === 0 ? "error" : undefined}
-              value={customLinkName}
-              onChange={(event) => setCustomLinkName(event.target.value.trim())}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  saveCustomLinkName();
-                }
-              }}
-              onBlur={() => onChangeName(customLinkName)}
-              placeholder="Share Project"
-              name="Name"
-              autoFocus
-            />
-          </Item>
-          <Separator />
-          <Item>
-            <Label>Permissions</Label>
-            <Permission
-              checked={relation === "viewers"}
-              onCheckedChange={handleCheckedChange("viewers")}
-              title="View"
-              info="Recipients can only view the project"
-            />
-            {/*
-           Hide temporarily until we have a way to allow edit content but not edit tree, etc.
-
-          <Permission
-            onCheckedChange={handleCheckedChange("editors")}
-            checked={relation === "editors"}
-            title="Edit Content"
-            info="Recipients can view the project and edit content like text and images, but they will not be able to change the styles or structure of your project."
-          />
-          */}
-            <Permission
-              onCheckedChange={handleCheckedChange("builders")}
-              checked={relation === "builders"}
-              title="Build"
-              info="Recipients can make any changes but can not publish the project."
-            />
-
-            <Permission
-              disabled={hasProPlan !== true}
-              onCheckedChange={handleCheckedChange("administrators")}
-              checked={relation === "administrators"}
-              title="Admin"
-              info={
-                <Flex direction="column">
-                  Recipients can make any changes and can also publish the
-                  project.
-                  {hasProPlan !== true && (
-                    <>
-                      <br />
-                      <br />
-                      Upgrade to a Pro account to share with Admin permissions.
-                      <br /> <br />
-                      <Link
-                        className={buttonStyle({ color: "gradient" })}
-                        color="contrast"
-                        underline="none"
-                        href="https://webstudio.is/pricing"
-                        target="_blank"
-                      >
-                        Upgrade
-                      </Link>
-                    </>
-                  )}
-                </Flex>
+      <PopoverContent
+        css={{
+          //padding: 0,
+          width: theme.spacing[24],
+        }}
+        sideOffset={0}
+        onInteractOutside={saveCustomLinkName}
+      >
+        <Item>
+          <Label htmlFor={ids.name}>Name</Label>
+          <InputField
+            id={ids.name}
+            color={customLinkName.length === 0 ? "error" : undefined}
+            value={customLinkName}
+            onChange={(event) => setCustomLinkName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                saveCustomLinkName();
+                setIsOpen(false);
               }
-            />
-          </Item>
-          <Separator />
-          <Item>
-            {/* @todo need a menu item that looks like one from dropdown but without DropdownMenu */}
-            <Button
-              color="destructive"
-              onClick={() => {
-                onDelete();
+            }}
+            onBlur={saveCustomLinkName}
+            placeholder="Share Project"
+            name="Name"
+            autoFocus
+          />
+        </Item>
+        <Separator />
+        <Item>
+          <Label>Permissions</Label>
+          <Permission
+            checked={value.relation === "viewers"}
+            onCheckedChange={handleCheckedChange("viewers")}
+            title="View"
+            //info="Recipients can view, copy instances and clone the project"
+            info={
+              <Flex direction="column">
+                Recipients can view, copy instances and clone the project.
+                {hasProPlan !== true && (
+                  <>
+                    <br />
+                    <br />
+                    Upgrade to a Pro account to set additional permissions.
+                    <br /> <br />
+                    <Link
+                      className={buttonStyle({ color: "gradient" })}
+                      color="contrast"
+                      underline="none"
+                      href="https://webstudio.is/pricing"
+                      target="_blank"
+                    >
+                      Upgrade
+                    </Link>
+                  </>
+                )}
+              </Flex>
+            }
+          />
+
+          <Grid
+            css={{
+              ml: theme.spacing[6],
+            }}
+          >
+            <Grid
+              gap={1}
+              flow={"column"}
+              css={{
+                alignItems: "center",
+                justifyContent: "start",
               }}
             >
-              Delete Link
-            </Button>
-          </Item>
-        </PopoverContent>
-      </PopoverPortal>
+              <Checkbox
+                disabled={hasProPlan !== true || value.relation !== "viewers"}
+                checked={value.canClone}
+                onCheckedChange={(canClone) => {
+                  onChange({ ...value, canClone: Boolean(canClone) });
+                }}
+                id={ids.canClone}
+              />
+              <Label
+                htmlFor={ids.canClone}
+                disabled={hasProPlan !== true || value.relation !== "viewers"}
+              >
+                Can clone
+              </Label>
+            </Grid>
+            <Grid
+              gap={1}
+              flow={"column"}
+              css={{
+                alignItems: "center",
+                justifyContent: "start",
+              }}
+            >
+              <Checkbox
+                disabled={hasProPlan !== true || value.relation !== "viewers"}
+                checked={value.canCopy}
+                onCheckedChange={(canCopy) => {
+                  onChange({ ...value, canCopy: Boolean(canCopy) });
+                }}
+                id={ids.canCopy}
+              />
+              <Label
+                htmlFor={ids.canCopy}
+                disabled={hasProPlan !== true || value.relation !== "viewers"}
+              >
+                Can copy
+              </Label>
+            </Grid>
+          </Grid>
+
+          {isFeatureEnabled("contentEditableMode") && (
+            <>
+              <Permission
+                disabled={hasProPlan !== true}
+                onCheckedChange={handleCheckedChange("editors")}
+                checked={value.relation === "editors"}
+                title="Content"
+                info={
+                  <Flex direction="column">
+                    Recipients can edit content only, such as text, images, and
+                    predefined components.
+                    {hasProPlan !== true && (
+                      <>
+                        <br />
+                        <br />
+                        Upgrade to a Pro account to share with Content Edit
+                        permissions.
+                        <br /> <br />
+                        <Link
+                          className={buttonStyle({ color: "gradient" })}
+                          color="contrast"
+                          underline="none"
+                          href="https://webstudio.is/pricing"
+                          target="_blank"
+                        >
+                          Upgrade
+                        </Link>
+                      </>
+                    )}
+                  </Flex>
+                }
+              />
+              <Grid
+                css={{
+                  ml: theme.spacing[6],
+                }}
+              >
+                <Grid
+                  gap={1}
+                  flow={"column"}
+                  css={{
+                    alignItems: "center",
+                    justifyContent: "start",
+                  }}
+                >
+                  <Checkbox
+                    disabled={
+                      hasProPlan !== true || value.relation !== "editors"
+                    }
+                    checked={value.canPublish}
+                    onCheckedChange={(canPublish) => {
+                      onChange({ ...value, canPublish: Boolean(canPublish) });
+                    }}
+                    id={ids.canPublish}
+                  />
+                  <Label
+                    htmlFor={ids.canPublish}
+                    disabled={
+                      hasProPlan !== true || value.relation !== "editors"
+                    }
+                  >
+                    Can publish
+                  </Label>
+                </Grid>
+              </Grid>
+            </>
+          )}
+
+          <Permission
+            onCheckedChange={handleCheckedChange("builders")}
+            checked={value.relation === "builders"}
+            title="Build"
+            info="Recipients can make any changes but can not publish the project."
+          />
+
+          <Permission
+            disabled={hasProPlan !== true}
+            onCheckedChange={handleCheckedChange("administrators")}
+            checked={value.relation === "administrators"}
+            title="Admin"
+            info={
+              <Flex direction="column">
+                Recipients can make any changes and can also publish the
+                project.
+                {hasProPlan !== true && (
+                  <>
+                    <br />
+                    <br />
+                    Upgrade to a Pro account to share with Admin permissions.
+                    <br /> <br />
+                    <Link
+                      className={buttonStyle({ color: "gradient" })}
+                      color="contrast"
+                      underline="none"
+                      href="https://webstudio.is/pricing"
+                      target="_blank"
+                    >
+                      Upgrade
+                    </Link>
+                  </>
+                )}
+              </Flex>
+            }
+          />
+        </Item>
+        <Separator />
+        <Item>
+          {/* @todo need a menu item that looks like one from dropdown but without DropdownMenu */}
+          <Button
+            color="neutral-destructive"
+            onClick={() => {
+              onDelete();
+            }}
+          >
+            Delete Link
+          </Button>
+        </Item>
+      </PopoverContent>
     </Popover>
   );
 };
@@ -220,8 +364,7 @@ const itemStyle = css({
   display: "flex",
   alignItems: "center",
   gap: theme.spacing[3],
-  py: theme.spacing[5],
-  px: theme.spacing[9],
+  padding: theme.panel.padding,
   backgroundColor: theme.colors.backgroundPanel,
 });
 
@@ -231,54 +374,55 @@ export type LinkOptions = {
   token: string;
   name: string;
   relation: Relation;
+  canCopy: boolean;
+  canClone: boolean;
+  canPublish: boolean;
 };
 
-type SharedLinkItemType = LinkOptions & {
-  onChangeRelation: (permission: Relation) => void;
-  onChangeName: (name: string) => void;
+type SharedLinkItemType = {
+  value: LinkOptions;
+  onChange: (value: LinkOptions) => void;
   onDelete: () => void;
-  builderUrl: (props: {
-    authToken: string;
-    mode: "preview" | "edit";
-  }) => string;
+  builderUrl: (props: { authToken: string; mode: BuilderMode }) => string;
   hasProPlan: boolean;
 };
 
+const relationToMode: Record<Relation, BuilderMode> = {
+  viewers: "preview",
+  editors: "content",
+  builders: "design",
+  administrators: "design",
+};
+
 const SharedLinkItem = ({
-  token,
-  name,
-  relation,
-  onChangeRelation,
-  onChangeName,
+  value,
+  onChange,
   onDelete,
   builderUrl,
   hasProPlan,
 }: SharedLinkItemType) => {
-  const [currentName, setCurrentName] = useState(name);
+  const [currentName, setCurrentName] = useState(value.name);
 
   return (
     <Box className={itemStyle()}>
       <Label css={{ flexGrow: 1 }}>{currentName}</Label>
-      <Button
-        prefix={<CopyIcon />}
-        onClick={() => {
-          navigator.clipboard.writeText(
-            builderUrl({
-              authToken: token,
-              mode: relation === "viewers" ? "preview" : "edit",
-            })
-          );
-        }}
+      <CopyToClipboard
+        text={builderUrl({
+          authToken: value.token,
+          mode: relationToMode[value.relation],
+        })}
+        copyText="Copy link"
       >
-        Copy link
-      </Button>
+        <IconButton aria-label="Copy link">
+          <CopyIcon aria-hidden />
+        </IconButton>
+      </CopyToClipboard>
       <Menu
         name={currentName}
-        relation={relation}
-        onChangePermission={onChangeRelation}
-        onChangeName={(name) => {
-          setCurrentName(name);
-          onChangeName(name);
+        value={value}
+        onChange={(value) => {
+          setCurrentName(value.name);
+          onChange(value);
         }}
         onDelete={onDelete}
         hasProPlan={hasProPlan}
@@ -326,19 +470,14 @@ export const ShareProject = ({
   const items = links.map((link) => (
     <Fragment key={link.token}>
       <SharedLinkItem
-        onChangeRelation={(relation) => {
-          onChange({ ...link, relation });
-        }}
-        onChangeName={(name) => {
-          onChange({ ...link, name });
+        onChange={(value) => {
+          onChange(value);
         }}
         onDelete={() => {
           onDelete(link);
         }}
         builderUrl={builderUrl}
-        name={link.name}
-        relation={link.relation}
-        token={link.token}
+        value={link}
         hasProPlan={hasProPlan}
       />
       <Separator />
@@ -346,12 +485,12 @@ export const ShareProject = ({
   ));
 
   const create = (
-    <Box className={itemStyle({ css: { py: theme.spacing["9"] } })}>
+    <Box className={itemStyle({ css: { py: theme.spacing["7"] } })}>
       <Button
         color="neutral"
         state={isPending ? "pending" : undefined}
         prefix={
-          isPending ? <Flex css={{ width: theme.spacing[9] }} /> : <PlusIcon />
+          isPending ? <Flex css={{ width: theme.spacing[7] }} /> : <PlusIcon />
         }
         onClick={() => {
           onCreate();
@@ -363,12 +502,7 @@ export const ShareProject = ({
   );
 
   return (
-    <Flex
-      direction="column"
-      css={{
-        width: theme.spacing[33],
-      }}
-    >
+    <Flex direction="column" css={{ width: theme.spacing[33] }}>
       <Collapsible.Root open={items.length > 0}>
         <Collapsible.Content className={collapsibleStyle()}>
           {items}

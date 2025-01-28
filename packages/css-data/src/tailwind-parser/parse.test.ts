@@ -1,4 +1,4 @@
-import { describe, expect, it as test, jest } from "@jest/globals";
+import { describe, expect, test, vi } from "vitest";
 
 import { parseTailwindToCss, parseTailwindToWebstudio } from "./parse";
 
@@ -22,7 +22,7 @@ Quick Validation of Generated CSS in WebStudio:
             "type": "layers",
             "value": [{
               type: "unparsed",
-              value: "linear-gradient(to right,rgba(99,102,241,1) 0%,rgba(99,102,241,0) 100%)"
+              value: "linear-gradient(to right,rgb(99 102 241/1) 0%,rgb(99 102 241/0) 100%)"
             }]
           }
         }
@@ -38,60 +38,43 @@ describe("parseTailwindToWebstudio", () => {
   test("no-underline", async () => {
     const tailwindClasses = `no-underline`;
 
-    expect(await parseTailwindToWebstudio(tailwindClasses))
-      .toMatchInlineSnapshot(`
-[
-  {
-    "property": "textDecorationLine",
-    "value": {
-      "type": "keyword",
-      "value": "none",
-    },
-  },
-]
-`);
+    expect(await parseTailwindToWebstudio(tailwindClasses)).toEqual([
+      {
+        property: "textDecorationLine",
+        value: { type: "keyword", value: "none" },
+      },
+      {
+        property: "textDecorationStyle",
+        value: { type: "keyword", value: "solid" },
+      },
+      {
+        property: "textDecorationColor",
+        value: { type: "keyword", value: "currentcolor" },
+      },
+    ]);
   });
 
   test("expand margins", async () => {
     const tailwindClasses = `m-4`;
 
-    expect(await parseTailwindToWebstudio(tailwindClasses))
-      .toMatchInlineSnapshot(`
-[
-  {
-    "property": "marginBottom",
-    "value": {
-      "type": "unit",
-      "unit": "rem",
-      "value": 1,
-    },
-  },
-  {
-    "property": "marginLeft",
-    "value": {
-      "type": "unit",
-      "unit": "rem",
-      "value": 1,
-    },
-  },
-  {
-    "property": "marginRight",
-    "value": {
-      "type": "unit",
-      "unit": "rem",
-      "value": 1,
-    },
-  },
-  {
-    "property": "marginTop",
-    "value": {
-      "type": "unit",
-      "unit": "rem",
-      "value": 1,
-    },
-  },
-]
-`);
+    expect(await parseTailwindToWebstudio(tailwindClasses)).toEqual([
+      {
+        property: "marginTop",
+        value: { type: "unit", unit: "rem", value: 1 },
+      },
+      {
+        property: "marginRight",
+        value: { type: "unit", unit: "rem", value: 1 },
+      },
+      {
+        property: "marginBottom",
+        value: { type: "unit", unit: "rem", value: 1 },
+      },
+      {
+        property: "marginLeft",
+        value: { type: "unit", unit: "rem", value: 1 },
+      },
+    ]);
   });
 
   test("substitute variables - gradient", async () => {
@@ -107,28 +90,31 @@ describe("parseTailwindToWebstudio", () => {
       "value": [
         {
           "type": "unparsed",
-          "value": "linear-gradient(to right,rgba(99,102,241,1) 10%,rgba(14,165,233,1) 30%,rgba(16,185,129,1) 90%)",
+          "value": "linear-gradient(to right,rgb(99 102 241/1) 10%,rgb(14 165 233/1) 30%,rgb(16 185 129/1) 90%)",
         },
       ],
     },
   },
   {
-    "property": "backgroundPosition",
+    "property": "backgroundPositionX",
     "value": {
       "type": "layers",
       "value": [
         {
-          "type": "tuple",
-          "value": [
-            {
-              "type": "keyword",
-              "value": "left",
-            },
-            {
-              "type": "keyword",
-              "value": "top",
-            },
-          ],
+          "type": "keyword",
+          "value": "left",
+        },
+      ],
+    },
+  },
+  {
+    "property": "backgroundPositionY",
+    "value": {
+      "type": "layers",
+      "value": [
+        {
+          "type": "keyword",
+          "value": "top",
         },
       ],
     },
@@ -266,128 +252,65 @@ describe("parseTailwindToWebstudio", () => {
   test("border", async () => {
     const tailwindClasses = `border border-sky-500`;
 
-    expect(await parseTailwindToWebstudio(tailwindClasses))
-      .toMatchInlineSnapshot(`
-[
-  {
-    "property": "borderBottomWidth",
-    "value": {
-      "type": "unit",
-      "unit": "px",
-      "value": 1,
-    },
-  },
-  {
-    "property": "borderLeftWidth",
-    "value": {
-      "type": "unit",
-      "unit": "px",
-      "value": 1,
-    },
-  },
-  {
-    "property": "borderRightWidth",
-    "value": {
-      "type": "unit",
-      "unit": "px",
-      "value": 1,
-    },
-  },
-  {
-    "property": "borderTopWidth",
-    "value": {
-      "type": "unit",
-      "unit": "px",
-      "value": 1,
-    },
-  },
-  {
-    "property": "borderBottomColor",
-    "value": {
-      "alpha": 1,
-      "b": 233,
-      "g": 165,
-      "r": 14,
-      "type": "rgb",
-    },
-  },
-  {
-    "property": "borderLeftColor",
-    "value": {
-      "alpha": 1,
-      "b": 233,
-      "g": 165,
-      "r": 14,
-      "type": "rgb",
-    },
-  },
-  {
-    "property": "borderRightColor",
-    "value": {
-      "alpha": 1,
-      "b": 233,
-      "g": 165,
-      "r": 14,
-      "type": "rgb",
-    },
-  },
-  {
-    "property": "borderTopColor",
-    "value": {
-      "alpha": 1,
-      "b": 233,
-      "g": 165,
-      "r": 14,
-      "type": "rgb",
-    },
-  },
-  {
-    "property": "borderTopStyle",
-    "value": {
-      "type": "keyword",
-      "value": "solid",
-    },
-  },
-  {
-    "property": "borderRightStyle",
-    "value": {
-      "type": "keyword",
-      "value": "solid",
-    },
-  },
-  {
-    "property": "borderBottomStyle",
-    "value": {
-      "type": "keyword",
-      "value": "solid",
-    },
-  },
-  {
-    "property": "borderLeftStyle",
-    "value": {
-      "type": "keyword",
-      "value": "solid",
-    },
-  },
-]
-`);
+    expect(await parseTailwindToWebstudio(tailwindClasses)).toEqual([
+      {
+        property: "borderTopWidth",
+        value: { type: "unit", unit: "px", value: 1 },
+      },
+      {
+        property: "borderRightWidth",
+        value: { type: "unit", unit: "px", value: 1 },
+      },
+      {
+        property: "borderBottomWidth",
+        value: { type: "unit", unit: "px", value: 1 },
+      },
+      {
+        property: "borderLeftWidth",
+        value: { type: "unit", unit: "px", value: 1 },
+      },
+      {
+        property: "borderTopColor",
+        value: { alpha: 1, b: 233, g: 165, r: 14, type: "rgb" },
+      },
+      {
+        property: "borderRightColor",
+        value: { alpha: 1, b: 233, g: 165, r: 14, type: "rgb" },
+      },
+      {
+        property: "borderBottomColor",
+        value: { alpha: 1, b: 233, g: 165, r: 14, type: "rgb" },
+      },
+      {
+        property: "borderLeftColor",
+        value: { alpha: 1, b: 233, g: 165, r: 14, type: "rgb" },
+      },
+      {
+        property: "borderTopStyle",
+        value: { type: "keyword", value: "solid" },
+      },
+      {
+        property: "borderRightStyle",
+        value: { type: "keyword", value: "solid" },
+      },
+      {
+        property: "borderBottomStyle",
+        value: { type: "keyword", value: "solid" },
+      },
+      {
+        property: "borderLeftStyle",
+        value: { type: "keyword", value: "solid" },
+      },
+    ]);
   });
 });
 
 describe("parseTailwindToCss", () => {
-  test("expand margins", async () => {
-    const tailwindClasses = `m-4`;
-
-    expect(await parseTailwindToCss(tailwindClasses)).toMatchInlineSnapshot(
-      `".mb-4{margin-bottom:1rem}.ml-4{margin-left:1rem}.mr-4{margin-right:1rem}.mt-4{margin-top:1rem}"`
-    );
-  });
-
   test("substitute variables - gradient", async () => {
     const tailwindClasses = `bg-gradient-to-r from-indigo-500`;
 
     expect(await parseTailwindToCss(tailwindClasses)).toMatchInlineSnapshot(
-      `".bg-gradient-to-r{background-image:linear-gradient(to right,rgba(99,102,241,1) 0%,rgba(99,102,241,0) 100%)}"`
+      `".bg-gradient-to-r{background-image:linear-gradient(to right,rgb(99 102 241/1) 0%,rgb(99 102 241/0) 100%)}"`
     );
   });
 
@@ -403,7 +326,7 @@ describe("parseTailwindToCss", () => {
     const tailwindClasses = `shadow`;
 
     expect(await parseTailwindToCss(tailwindClasses)).toMatchInlineSnapshot(
-      `".shadow{box-shadow:0 0 rgba(0,0,0,0),0 0 rgba(0,0,0,0),0 1px 3px 0 rgba(0,0,0,0.1),0 1px 2px -1px rgba(0,0,0,0.1)}"`
+      `".shadow{box-shadow:0 0 rgb(0 0 0/0),0 0 rgb(0 0 0/0),0 1px 3px 0 rgb(0 0 0/0.1),0 1px 2px -1px rgb(0 0 0/0.1)}"`
     );
   });
 
@@ -418,7 +341,7 @@ describe("parseTailwindToCss", () => {
 
   test("warn if variable is not defined and omits property and empty selectors", async () => {
     const tailwindClasses = `bg-gradient-to-r`;
-    const warn = jest.fn();
+    const warn = vi.fn();
 
     expect(
       await parseTailwindToCss(tailwindClasses, warn)

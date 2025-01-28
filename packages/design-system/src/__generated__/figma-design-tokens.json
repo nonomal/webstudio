@@ -77,7 +77,7 @@
         "type": "lineHeights"
       },
       "10": {
-        "value": "360",
+        "value": "260",
         "type": "lineHeights"
       }
     },
@@ -387,7 +387,7 @@
     },
     "background": {
       "panel": {
-        "value": "#f8f8f8",
+        "value": "#fff",
         "type": "color",
         "description": "background color for all panels, titles, columns and rows."
       },
@@ -397,7 +397,7 @@
         "description": "primary color, used in button"
       },
       "hover": {
-        "value": "#dfe3e6",
+        "value": "#efefef",
         "type": "color",
         "description": "hover color for toggle group button, icon button, toggle button, small icon button, small toggle button, nested select button, menu item large"
       },
@@ -407,12 +407,12 @@
         "description": "color for active elements"
       },
       "menu": {
-        "value": "#ededed",
+        "value": "#fff",
         "type": "color",
         "description": "background color for menu and select menu"
       },
       "controls": {
-        "value": "#ffffff",
+        "value": "#f5f5f5",
         "type": "color",
         "description": "background color for text input, toggle group, input field, color input, select button, panel button, text-area, search field, checkbox, spacing, flex control"
       },
@@ -438,7 +438,7 @@
           "description": "background color on neutral toast"
         },
         "dark": {
-          "value": "#7e868c",
+          "value": "#b2b2b2",
           "type": "color"
         }
       },
@@ -491,7 +491,7 @@
       },
       "preset": {
         "main": {
-          "value": "#e6e8eb",
+          "value": "#e6e6e6",
           "type": "color"
         },
         "hover": {
@@ -538,7 +538,7 @@
       },
       "button": {
         "hover": {
-          "value": "#ffffff17",
+          "value": "#00000010",
           "type": "color",
           "description": "transparent color to create the hover state for button"
         },
@@ -560,12 +560,12 @@
       },
       "item": {
         "current": {
-          "value": "#096cff",
+          "value": "#e1f0ff",
           "type": "color",
           "description": "color for current item in the navigator item, menu item, pages panel item components"
         },
         "current-child": {
-          "value": "#e1f0ff",
+          "value": "{background.panel}",
           "type": "color",
           "description": "color for child of current item in the navigator item, pages panel item components"
         },
@@ -575,7 +575,7 @@
           "description": "color for the hidden current item in the navigator item component"
         },
         "menu-item-hover": {
-          "value": "#d3d3d3",
+          "value": "#efefef",
           "type": "color",
           "description": "The hover state on menu item components."
         }
@@ -596,7 +596,7 @@
       },
       "spacing": {
         "top-bottom": {
-          "value": "#f1f3f5",
+          "value": "#f8f8f8",
           "type": "color"
         },
         "left-right": {
@@ -605,13 +605,13 @@
           "description": "Left and right padding and margin background colors for the Position section UI."
         },
         "hover": {
-          "value": "#d7dbdf",
+          "value": "#e3e3e3",
           "type": "color"
         }
       },
       "style-source": {
         "token": {
-          "value": "#834df4",
+          "value": "{foreground.reusable}",
           "type": "color",
           "description": "Style sources that are tokens"
         },
@@ -665,7 +665,7 @@
         }
       },
       "canvas": {
-        "value": "#c7c7c7",
+        "value": "#eee",
         "type": "color",
         "description": "The color of the Builder UI canvas area background."
       },
@@ -697,7 +697,7 @@
         }
       },
       "menu-hint": {
-        "value": "#dedede",
+        "value": "#efefef",
         "type": "color",
         "description": "For the background of the hint menu item."
       },
@@ -768,7 +768,7 @@
           "type": "color"
         },
         "dashboard": {
-          "value": "#ededed",
+          "value": "radial-gradient(65.88% 47.48% at 50% 50%, #FFFFFF 0%, rgba(255, 255, 255, 0) 100%),linear-gradient(0deg, rgba(255, 255, 255, 0) 49.46%, rgba(255, 255, 255, 0.33) 100%), linear-gradient(180deg, rgba(255, 174, 60, 0) 0%, rgba(230, 60, 254, 0.33) 100%),radial-gradient(211.58% 161.63% at 3.13% 100%, rgba(255, 174, 60, 0.3) 0%, rgba(227, 53, 255, 0) 100%), radial-gradient(107.1% 32.15% at 92.96% 5.04%, rgba(53, 255, 182, 0.2) 0%, rgba(74, 78, 250, 0.2) 100%), #EBFFFC;",
           "type": "color"
         },
         "regular-button-selected": {
@@ -819,7 +819,7 @@
     },
     "border": {
       "main": {
-        "value": "#c1c8cd",
+        "value": "#e6e6e6",
         "type": "color",
         "description": "color for separators, panel borders, preset borders, input fields, select buttons, panel buttons, text area, search field, menu, select menu, spacing controls,"
       },
@@ -986,7 +986,7 @@
           "description": "color for flex control ui elements"
         },
         "hover": {
-          "value": "#96c7f2",
+          "value": "#e3e3e3",
           "type": "color",
           "description": "color for hovered state of flex control ui elements"
         }
@@ -1052,7 +1052,7 @@
           "type": "color"
         },
         "flex-hover": {
-          "value": "#96c7f2",
+          "value": "#e3e3e3",
           "type": "color",
           "description": "color for hovered state of flex control ui elements"
         }
@@ -1093,6 +1093,10 @@
         "value": "#ff22ae",
         "type": "color",
         "description": "The inverse color of our primary blue, when we want a contrasting highlight."
+      },
+      "reusable": {
+        "value": "#834df4",
+        "type": "color"
       }
     },
     "Brand": {
@@ -1347,7 +1351,7 @@
         "type": "fontSizes"
       },
       "7": {
-        "value": "360",
+        "value": "260",
         "type": "fontSizes"
       }
     },

@@ -1,26 +1,20 @@
-import { beforeEach, expect, test } from "@jest/globals";
+import { beforeEach, expect, test } from "vitest";
 import { cleanStores } from "nanostores";
-import type { Instance } from "@webstudio-is/sdk";
-import {
-  collectionComponent,
-  textContentAttribute,
-} from "@webstudio-is/react-sdk";
+import { createDefaultPages } from "@webstudio-is/project-build";
+import { setEnv } from "@webstudio-is/feature-flags";
+import { type Instance, collectionComponent } from "@webstudio-is/sdk";
+import { textContentAttribute } from "@webstudio-is/react-sdk";
 import { $instances } from "./instances";
 import {
   $propValuesByInstanceSelector,
   $variableValuesByInstanceSelector,
 } from "./props";
-import { $pages, $selectedPageId } from "./pages";
-import {
-  $assets,
-  $dataSourceVariables,
-  $dataSources,
-  $props,
-  $resourceValues,
-  $resources,
-} from "./nano-states";
-import { $params } from "~/canvas/stores";
-import { createDefaultPages } from "@webstudio-is/project-build";
+import { $pages } from "./pages";
+import { $assets, $dataSources, $props, $resources } from "./misc";
+import { $dataSourceVariables, $resourceValues } from "./variables";
+import { $awareness } from "../awareness";
+
+setEnv("*");
 
 const getIdValuePair = <T extends { id: string }>(item: T) =>
   [item.id, item] as const;
@@ -37,11 +31,11 @@ const setBoxInstance = (id: Instance["id"]) => {
 const selectPageRoot = (rootInstanceId: Instance["id"]) => {
   const defaultPages = createDefaultPages({
     homePageId: "pageId",
-    homePagePath: "/my-page",
     rootInstanceId,
+    systemDataSourceId: "systemId",
   });
   $pages.set(defaultPages);
-  $selectedPageId.set(defaultPages.homePage.id);
+  $awareness.set({ pageId: defaultPages.homePage.id });
 };
 
 beforeEach(() => {
@@ -49,6 +43,8 @@ beforeEach(() => {
   $props.set(new Map());
   $resources.set(new Map());
   $dataSources.set(new Map());
+  $dataSourceVariables.set(new Map());
+  $resourceValues.set(new Map());
 });
 
 test("collect prop values", () => {
@@ -92,12 +88,14 @@ test("compute expression prop values", () => {
     toMap([
       {
         id: "var1",
+        scopeInstanceId: "box",
         type: "variable",
         name: "",
         value: { type: "number", value: 1 },
       },
       {
         id: "var2",
+        scopeInstanceId: "box",
         type: "variable",
         name: "",
         value: { type: "string", value: "Hello" },
@@ -161,6 +159,7 @@ test("generate action prop callbacks", () => {
     toMap([
       {
         id: "var",
+        scopeInstanceId: "box",
         type: "variable",
         name: "",
         value: { type: "number", value: 1 },
@@ -205,11 +204,10 @@ test("generate action prop callbacks", () => {
   cleanStores($propValuesByInstanceSelector);
 });
 
-test("resolve asset prop values when params is provided", () => {
+test("resolve asset prop values", () => {
   setBoxInstance("box");
   selectPageRoot("box");
   $dataSources.set(new Map());
-  $params.set(undefined);
   $assets.set(
     toMap([
       {
@@ -238,23 +236,19 @@ test("resolve asset prop values when params is provided", () => {
   );
   expect(
     $propValuesByInstanceSelector.get().get(JSON.stringify(["box"]))
-  ).toEqual(new Map());
-
-  $params.set({
-    assetBaseUrl: "/asset/",
-    imageBaseUrl: "/image/",
-  });
-  expect(
-    $propValuesByInstanceSelector.get().get(JSON.stringify(["box"]))
-  ).toEqual(new Map<string, unknown>([["myAsset", "/asset/my-file.jpg"]]));
+  ).toEqual(
+    new Map<string, unknown>([
+      ["$webstudio$canvasOnly$assetId", "assetId"],
+      ["myAsset", "/cgi/asset/my-file.jpg"],
+    ])
+  );
 
   cleanStores($propValuesByInstanceSelector);
 });
 
-test("resolve page prop values when params is provided", () => {
+test("resolve page prop values", () => {
   setBoxInstance("box");
   selectPageRoot("box");
-  $params.set(undefined);
   $dataSources.set(new Map());
   $props.set(
     toMap([
@@ -269,15 +263,7 @@ test("resolve page prop values when params is provided", () => {
   );
   expect(
     $propValuesByInstanceSelector.get().get(JSON.stringify(["box"]))
-  ).toEqual(new Map());
-
-  $params.set({
-    assetBaseUrl: "/asset/",
-    imageBaseUrl: "/image/",
-  });
-  expect(
-    $propValuesByInstanceSelector.get().get(JSON.stringify(["box"]))
-  ).toEqual(new Map<string, unknown>([["myPage", "/my-page"]]));
+  ).toEqual(new Map<string, unknown>([["myPage", "/"]]));
 
   cleanStores($propValuesByInstanceSelector);
 });
@@ -304,6 +290,7 @@ test("compute expression from collection items", () => {
     toMap([
       {
         id: "itemId",
+        scopeInstanceId: "list",
         type: "parameter",
         name: "item",
       },
@@ -374,6 +361,7 @@ test("access parameter value from variables values", () => {
     toMap([
       {
         id: "parameterId",
+        scopeInstanceId: "body",
         type: "parameter",
         name: "paramName",
       },
@@ -412,6 +400,7 @@ test("compute props bound to resource variables", () => {
     toMap([
       {
         id: "resourceVariableId",
+        scopeInstanceId: "body",
         type: "resource",
         name: "paramName",
         resourceId: "resourceId",
@@ -533,6 +522,53 @@ test("compute instance text content bound to expression", () => {
       [
         JSON.stringify(["expressionBox", "body"]),
         new Map<string, unknown>([[textContentAttribute, "Hello world"]]),
+      ],
+    ])
+  );
+
+  cleanStores($propValuesByInstanceSelector);
+});
+
+test("use default system values in props", () => {
+  $instances.set(
+    toMap([
+      {
+        id: "body",
+        type: "instance",
+        component: "Body",
+        children: [],
+      },
+    ])
+  );
+  $dataSources.set(
+    toMap([
+      {
+        id: "systemId",
+        scopeInstanceId: "body",
+        name: "system",
+        type: "parameter",
+      },
+    ])
+  );
+  $props.set(
+    toMap([
+      {
+        id: "1",
+        instanceId: "body",
+        name: "data-origin",
+        type: "expression",
+        value: `$ws$dataSource$systemId.origin`,
+      },
+    ])
+  );
+  selectPageRoot("body");
+  expect($propValuesByInstanceSelector.get()).toEqual(
+    new Map([
+      [
+        JSON.stringify(["body"]),
+        new Map<string, unknown>([
+          ["data-origin", "https://undefined.wstd.work"],
+        ]),
       ],
     ])
   );
@@ -824,6 +860,113 @@ test("stop variables lookup outside of slots", () => {
       [
         JSON.stringify(["box", "slot", "body"]),
         new Map<string, unknown>([["boxVariable", "box"]]),
+      ],
+    ])
+  );
+
+  cleanStores($variableValuesByInstanceSelector);
+});
+
+test("compute parameter and resource variables without values to make it available in scope", () => {
+  $instances.set(
+    toMap([
+      {
+        id: "body",
+        type: "instance",
+        component: "Body",
+        children: [],
+      },
+    ])
+  );
+  selectPageRoot("body");
+  $dataSources.set(
+    toMap([
+      {
+        id: "parameterVariableId",
+        scopeInstanceId: "body",
+        name: "parameterName",
+        type: "parameter",
+      },
+      {
+        id: "resourceVariableId",
+        scopeInstanceId: "body",
+        name: "resourceName",
+        type: "resource",
+        resourceId: "resourceId",
+      },
+    ])
+  );
+  $props.set(new Map());
+
+  expect($variableValuesByInstanceSelector.get()).toEqual(
+    new Map([
+      [
+        JSON.stringify(["body"]),
+        new Map<string, unknown>([
+          ["parameterVariableId", undefined],
+          ["resourceVariableId", undefined],
+        ]),
+      ],
+    ])
+  );
+
+  cleanStores($variableValuesByInstanceSelector);
+});
+
+test("prefill default system variable value", () => {
+  $instances.set(
+    toMap([
+      {
+        id: "body",
+        type: "instance",
+        component: "Body",
+        children: [],
+      },
+    ])
+  );
+  selectPageRoot("body");
+  $dataSources.set(
+    toMap([
+      {
+        id: "systemId",
+        scopeInstanceId: "body",
+        name: "system",
+        type: "parameter",
+      },
+    ])
+  );
+  $props.set(new Map());
+  expect($variableValuesByInstanceSelector.get()).toEqual(
+    new Map([
+      [
+        JSON.stringify(["body"]),
+        new Map<string, unknown>([
+          [
+            "systemId",
+            { params: {}, search: {}, origin: "https://undefined.wstd.work" },
+          ],
+        ]),
+      ],
+    ])
+  );
+
+  $dataSourceVariables.set(
+    new Map([["systemId", { params: { slug: "my-post" }, search: {} }]])
+  );
+  expect($variableValuesByInstanceSelector.get()).toEqual(
+    new Map([
+      [
+        JSON.stringify(["body"]),
+        new Map<string, unknown>([
+          [
+            "systemId",
+            {
+              params: { slug: "my-post" },
+              search: {},
+              origin: "https://undefined.wstd.work",
+            },
+          ],
+        ]),
       ],
     ])
   );

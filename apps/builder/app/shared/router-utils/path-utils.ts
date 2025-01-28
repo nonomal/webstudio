@@ -1,8 +1,7 @@
 import type { AUTH_PROVIDERS } from "~/shared/session";
-import type { Project } from "@webstudio-is/project";
-import type { ThemeSetting } from "~/shared/theme";
-import env from "~/shared/env";
-import { $authToken } from "../nano-states";
+import { publicStaticEnv } from "~/env/env.static";
+import { getAuthorizationServerOrigin } from "./origins";
+import type { BuilderMode } from "../nano-states/misc";
 
 const searchParams = (params: Record<string, string | undefined | null>) => {
   const searchParams = new URLSearchParams();
@@ -16,19 +15,17 @@ const searchParams = (params: Record<string, string | undefined | null>) => {
 };
 
 export const builderPath = ({
-  projectId,
   pageId,
   authToken,
   pageHash,
   mode,
 }: {
-  projectId: string;
   pageId?: string;
   authToken?: string;
   pageHash?: string;
-  mode?: "preview";
+  mode?: "preview" | "content";
 }) => {
-  return `/builder/${projectId}${searchParams({
+  return `/${searchParams({
     pageId,
     authToken,
     pageHash,
@@ -41,13 +38,24 @@ export const builderUrl = (props: {
   pageId?: string;
   origin: string;
   authToken?: string;
-  mode?: "edit" | "preview";
+  mode?: BuilderMode;
 }) => {
-  const { projectId, pageId, authToken } = props;
+  const authServerOrigin = getAuthorizationServerOrigin(props.origin);
+
   const url = new URL(
-    builderPath({ projectId, pageId, authToken }),
-    props.origin
+    builderPath({ pageId: props.pageId, authToken: props.authToken }),
+    authServerOrigin
   );
+
+  const fragments = url.host.split(".");
+  if (fragments.length <= 3) {
+    fragments.splice(0, 0, "p-" + props.projectId);
+  } else {
+    // staging | development branches
+    fragments[0] = "p-" + props.projectId + "-dot-" + fragments[0];
+  }
+
+  url.host = fragments.join(".");
 
   if (props.mode !== undefined) {
     url.searchParams.set("mode", props.mode);
@@ -56,28 +64,32 @@ export const builderUrl = (props: {
   return url.href;
 };
 
-export const dashboardPath = () => {
-  return "/dashboard";
-};
-
-export const builderDomainsPath = (method: string) => {
-  const authToken = $authToken.get();
-  const urlSearchParams = new URLSearchParams();
-  if (authToken !== undefined) {
-    urlSearchParams.set("authToken", authToken);
+export const dashboardPath = (
+  view: "templates" | "search" | "projects" = "projects"
+) => {
+  if (view === "projects") {
+    return `/dashboard`;
   }
-  const urlSearchParamsString = urlSearchParams.toString();
-
-  return `/builder/domains/${method}${
-    urlSearchParamsString ? `?${urlSearchParamsString}` : ""
-  }`;
+  return `/dashboard/${view}`;
 };
 
-export const dashboardProjectPath = (method: string) =>
-  `/dashboard/projects/${method}`;
+export const dashboardUrl = (props: { origin: string }) => {
+  const authServerOrigin = getAuthorizationServerOrigin(props.origin);
 
-export const authorizationTokenPath = (method: string) =>
-  `/rest/authorization-token/${method}`;
+  return `${authServerOrigin}/dashboard`;
+};
+
+export const cloneProjectUrl = (props: {
+  origin: string;
+  sourceAuthToken: string;
+}) => {
+  const authServerOrigin = getAuthorizationServerOrigin(props.origin);
+
+  const searchParams = new URLSearchParams();
+  searchParams.set("projectToCloneAuthToken", props.sourceAuthToken);
+
+  return `${authServerOrigin}/dashboard?${searchParams.toString()}`;
+};
 
 export const loginPath = (params: {
   error?: (typeof AUTH_PROVIDERS)[keyof typeof AUTH_PROVIDERS];
@@ -86,6 +98,7 @@ export const loginPath = (params: {
 }) => `/login${searchParams(params)}`;
 
 export const logoutPath = () => "/logout";
+export const restLogoutPath = () => "/dashboard-logout";
 
 export const userPlanSubscriptionPath = () => {
   const urlSearchParams = new URLSearchParams();
@@ -106,30 +119,18 @@ export const authPath = ({
   provider: "google" | "github" | "dev";
 }) => `/auth/${provider}`;
 
-export const restAssetsPath = ({ authToken }: { authToken?: string }) => {
-  const urlSearchParams = new URLSearchParams();
-  if (authToken !== undefined) {
-    urlSearchParams.set("authToken", authToken);
-  }
-  const urlSearchParamsString = urlSearchParams.toString();
-
-  return `/rest/assets${
-    urlSearchParamsString ? `?${urlSearchParamsString}` : ""
-  }`;
+export const restAssetsPath = () => {
+  return `/rest/assets`;
 };
 
 export const restAssetsUploadPath = ({ name }: { name: string }) => {
   return `/rest/assets/${name}`;
 };
 
-export const restThemePath = ({ setting }: { setting: ThemeSetting }) =>
-  `/rest/theme/${setting}`;
-
-export const restPatchPath = (props: { authToken?: string }) => {
+export const restPatchPath = () => {
   const urlSearchParams = new URLSearchParams();
-  if (props.authToken !== undefined) {
-    urlSearchParams.set("authToken", props.authToken);
-  }
+
+  urlSearchParams.set("client-version", publicStaticEnv.VERSION);
 
   const urlSearchParamsString = urlSearchParams.toString();
 
@@ -138,28 +139,14 @@ export const restPatchPath = (props: { authToken?: string }) => {
   }`;
 };
 
-export const getBuildUrl = ({ project }: { project: Project }) => {
-  // const url = new URL(buildOrigin);
-  const searchParams = new URLSearchParams();
-  searchParams.set("projectId", project.id);
-
-  return `/?${searchParams.toString()}`;
-};
-
-export const getPublishedUrl = (domain: string) => {
-  const protocol = typeof location === "object" ? location.protocol : "https:";
-
-  const publisherHost = env.PUBLISHER_HOST ?? "";
-
-  // We use location.host to get the hostname and port in development mode and to not break local testing.
-  const localhost = typeof location === "object" ? location.host : "";
-
-  const host = publisherHost || env.BUILDER_HOST || localhost;
-
-  return `${protocol}//${domain}.${host}`;
+export const getCanvasUrl = () => {
+  return `/canvas`;
 };
 
 export const restAi = (subEndpoint?: "detect" | "audio/transcriptions") =>
   typeof subEndpoint === "string" ? `/rest/ai/${subEndpoint}` : "/rest/ai";
 
 export const restResourcesLoader = () => `/rest/resources-loader`;
+
+export const marketplacePath = (method: string) =>
+  `/builder/marketplace/${method}`;

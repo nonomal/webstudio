@@ -1,21 +1,23 @@
-import { ShareProject, type LinkOptions } from "./share-project";
-import { createTrpcRemixProxy } from "~/shared/remix/trpc-remix-proxy";
-import type { AuthorizationTokensRouter } from "@webstudio-is/authorization-token";
-import { authorizationTokenPath, builderUrl } from "~/shared/router-utils";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDebouncedCallback } from "use-debounce";
-import type { Project } from "@webstudio-is/prisma-client";
+import { builderUrl } from "~/shared/router-utils";
+import { trpcClient } from "../trpc/trpc-client";
+import { ShareProject, type LinkOptions } from "./share-project";
 
-const trpc = createTrpcRemixProxy<AuthorizationTokensRouter>(
-  authorizationTokenPath
-);
-
-const useShareProjectContainer = (projectId: Project["id"]) => {
-  const { data, load, state: loadState } = trpc.findMany.useQuery();
-  const { send: createToken, state: createState } = trpc.create.useMutation();
-  const { send: removeToken, state: removeState } = trpc.remove.useMutation();
-  const { send: updateToken, state: updateState } = trpc.update.useMutation();
+const useShareProjectContainer = (projectId: string) => {
+  const {
+    data,
+    load,
+    state: loadState,
+  } = trpcClient.authorizationToken.findMany.useQuery();
+  const { send: createToken, state: createState } =
+    trpcClient.authorizationToken.create.useMutation();
+  const { send: removeToken, state: removeState } =
+    trpcClient.authorizationToken.remove.useMutation();
+  const { send: updateToken, state: updateState } =
+    trpcClient.authorizationToken.update.useMutation();
   const [links, setLinks] = useState(data ?? []);
+  const deletingLinks = useRef(new Set<string>());
 
   useEffect(() => {
     load({ projectId }, (data) => {
@@ -24,14 +26,13 @@ const useShareProjectContainer = (projectId: Project["id"]) => {
   }, [load, projectId]);
 
   const handleChangeDebounced = useDebouncedCallback((link: LinkOptions) => {
-    if (projectId === undefined) {
+    // Link is about to get deleted, no need to update.
+    if (deletingLinks.current.has(link.token)) {
       return;
     }
     const updatedLink = {
       projectId: projectId,
-      token: link.token,
-      relation: link.relation,
-      name: link.name,
+      ...link,
     };
     const updatedLinks = links.map((currentLink) => {
       if (currentLink.token === updatedLink.token) {
@@ -45,9 +46,8 @@ const useShareProjectContainer = (projectId: Project["id"]) => {
   }, 100);
 
   const handleDelete = (link: LinkOptions) => {
-    if (projectId === undefined) {
-      return;
-    }
+    deletingLinks.current.add(link.token);
+
     const updatedLinks = links.filter((currentLink) => {
       return currentLink.token !== link.token;
     });
@@ -58,15 +58,18 @@ const useShareProjectContainer = (projectId: Project["id"]) => {
   };
 
   const handleCreate = () => {
-    if (projectId === undefined) {
-      return;
-    }
-
-    createToken({
-      projectId: projectId,
-      relation: "viewers",
-      name: "Custom link",
-    });
+    createToken(
+      {
+        projectId: projectId,
+        relation: "viewers",
+        name: "Custom link",
+      },
+      () => {
+        load({ projectId }, (data) => {
+          setLinks(data ?? []);
+        });
+      }
+    );
   };
 
   const isPending =
@@ -85,7 +88,7 @@ const useShareProjectContainer = (projectId: Project["id"]) => {
 };
 
 type ShareButtonProps = {
-  projectId: Project["id"];
+  projectId: string;
   hasProPlan: boolean;
 };
 

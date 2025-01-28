@@ -15,6 +15,8 @@ export const labelColors = [
   "local",
   "overwritten",
   "remote",
+  "code",
+  "inactive",
 ] as const;
 
 const StyledLabel = styled(RadixLabel, {
@@ -29,8 +31,11 @@ const StyledLabel = styled(RadixLabel, {
   boxSizing: "border-box",
   flexShrink: 0,
   py: theme.spacing[1],
+  px: theme.spacing[2],
   border: "1px solid transparent",
   borderRadius: theme.borderRadius[3],
+  transition: "200ms color, 200ms background-color",
+  color: theme.colors.foregroundMain,
 
   // https://github.com/webstudio-is/webstudio/issues/1271#issuecomment-1478436340
   "&:focus-visible": {
@@ -54,41 +59,49 @@ const StyledLabel = styled(RadixLabel, {
     color: {
       default: {
         color: theme.colors.foregroundMain,
+        "&:hover": {
+          backgroundColor: theme.colors.backgroundHover,
+        },
       },
       preset: {
-        px: theme.spacing[3],
         backgroundColor: theme.colors.backgroundPresetMain,
-        borderColor: theme.colors.borderMain,
         color: theme.colors.foregroundMain,
         "&:hover": {
           backgroundColor: theme.colors.backgroundPresetHover,
         },
       },
       local: {
-        px: theme.spacing[3],
         backgroundColor: theme.colors.backgroundLocalMain,
-        borderColor: theme.colors.borderLocalMain,
         color: theme.colors.foregroundLocalMain,
         "&:hover": {
           backgroundColor: theme.colors.backgroundLocalHover,
         },
       },
       overwritten: {
-        px: theme.spacing[3],
         backgroundColor: theme.colors.backgroundOverwrittenMain,
-        borderColor: theme.colors.borderOverwrittenMain,
         color: theme.colors.foregroundOverwrittenMain,
         "&:hover": {
           backgroundColor: theme.colors.backgroundOverwrittenHover,
         },
       },
       remote: {
-        px: theme.spacing[3],
         backgroundColor: theme.colors.backgroundRemoteMain,
-        borderColor: theme.colors.borderRemoteMain,
         color: theme.colors.foregroundRemoteMain,
         "&:hover": {
           backgroundColor: theme.colors.backgroundRemoteHover,
+        },
+      },
+      code: {
+        color: theme.colors.foregroundLocalMain,
+        "&:hover": {
+          backgroundColor: theme.colors.backgroundHover,
+        },
+      },
+      // Example is collapsible section title label when section has no content.
+      inactive: {
+        color: theme.colors.foregroundTextSubtle,
+        "&:hover": {
+          color: theme.colors.foregroundMain,
         },
       },
     },
@@ -101,21 +114,22 @@ const StyledLabel = styled(RadixLabel, {
         flexGrow: 1,
       },
     },
-    sectionTitle: {
-      true: textVariants.titles,
-      false: textVariants.labelsSentenceCase,
+    text: {
+      title: textVariants.titles,
+      sentence: textVariants.labelsSentenceCase,
+      mono: textVariants.mono,
     },
   },
 
   defaultVariants: {
-    color: "default",
-    sectionTitle: false,
+    text: "sentence",
   },
 });
 
 type Props = {
+  tag?: "button" | "label";
   color?: (typeof labelColors)[number];
-  sectionTitle?: boolean;
+  text?: "title" | "sentence" | "mono";
   disabled?: boolean;
   truncate?: boolean;
   children: ReactNode;
@@ -124,13 +138,17 @@ type Props = {
 export const isLabelButton = (color: Props["color"]) => color !== undefined;
 
 export const Label = forwardRef((props: Props, ref: Ref<HTMLLabelElement>) => {
-  const { disabled, children, ...rest } = props;
+  const { tag, disabled, children, ...rest } = props;
 
   // To enable keyboard accessibility for users who rely on the spacebar to activate the radix
   // when using a preset, locala, overwritten or remote color, we need to wrap the label with
   // a button that has a "label" role.
   // (Radix adds role="button" to the label)
-  const isButton = isLabelButton(props.color);
+  let isButton = isLabelButton(props.color) || tag === "button";
+  // when explicit label
+  if (tag === "label") {
+    isButton = false;
+  }
 
   return (
     <StyledLabel

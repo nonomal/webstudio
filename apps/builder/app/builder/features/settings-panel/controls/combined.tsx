@@ -14,12 +14,13 @@ import { TextContent } from "./text-content";
 export const renderControl = ({
   meta,
   prop,
+  key,
   ...rest
 }: ControlProps<string> & { key?: string }) => {
   const computed = rest.computedValue;
 
   if (meta.control === "textContent") {
-    return <TextContent meta={meta} prop={prop} {...rest} />;
+    return <TextContent key={key} meta={meta} prop={prop} {...rest} />;
   }
 
   // never render parameter props
@@ -32,30 +33,43 @@ export const renderControl = ({
     return;
   }
 
+  if (meta.control === "action") {
+    return;
+  }
+
   if (meta.control === "json") {
-    return <JsonControl meta={meta} prop={prop} {...rest} />;
+    return <JsonControl key={key} meta={meta} prop={prop} {...rest} />;
   }
 
   if (meta.control === "text") {
-    return <TextControl meta={meta} prop={prop} {...rest} />;
+    return <TextControl key={key} meta={meta} prop={prop} {...rest} />;
   }
 
   if (meta.control === "code") {
-    return <CodeControl meta={meta} prop={prop} {...rest} />;
+    return <CodeControl key={key} meta={meta} prop={prop} {...rest} />;
+  }
+
+  if (meta.control === "codetext") {
+    return <CodeControl key={key} meta={meta} prop={prop} {...rest} />;
   }
 
   if (meta.control === "color") {
     return (
-      <TextControl meta={{ ...meta, control: "text" }} prop={prop} {...rest} />
+      <TextControl
+        key={key}
+        meta={{ ...meta, control: "text" }}
+        prop={prop}
+        {...rest}
+      />
     );
   }
 
   if (meta.control === "number") {
-    return <NumberControl meta={meta} prop={prop} {...rest} />;
+    return <NumberControl key={key} meta={meta} prop={prop} {...rest} />;
   }
 
   if (meta.control === "boolean") {
-    return <BooleanControl meta={meta} prop={prop} {...rest} />;
+    return <BooleanControl key={key} meta={meta} prop={prop} {...rest} />;
   }
 
   if (
@@ -63,23 +77,23 @@ export const renderControl = ({
     meta.control === "inline-check" ||
     meta.control === "multi-select"
   ) {
-    return <CheckControl meta={meta} prop={prop} {...rest} />;
+    return <CheckControl key={key} meta={meta} prop={prop} {...rest} />;
   }
 
   if (meta.control === "radio" || meta.control === "inline-radio") {
-    return <RadioControl meta={meta} prop={prop} {...rest} />;
+    return <RadioControl key={key} meta={meta} prop={prop} {...rest} />;
   }
 
   if (meta.control === "select") {
-    return <SelectControl meta={meta} prop={prop} {...rest} />;
+    return <SelectControl key={key} meta={meta} prop={prop} {...rest} />;
   }
 
   if (meta.control === "file") {
-    return <FileControl meta={meta} prop={prop} {...rest} />;
+    return <FileControl key={key} meta={meta} prop={prop} {...rest} />;
   }
 
   if (meta.control === "url") {
-    return <UrlControl meta={meta} prop={prop} {...rest} />;
+    return <UrlControl key={key} meta={meta} prop={prop} {...rest} />;
   }
 
   // Type in meta can be changed at some point without updating props in DB that are still using the old type
@@ -88,6 +102,7 @@ export const renderControl = ({
     if (prop.type === "asset") {
       return (
         <FileControl
+          key={key}
           meta={{
             ...meta,
             defaultValue: undefined,
@@ -103,6 +118,7 @@ export const renderControl = ({
     if (prop.type === "page") {
       return (
         <UrlControl
+          key={key}
           meta={{
             ...meta,
             defaultValue: undefined,
@@ -121,6 +137,7 @@ export const renderControl = ({
     ) {
       return (
         <TextControl
+          key={key}
           meta={{
             ...meta,
             defaultValue: undefined,
@@ -139,6 +156,7 @@ export const renderControl = ({
     ) {
       return (
         <NumberControl
+          key={key}
           meta={{
             ...meta,
             defaultValue: undefined,
@@ -157,6 +175,7 @@ export const renderControl = ({
     ) {
       return (
         <BooleanControl
+          key={key}
           meta={{
             ...meta,
             defaultValue: undefined,
@@ -172,6 +191,7 @@ export const renderControl = ({
     if (prop.type === "json" || prop.type === "expression") {
       return (
         <JsonControl
+          key={key}
           meta={{
             ...meta,
             defaultValue: undefined,
@@ -187,6 +207,12 @@ export const renderControl = ({
     if (prop.type === "string[]") {
       throw new Error(
         `Cannot render a fallback control for prop "${rest.propName}" with type string[], because we don't know the available options for a multiselect control`
+      );
+    }
+
+    if (prop.type === "resource") {
+      throw new Error(
+        `Cannot render a fallback control for prop "${rest.propName}" with type resource`
       );
     }
 

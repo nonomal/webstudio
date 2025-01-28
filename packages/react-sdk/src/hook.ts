@@ -1,6 +1,12 @@
 import type { Instance, Prop } from "@webstudio-is/sdk";
 import type { IndexesWithinAncestors } from "./instance-utils";
 
+export type InstanceData = {
+  id: Instance["id"];
+  instanceKey: string;
+  component: Instance["component"];
+};
+
 /**
  * Hooks are subscriptions to builder events
  * with limited way to interact with it.
@@ -9,15 +15,15 @@ import type { IndexesWithinAncestors } from "./instance-utils";
 
 export type HookContext = {
   indexesWithinAncestors: IndexesWithinAncestors;
-  getPropValue: (instanceId: Instance["id"], propName: Prop["name"]) => unknown;
-  setPropVariable: (
-    instanceId: Instance["id"],
+  getPropValue: (instanceData: InstanceData, propName: Prop["name"]) => unknown;
+  setMemoryProp: (
+    instanceData: InstanceData,
     propName: Prop["name"],
     value: unknown
   ) => void;
 };
 
-export type InstancePath = Instance[];
+export type InstancePath = InstanceData[];
 
 type NavigatorEvent = {
   /**
@@ -37,8 +43,8 @@ export type Hook = {
  */
 export const getClosestInstance = (
   instancePath: InstancePath,
-  currentInstance: Instance,
-  closestComponent: Instance["component"]
+  currentInstance: InstanceData,
+  closestComponent: InstanceData["component"]
 ) => {
   let matched = false;
   for (const instance of instancePath) {

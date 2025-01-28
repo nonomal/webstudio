@@ -1,70 +1,71 @@
-import { Flex, Grid, Text, rawTheme } from "@webstudio-is/design-system";
-import { EmptyState } from "./empty-state";
-import { Panel } from "../panel";
+import {
+  Flex,
+  Grid,
+  List,
+  ListItem,
+  Text,
+  rawTheme,
+  theme,
+} from "@webstudio-is/design-system";
 import type { DashboardProject } from "@webstudio-is/dashboard";
-import { ProjectCard, ProjectTemplateCard } from "./project-card";
+import { ProjectCard } from "./project-card";
 import { CreateProject } from "./project-dialogs";
+import { Header, Main } from "../shared/layout";
+
+export const ProjectsGrid = ({
+  projects,
+  hasProPlan,
+  publisherHost,
+}: ProjectsProps) => {
+  return (
+    <List asChild>
+      <Grid
+        gap="6"
+        css={{
+          gridTemplateColumns: `repeat(auto-fill, minmax(${rawTheme.spacing[31]}, 1fr))`,
+          paddingBottom: theme.spacing[13],
+        }}
+      >
+        {projects.map((project) => {
+          return (
+            <ListItem index={0} key={project.id} asChild>
+              <ProjectCard
+                project={project}
+                hasProPlan={hasProPlan}
+                publisherHost={publisherHost}
+              />
+            </ListItem>
+          );
+        })}
+      </Grid>
+    </List>
+  );
+};
 
 type ProjectsProps = {
   projects: Array<DashboardProject>;
-  projectTemplates: Array<DashboardProject>;
   hasProPlan: boolean;
+  publisherHost: string;
 };
 
-export const Projects = ({
-  projects,
-  projectTemplates,
-  hasProPlan,
-}: ProjectsProps) => {
+export const Projects = (props: ProjectsProps) => {
   return (
-    <Panel>
-      <Flex direction="column" gap="3">
-        <Flex justify="between">
-          <Text variant="brandSectionTitle" as="h2">
-            Projects
-          </Text>
-          <Flex gap="2">
-            <CreateProject />
-          </Flex>
+    <Main>
+      <Header variant="main">
+        <Text variant="brandSectionTitle" as="h2">
+          Projects
+        </Text>
+        <Flex gap="2">
+          <CreateProject />
         </Flex>
-        {projects.length === 0 && <EmptyState />}
-        <Grid
-          gap="6"
-          css={{
-            gridTemplateColumns: `repeat(auto-fill, minmax(${rawTheme.spacing[31]}, 1fr))`,
-          }}
-        >
-          {projects.map((project) => {
-            return (
-              <ProjectCard
-                {...project}
-                key={project.id}
-                hasProPlan={hasProPlan}
-              />
-            );
-          })}
-        </Grid>
+      </Header>
+      <Flex
+        direction="column"
+        gap="3"
+        css={{ paddingInline: theme.spacing[13] }}
+      >
+        <ProjectsGrid {...props} />
       </Flex>
-
-      {projectTemplates.length > 0 && (
-        <Flex direction="column" gap="3">
-          <Flex justify="between">
-            <Text variant="brandSectionTitle" as="h2">
-              Templates
-            </Text>
-          </Flex>
-          <Grid
-            gap="6"
-            css={{
-              gridTemplateColumns: `repeat(auto-fill, minmax(${rawTheme.spacing[31]}, 1fr))`,
-            }}
-          >
-            {projectTemplates.map((project) => {
-              return <ProjectTemplateCard {...project} key={project.id} />;
-            })}
-          </Grid>
-        </Flex>
-      )}
-    </Panel>
+    </Main>
   );
 };

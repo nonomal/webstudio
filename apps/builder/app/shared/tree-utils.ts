@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
-import {
+import { shallowEqual } from "shallow-equal";
+import type {
   Instance,
   Instances,
   Prop,
@@ -8,12 +9,9 @@ import {
   Styles,
   StyleSource,
   StyleSourceSelection,
+  WsComponentMeta,
 } from "@webstudio-is/sdk";
-import { findTreeInstanceIds } from "@webstudio-is/sdk";
-import {
-  collectionComponent,
-  type WsComponentMeta,
-} from "@webstudio-is/react-sdk";
+import { findTreeInstanceIds, collectionComponent } from "@webstudio-is/sdk";
 
 // slots can have multiple parents so instance should be addressed
 // with full rendered path to avoid double selections with slots
@@ -44,9 +42,41 @@ export const areInstanceSelectorsEqual = (
   return left.join(",") === right.join(",");
 };
 
+export const isDescendantOrSelf = (
+  descendant: InstanceSelector,
+  self: InstanceSelector
+) => {
+  if (self.length === 0) {
+    return true;
+  }
+
+  if (descendant.length < self.length) {
+    return false;
+  }
+
+  const endSlice = descendant.slice(-self.length);
+
+  return shallowEqual(endSlice, self);
+};
+
 export type DroppableTarget = {
   parentSelector: InstanceSelector;
   position: number | "end";
+};
+
+const getCollectionDropTarget = (
+  instances: Instances,
+  dropTarget: DroppableTarget
+) => {
+  const [parentId, grandparentId] = dropTarget.parentSelector;
+  const parent = instances.get(parentId);
+  const grandparent = instances.get(grandparentId);
+  if (parent === undefined && grandparent?.component === collectionComponent) {
+    return {
+      parentSelector: dropTarget.parentSelector.slice(1),
+      position: dropTarget.position,
+    };
+  }
 };
 
 export const getInstanceOrCreateFragmentIfNecessary = (
@@ -219,6 +249,7 @@ export const getReparentDropTargetMutable = (
     prevParent = grandparentInstance;
   }
 
+  dropTarget = getCollectionDropTarget(instances, dropTarget) ?? dropTarget;
   dropTarget =
     getInstanceOrCreateFragmentIfNecessary(instances, dropTarget) ?? dropTarget;
   dropTarget =
@@ -315,72 +346,4 @@ export const findLocalStyleSourcesWithinInstances = (
   }
 
   return subtreeLocalStyleSourceIds;
-};
-
-export const insertInstancesMutable = (
-  instances: Instances,
-  props: Props,
-  metas: Map<string, WsComponentMeta>,
-  insertedInstances: Instance[],
-  children: Instance["children"],
-  dropTarget: DroppableTarget
-) => {
-  dropTarget =
-    getInstanceOrCreateFragmentIfNecessary(instances, dropTarget) ?? dropTarget;
-  dropTarget =
-    wrapEditableChildrenAroundDropTargetMutable(
-      instances,
-      props,
-      metas,
-      dropTarget
-    ) ?? dropTarget;
-  const [parentId] = dropTarget.parentSelector;
-  const parentInstance = instances.get(parentId);
-  if (parentInstance === undefined) {
-    return;
-  }
-
-  let treeRootInstanceId: undefined | Instance["id"] = undefined;
-  for (const instance of insertedInstances) {
-    if (treeRootInstanceId === undefined) {
-      treeRootInstanceId = instance.id;
-    }
-    instances.set(instance.id, instance);
-  }
-  if (treeRootInstanceId === undefined) {
-    return;
-  }
-
-  const { position } = dropTarget;
-  if (position === "end") {
-    parentInstance.children.push(...children);
-  } else {
-    parentInstance.children.splice(position, 0, ...children);
-  }
-};
-
-export const insertPropsCopyMutable = (
-  props: Props,
-  copiedProps: Prop[],
-  copiedInstanceIds: Map<Instance["id"], Instance["id"]>
-) => {
-  for (const prop of copiedProps) {
-    const newInstanceId = copiedInstanceIds.get(prop.instanceId);
-    // insert without changes when instance does not have new id
-    if (newInstanceId === undefined) {
-      // prevent overriding shared props if already exist
-      if (props.has(prop.id) === false) {
-        props.set(prop.id, prop);
-      }
-      continue;
-    }
-
-    // copy prop before inserting
-    const newPropId = nanoid();
-    props.set(newPropId, {
-      ...prop,
-      id: newPropId,
-      instanceId: newInstanceId,
-    });
-  }
 };

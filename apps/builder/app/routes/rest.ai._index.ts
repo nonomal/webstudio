@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { ActionArgs } from "@remix-run/node";
+import type { ActionFunctionArgs } from "@remix-run/server-runtime";
 import {
   copywriter,
   operations,
@@ -17,16 +17,18 @@ import {
 import env from "~/env/env.server";
 import { createContext } from "~/shared/context.server";
 import { authorizeProject } from "@webstudio-is/trpc-interface/index.server";
-import { loadBuildByProjectId } from "@webstudio-is/project-build/index.server";
+import { loadDevBuildByProjectId } from "@webstudio-is/project-build/index.server";
+import { preventCrossOriginCookie } from "~/services/no-cross-origin-cookie";
+import { checkCsrf } from "~/services/csrf-session.server";
 
-export const RequestParamsSchema = z.object({
+export const RequestParams = z.object({
   projectId: z.string().min(1, "nonempty"),
   instanceId: z.string().min(1, "nonempty"),
   prompt: z.string().min(1, "nonempty").max(1200),
   components: z.array(z.string()),
   jsx: z.string().min(1, "nonempty"),
   command: z.union([
-    // Using client* friendly imports because RequestParamsSchema
+    // Using client* friendly imports because RequestParams
     // is used to parse the form data on the client too.
     z.literal(clientCopywriter.name),
     z.literal(clientOperations.editStylesName),
@@ -40,7 +42,11 @@ export const config = {
   maxDuration: 180, // seconds
 };
 
-export const action = async ({ request }: ActionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {
+  preventCrossOriginCookie(request);
+  await checkCsrf(request);
+
+  const context = await createContext(request);
   // @todo Reinstate isFeatureEnabled('ai')
 
   if (env.OPENAI_KEY === undefined) {
@@ -86,7 +92,7 @@ export const action = async ({ request }: ActionArgs) => {
   }
   const PEXELS_API_KEY = env.PEXELS_API_KEY;
 
-  const parsed = RequestParamsSchema.safeParse(await request.json());
+  const parsed = RequestParams.safeParse(await request.json());
 
   if (parsed.success === false) {
     return {
@@ -102,6 +108,19 @@ export const action = async ({ request }: ActionArgs) => {
   }
 
   const requestContext = await createContext(request);
+
+  if (requestContext.authorization.type !== "user") {
+    return {
+      id: "ai",
+      ...createErrorResponse({
+        error: "unauthorized",
+        status: 401,
+        message: "You don't have edit access to this project",
+        debug: "Unauthorized access attempt",
+      }),
+      llmMessages: [],
+    };
+  }
 
   if (requestContext.authorization.userId === undefined) {
     return {
@@ -138,7 +157,7 @@ export const action = async ({ request }: ActionArgs) => {
       };
     }
 
-    const { instances } = await loadBuildByProjectId(projectId);
+    const { instances } = await loadDevBuildByProjectId(context, projectId);
 
     const model = createGptModel({
       apiKey: env.OPENAI_KEY,
@@ -153,7 +172,9 @@ export const action = async ({ request }: ActionArgs) => {
       context: {
         prompt,
         textInstances: copywriter.collectTextInstances({
-          instances: new Map(instances),
+          instances: new Map(
+            instances.map((instance) => [instance.id, instance])
+          ),
           rootInstanceId: instanceId,
         }),
       },
@@ -175,7 +196,7 @@ export const action = async ({ request }: ActionArgs) => {
     apiKey: env.OPENAI_KEY,
     organization: env.OPENAI_ORG,
     temperature: 0,
-    model: "gpt-3.5-turbo-16k",
+    model: "gpt-3.5-turbo",
   });
 
   const chain = operations.createChain<GptModelMessageFormat>();

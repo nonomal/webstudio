@@ -1,129 +1,214 @@
-import type { Project } from "@webstudio-is/prisma-client";
-import type { AuthPermit } from "../shared/authorization-router";
 import type { AppContext } from "../context/context.server";
+import type { Database } from "@webstudio-is/postrest/index.server";
+import memoize from "memoize";
 
-/**
- * For 3rd party authorization systems like Ory we need to register the project owner.
- *
- * We do that before the project create (and out of the transaction),
- * so in case of an error we will have just stale records of non existed projects in authorization system.
- */
-export const registerProjectOwner = async (
-  props: { projectId: string },
-  context: AppContext
+type Relation =
+  Database["public"]["Tables"]["AuthorizationToken"]["Row"]["relation"];
+
+export type AuthPermit = "view" | "edit" | "build" | "admin" | "own";
+
+type TokenAuthPermit = Exclude<AuthPermit, "own">;
+
+type CheckInput = {
+  namespace: "Project";
+  id: string;
+
+  permit: AuthPermit;
+
+  subjectSet: {
+    namespace: "User" | "Token";
+    id: string;
+  };
+};
+
+const check = async (
+  postgrestClient: AppContext["postgrest"]["client"],
+  input: CheckInput
 ) => {
-  const { authorization } = context;
-  const { userId, authorizeTrpc } = authorization;
+  const { subjectSet } = input;
 
-  if (userId === undefined) {
-    throw new Error("The user must be authenticated to create a project");
+  if (subjectSet.namespace === "User") {
+    // We check only if the user is the owner of the project
+    const row = await postgrestClient
+      .from("Project")
+      .select("id")
+      .eq("id", input.id)
+      .eq("userId", subjectSet.id)
+      .maybeSingle();
+    if (row.error) {
+      throw row.error;
+    }
+
+    return { allowed: row.data !== null };
   }
 
-  await authorizeTrpc.create.mutate({
-    namespace: "Project",
-    id: props.projectId,
-    relation: "owners",
-    subjectSet: {
-      namespace: "User",
-      id: userId,
-    },
-  });
+  if (input.permit === "own") {
+    return { allowed: false };
+  }
+
+  if (subjectSet.namespace !== "Token") {
+    return { allowed: false };
+  }
+
+  const permitToRelationRewrite: Record<TokenAuthPermit, Relation[]> = {
+    view: ["viewers", "editors", "builders", "administrators"],
+    edit: ["editors", "builders", "administrators"],
+    build: ["builders", "administrators"],
+    admin: ["administrators"],
+  };
+
+  const row = await postgrestClient
+    .from("AuthorizationToken")
+    .select("token")
+    .eq("token", subjectSet.id)
+    .in("relation", [...permitToRelationRewrite[input.permit]])
+    .maybeSingle();
+
+  if (row.error) {
+    throw row.error;
+  }
+
+  return { allowed: row.data !== null };
+};
+
+// doesn't work in cloudflare workers
+const memoizedCheck = memoize(check, {
+  // 1 minute
+  maxAge: 60 * 1000,
+  cacheKey: ([_context, input]) => JSON.stringify(input),
+});
+
+type AuthInfo =
+  | {
+      type: "user";
+      userId: string;
+    }
+  | {
+      type: "token";
+      authToken: string;
+    }
+  | {
+      type: "service";
+    };
+
+export const checkProjectPermit = async (
+  projectId: string,
+  permit: AuthPermit,
+  authInfo: AuthInfo,
+  postgrestClient: AppContext["postgrest"]["client"]
+) => {
+  const checks = [];
+  const namespace = "Project";
+
+  if (authInfo.type === "service") {
+    return permit === "view";
+  }
+
+  // @todo Delete and use tokens
+  const templateIds = [
+    // Production
+    "5e086cf4-4293-471c-8eab-ddca8b5cd4db",
+    "94e6e1b8-c6c4-485a-9d7a-8282e11920c0",
+    "05954204-fcee-407e-b47f-77a38de74431",
+    "afc162c2-6396-41b7-a855-8fc04604a7b1",
+    "3f260731-825b-486a-b534-e747f0ed6106",
+    "400b1bde-def1-49e0-9b64-e26416d326fa",
+    "2e802ad7-ef32-48e6-8706-3a162785ef95",
+    "01f6f1d8-06f5-4a6c-a3b1-89a0448046c7",
+    "5b33acf4-53cf-4f03-8973-d5679772edee",
+    "909a139b-1f2d-415a-ac90-382fa19fa7d8",
+    "ef82ee51-e4d6-4a69-a4cc-7bf1dee65ed7",
+    "e761178f-6ac6-47f6-b881-56cc75640d73",
+    // Staging IDs
+    "c236999d-be6b-43fb-9edc-78a2ba59e56d",
+    "a1371dce-752c-4ccf-8ea4-88bab577fe50",
+    "6204396c-3f9e-4d29-8d19-ff0f76960a74",
+  ];
+
+  // @todo Delete and use tokens
+  if (permit === "view" && templateIds.includes(projectId)) {
+    return true;
+  }
+
+  if (authInfo.type === "token") {
+    // Token doesn't have "own" permit, do not check it
+    if (permit === "own") {
+      return false;
+    }
+
+    checks.push(
+      memoizedCheck(postgrestClient, {
+        namespace,
+        id: projectId,
+        subjectSet: {
+          id: authInfo.authToken,
+          namespace: "Token",
+        },
+        permit: permit,
+      })
+    );
+  }
+
+  // Check if the user is allowed to access the project
+  if (authInfo.type === "user") {
+    checks.push(
+      memoizedCheck(postgrestClient, {
+        subjectSet: {
+          namespace: "User",
+          id: authInfo.userId,
+        },
+        namespace,
+        id: projectId,
+        permit: permit,
+      })
+    );
+  }
+
+  if (checks.length === 0) {
+    return false;
+  }
+
+  const authResults = await Promise.allSettled(checks);
+
+  for (const authResult of authResults) {
+    if (authResult.status === "rejected") {
+      throw new Error(`Authorization call failed ${authResult.reason}`);
+    }
+  }
+
+  const allowed = authResults.some(
+    (authResult) =>
+      authResult.status === "fulfilled" && authResult.value.allowed
+  );
+
+  return allowed;
 };
 
 export const hasProjectPermit = async (
   props: {
-    projectId: Project["id"];
+    projectId: string;
     permit: AuthPermit;
   },
   context: AppContext
 ) => {
-  const start = Date.now();
+  const { authorization } = context;
 
-  try {
-    const { authorization } = context;
-    const { authorizeTrpc } = authorization;
-
-    const checks = [];
-    const namespace = "Project";
-
-    // Allow load production build env i.e. "published" project
-    if (props.permit === "view" && context.authorization.isServiceCall) {
-      return true;
-    }
-
-    // Allow load webstudiois for clone
-    // @todo Rethink permissions for this use-case
-    // The plan is to make new permission for projects which are allowed to be publicly clonable by anyone
-    // https://github.com/webstudio-is/webstudio/issues/1038
-    if (
-      props.permit === "view" &&
-      props.projectId === "62154aaef0cb0860ccf85d6e"
-    ) {
-      return true;
-    }
-
-    if (
-      props.permit === "view" &&
-      context.authorization.projectTemplates.includes(props.projectId)
-    ) {
-      return true;
-    }
-
-    // Check if the user is allowed to access the project
-    if (authorization.userId !== undefined) {
-      checks.push(
-        authorizeTrpc.check.query({
-          subjectSet: {
-            namespace: "User",
-            id: authorization.userId,
-          },
-          namespace,
-          id: props.projectId,
-          permit: props.permit,
-        })
-      );
-    }
-
-    // Check if the special link with a token allows to access the project
-    // Token doesn't have own permit, do not check it
-    if (authorization.authToken !== undefined && props.permit !== "own") {
-      checks.push(
-        authorizeTrpc.check.query({
-          namespace,
-          id: props.projectId,
-          subjectSet: {
-            id: authorization.authToken,
-            namespace: "Token",
-          },
-          permit: props.permit,
-        })
-      );
-    }
-
-    if (checks.length === 0) {
-      return false;
-    }
-
-    const authResults = await Promise.allSettled(checks);
-
-    for (const authResult of authResults) {
-      if (authResult.status === "rejected") {
-        throw new Error(`Authorization call failed ${authResult.reason}`);
-      }
-    }
-
-    const allowed = authResults.some(
-      (authResult) =>
-        authResult.status === "fulfilled" && authResult.value.allowed
-    );
-
-    return allowed;
-  } finally {
-    const diff = Date.now() - start;
-
-    // eslint-disable-next-line no-console
-    console.log(`hasProjectPermit execution ${diff}ms`);
+  if (authorization.type === "anonymous") {
+    return false;
   }
+
+  const authInfo: AuthInfo = authorization;
+
+  if (authInfo === undefined) {
+    return false;
+  }
+
+  return checkProjectPermit(
+    props.projectId,
+    props.permit,
+    authInfo,
+    context.postgrest.client
+  );
 };
 
 /**
@@ -131,37 +216,28 @@ export const hasProjectPermit = async (
  * @todo think about caching to authorizeTrpc.check.query
  * batching check queries would help too https://github.com/ory/keto/issues/812
  */
-export const getProjectPermit = async <T extends AuthPermit>(
+export const getProjectPermit = async (
   props: {
     projectId: string;
-    permits: readonly T[];
+    permits: readonly AuthPermit[];
   },
   context: AppContext
-): Promise<T | undefined> => {
-  const start = Date.now();
+): Promise<AuthPermit | undefined> => {
+  const permitToCheck = props.permits;
 
-  try {
-    const permitToCheck = props.permits;
+  const permits = await Promise.allSettled(
+    permitToCheck.map((permit) =>
+      hasProjectPermit({ projectId: props.projectId, permit }, context)
+    )
+  );
 
-    const permits = await Promise.allSettled(
-      permitToCheck.map((permit) =>
-        hasProjectPermit({ projectId: props.projectId, permit }, context)
-      )
-    );
-
-    for (const permit of permits) {
-      if (permit.status === "rejected") {
-        throw new Error(`Authorization call failed ${permit.reason}`);
-      }
-
-      if (permit.value === true) {
-        return permitToCheck[permits.indexOf(permit)];
-      }
+  for (const permit of permits) {
+    if (permit.status === "rejected") {
+      throw new Error(`Authorization call failed ${permit.reason}`);
     }
-  } finally {
-    const diff = Date.now() - start;
 
-    // eslint-disable-next-line no-console
-    console.log(`getProjectPermit execution ${diff}ms`);
+    if (permit.value === true) {
+      return permitToCheck[permits.indexOf(permit)];
+    }
   }
 };

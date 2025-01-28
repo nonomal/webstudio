@@ -1,13 +1,12 @@
 import { useState } from "react";
 import {
-  DeprecatedButton,
-  DeprecatedPopover,
-  DeprecatedPopoverTrigger,
-  DeprecatedPopoverContent,
-  DeprecatedPopoverPortal,
-  DeprecatedPopoverHeader,
+  SmallIconButton,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  PopoverTitle,
 } from "@webstudio-is/design-system";
-import { GearIcon, gearIconCssVars } from "@webstudio-is/icons";
+import { GearIcon } from "@webstudio-is/icons";
 import type { Asset } from "@webstudio-is/sdk";
 import { theme } from "@webstudio-is/design-system";
 import { ImageInfo } from "./image-info";
@@ -27,41 +26,40 @@ export const ImageInfoTrigger = ({
 }) => {
   const [isInfoOpen, setInfoOpen] = useState(false);
   return (
-    <DeprecatedPopover open={isInfoOpen} onOpenChange={setInfoOpen}>
-      <DeprecatedPopoverTrigger asChild>
-        <DeprecatedButton
-          variant="raw"
+    <Popover modal open={isInfoOpen} onOpenChange={setInfoOpen}>
+      <PopoverTrigger asChild>
+        <SmallIconButton
           title="Options"
           onClick={() => setInfoOpen(true)}
+          tabIndex={-1}
           css={{
             visibility: `var(${triggerVisibilityVar}, hidden)`,
             position: "absolute",
-            color: theme.colors.slate11,
+            color: theme.colors.backgroundIconSubtle,
             top: theme.spacing[3],
             right: theme.spacing[3],
             cursor: "pointer",
             transition: "opacity 100ms ease",
-            "&:hover": {
-              color: theme.colors.hiContrast,
+            "& svg": {
+              fill: `oklch(from ${theme.colors.white} l c h / 0.9)`,
             },
-            ...gearIconCssVars({ fill: theme.colors.loContrast }),
+            "&:hover": {
+              color: theme.colors.foregroundIconMain,
+            },
           }}
-        >
-          <GearIcon />
-        </DeprecatedButton>
-      </DeprecatedPopoverTrigger>
-      <DeprecatedPopoverPortal>
-        <DeprecatedPopoverContent css={{ zIndex: theme.zIndices[1] }}>
-          <DeprecatedPopoverHeader title="Asset Details" />
-          <ImageInfo
-            onDelete={(ids) => {
-              setInfoOpen(false);
-              onDelete(ids);
-            }}
-            asset={asset}
-          />
-        </DeprecatedPopoverContent>
-      </DeprecatedPopoverPortal>
-    </DeprecatedPopover>
+          icon={<GearIcon />}
+        />
+      </PopoverTrigger>
+      <PopoverContent>
+        <PopoverTitle>Asset Details</PopoverTitle>
+        <ImageInfo
+          onDelete={(ids) => {
+            setInfoOpen(false);
+            onDelete(ids);
+          }}
+          asset={asset}
+        />
+      </PopoverContent>
+    </Popover>
   );
 };

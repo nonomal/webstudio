@@ -1,10 +1,11 @@
-import { test, expect } from "@jest/globals";
+import { test, expect } from "vitest";
 import { createDefaultPages } from "./pages-utils";
 
 test("createDefaultPages", () => {
   expect(
     createDefaultPages({
       rootInstanceId: "rootInstanceId",
+      systemDataSourceId: "systemDataSourceId",
       homePageId: "homePageId",
     })
   ).toEqual({
@@ -13,9 +14,10 @@ test("createDefaultPages", () => {
       id: "homePageId",
       name: "Home",
       path: "",
-      title: "Home",
+      title: `"Home"`,
       meta: {},
       rootInstanceId: "rootInstanceId",
+      systemDataSourceId: "systemDataSourceId",
     },
     pages: [],
     folders: [

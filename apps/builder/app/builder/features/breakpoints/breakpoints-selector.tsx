@@ -1,17 +1,24 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Breakpoint, Breakpoints } from "@webstudio-is/sdk";
 import {
-  EnhancedTooltip,
+  Flex,
   Text,
   Toolbar,
   ToolbarToggleGroup,
   ToolbarToggleItem,
+  Tooltip,
+  theme,
 } from "@webstudio-is/design-system";
-import { BpStarOffIcon, BpStarOnIcon } from "@webstudio-is/icons";
+import { AlertIcon, AsteriskIcon } from "@webstudio-is/icons";
 import { CascadeIndicator } from "./cascade-indicator";
-import { $selectedBreakpointId } from "~/shared/nano-states";
+import {
+  $selectedBreakpoint,
+  $selectedBreakpointId,
+} from "~/shared/nano-states";
 import { groupBreakpoints, isBaseBreakpoint } from "~/shared/breakpoints";
-import { setInitialCanvasWidth } from "./use-set-initial-canvas-width";
+import { setCanvasWidth } from "./use-set-initial-canvas-width";
+import { $canvasWidth } from "~/builder/shared/nano-states";
+import { useDebouncedCallback } from "use-debounce";
 
 const getTooltipContent = (breakpoint: Breakpoint) => {
   if (isBaseBreakpoint(breakpoint)) {
@@ -46,6 +53,77 @@ const getTooltipContent = (breakpoint: Breakpoint) => {
   }
 };
 
+// We are testing a specific canvas width using matchMedia to see if a CSS breakpoint would apply.
+// This is needed because browser zoom can cause a mismatch between the actual media query and the displayed breakpoint.
+const breakpointMatchesMediaQuery = (
+  breakpoint?: Breakpoint,
+  canvasWidth?: number
+) => {
+  if (
+    canvasWidth === undefined ||
+    (breakpoint?.minWidth === undefined && breakpoint?.maxWidth === undefined)
+  ) {
+    // We don't know in this case if there is a mismatch, so we say it's fine.
+    return true;
+  }
+
+  const iframe = document.createElement("iframe");
+  iframe.style.visibility = "hidden";
+  iframe.style.top = "-100000px";
+  iframe.style.width = `${canvasWidth}px`;
+  document.body.appendChild(iframe);
+  const queryList = iframe.contentWindow?.matchMedia(
+    `(${breakpoint.minWidth ? "min" : "max"}-width: ${canvasWidth}px)`
+  );
+  // For some reason we don't get the same results if delete the iframe immediately.
+  requestAnimationFrame(() => {
+    document.body.removeChild(iframe);
+  });
+  return queryList?.matches ?? false;
+};
+
+// When browser zoom is used we can't guarantee that the displayed selected breakpoint is actually matching the media query on the canvas.
+// Actual media query will vary unpredictably, sometimes resulting in 1 px difference and we better warn user they are zooming.
+const ZoomWarning = () => {
+  const [matches, setMatches] = useState(true);
+  const setMatchesDebounced = useDebouncedCallback((canvasWidth) => {
+    const matches = breakpointMatchesMediaQuery(
+      $selectedBreakpoint.get(),
+      canvasWidth
+    );
+    setMatches(matches);
+  }, 1000);
+
+  useEffect(() => {
+    const unsubscribe = $canvasWidth.listen(setMatchesDebounced);
+    return () => {
+      unsubscribe();
+    };
+  });
+
+  if (matches === true) {
+    return;
+  }
+
+  return (
+    <Tooltip
+      variant="wrapped"
+      content={`Your browser zoom is causing a mismatch between breakpoints and the actual media query on the canvas.`}
+    >
+      <Flex
+        align="center"
+        css={{
+          px: theme.spacing[5],
+          height: "100%",
+          color: theme.colors.backgroundAlertMain,
+        }}
+      >
+        <AlertIcon />
+      </Flex>
+    </Tooltip>
+  );
+};
+
 type BreakpointsSelector = {
   breakpoints: Breakpoints;
   selectedBreakpoint: Breakpoint;
@@ -70,17 +148,18 @@ export const BreakpointsSelector = ({
             return;
           }
           $selectedBreakpointId.set(breakpointId);
-          setInitialCanvasWidth(breakpointId);
+          setCanvasWidth(breakpointId);
         }}
         css={{ position: "relative" }}
       >
         {groupBreakpoints(Array.from(breakpoints.values())).map(
           (breakpoint) => {
             return (
-              <EnhancedTooltip
+              <Tooltip
                 key={breakpoint.id}
                 content={getTooltipContent(breakpoint)}
-                css={{ maxWidth: 240 }}
+                variant="wrapped"
+                disableHoverableContent
               >
                 <ToolbarToggleItem
                   variant="subtle"
@@ -93,15 +172,11 @@ export const BreakpointsSelector = ({
                   }}
                   value={breakpoint.id}
                 >
-                  {breakpoint.minWidth ??
-                    breakpoint.maxWidth ??
-                    (breakpoint.id === selectedBreakpoint.id ? (
-                      <BpStarOnIcon size={22} />
-                    ) : (
-                      <BpStarOffIcon size={22} />
-                    ))}
+                  {breakpoint.minWidth ?? breakpoint.maxWidth ?? (
+                    <AsteriskIcon size={22} />
+                  )}
                 </ToolbarToggleItem>
-              </EnhancedTooltip>
+              </Tooltip>
             );
           }
         )}
@@ -111,6 +186,7 @@ export const BreakpointsSelector = ({
           breakpoints={breakpoints}
         />
       </ToolbarToggleGroup>
+      <ZoomWarning />
     </Toolbar>
   );
 };

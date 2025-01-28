@@ -12,7 +12,7 @@ import { isValidDeclaration } from "@webstudio-is/css-data";
 import { parseIntermediateOrInvalidValue } from "../../shared/css-value-input/parse-intermediate-or-invalid-value";
 import { toValue } from "@webstudio-is/css-engine";
 import type { CssValueInputValue } from "../../shared/css-value-input/css-value-input";
-import type { PositionProperty } from "../position/position-layout";
+import type { InsetProperty } from "../position/inset-layout";
 
 type ScrubStatus<P extends string> = {
   isActive: boolean;
@@ -63,7 +63,7 @@ export const useScrub = <P extends StyleProperty>(props: {
   const nonDependencies = useRef({ props, values, properties });
   nonDependencies.current = { props, values, properties };
 
-  const unitRef = useRef<UnitValue["unit"]>();
+  const unitRef = useRef<undefined | UnitValue["unit"]>(undefined);
 
   useEffect(() => {
     if (finalTarget === undefined) {
@@ -182,23 +182,23 @@ export const getSpaceModifiersGroup = (
   return groups.find((group) => group.includes(property)) ?? [property];
 };
 
-const opposingPositionGroups = [
+const opposingInsetGroups = [
   ["top", "bottom"],
   ["left", "right"],
 ] as const;
 
-const circlePositionGroups = [["top", "right", "bottom", "left"]] as const;
+const circleInsetGroups = [["top", "right", "bottom", "left"]] as const;
 
-export const getPositionModifiersGroup = (
-  property: PositionProperty,
+export const getInsetModifiersGroup = (
+  property: InsetProperty,
   modifiers: { shiftKey: boolean; altKey: boolean }
 ) => {
-  let groups: ReadonlyArray<ReadonlyArray<PositionProperty>> = [];
+  let groups: ReadonlyArray<ReadonlyArray<InsetProperty>> = [];
 
   if (modifiers.shiftKey) {
-    groups = circlePositionGroups;
+    groups = circleInsetGroups;
   } else if (modifiers.altKey) {
-    groups = opposingPositionGroups;
+    groups = opposingInsetGroups;
   }
 
   return groups.find((group) => group.includes(property)) ?? [property];

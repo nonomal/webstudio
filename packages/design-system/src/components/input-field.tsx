@@ -9,6 +9,8 @@ import {
   type ComponentProps,
   type Ref,
   type FocusEventHandler,
+  useRef,
+  type KeyboardEventHandler,
 } from "react";
 import { textVariants } from "./text";
 import { css, theme, type CSS } from "../stitches.config";
@@ -38,12 +40,15 @@ const inputStyle = css({
   height: "100%",
   paddingRight: theme.spacing[2],
   paddingLeft: theme.spacing[3],
-  "&[data-color=placeholder]:not(:hover, :disabled, :focus), &::placeholder": {
-    color: theme.colors.foregroundSubtle,
-  },
+  "&[data-color=placeholder]:not(:hover, :disabled, [aria-disabled=true], :focus), &::placeholder":
+    {
+      color: theme.colors.foregroundSubtle,
+    },
   "&[data-color=error]": { color: theme.colors.foregroundDestructive },
-  "&:disabled, &:disabled::placeholder": {
-    color: theme.colors.foregroundDisabled,
+  "&:disabled, &[aria-disabled=true]": {
+    "&, &::placeholder": {
+      color: theme.colors.foregroundDisabled,
+    },
   },
   '&[type="number"]': {
     MozAppearance: "textfield",
@@ -53,40 +58,69 @@ const inputStyle = css({
     },
   },
   variants: {
-    variant: {
+    text: {
       regular: textVariants.regular,
       mono: textVariants.mono,
     },
+    fieldSizing: {
+      content: {
+        fieldSizing: "content",
+      },
+      fixed: {
+        fieldSizing: "fixed",
+      },
+    },
   },
   defaultVariants: {
-    variant: "regular",
+    text: "regular",
   },
 });
 
 const containerStyle = css({
   display: "flex",
-  height: theme.spacing[12],
   boxSizing: "border-box",
   minWidth: 0,
   alignItems: "center",
   borderRadius: theme.borderRadius[4],
-  border: `solid 1px ${theme.colors.borderMain}`,
+  border: `solid 1px transparent`,
   backgroundColor: theme.colors.backgroundControls,
-  "&:has([data-input-field-input]:focus), &:focus": {
-    outline: `solid 2px ${theme.colors.borderFocus}`,
-    outlineOffset: "-1px",
+  "&:hover": {
+    borderColor: theme.colors.borderMain,
   },
-
+  "&:focus-within": {
+    borderColor: theme.colors.borderFocus,
+    outline: "none",
+  },
   "&:has([data-input-field-input][data-color=error])": {
     borderColor: theme.colors.borderDestructiveMain,
   },
-  "&:has([data-input-field-input][data-color=error]:focus), &[data-color=error]:focus":
-    {
-      outlineColor: theme.colors.borderDestructiveMain,
-    },
-
-  "&:has([data-input-field-input]:disabled)": {
+  "&:focus-within:has([data-color=error])": {
+    borderColor: theme.colors.borderDestructiveMain,
+  },
+  "&:has([data-input-field-input]:is(:disabled, [aria-disabled=true]))": {
     backgroundColor: theme.colors.backgroundInputDisabled,
+  },
+
+  variants: {
+    variant: {
+      chromeless: {
+        "&:not(:hover, :focus-within)": {
+          borderColor: "transparent",
+          backgroundColor: "transparent",
+        },
+      },
+    },
+    size: {
+      1: {
+        height: theme.spacing[9],
+      },
+      2: {
+        height: theme.sizes.controlHeight,
+      },
+    },
+  },
+  defaultVariants: {
+    size: 2,
   },
 });
 
@@ -106,12 +140,16 @@ const Container = forwardRef(
       css,
       prefix,
       suffix,
+      variant,
+      size,
       ...props
     }: {
       children: ReactNode;
       prefix?: ReactNode;
       suffix?: ReactNode;
       css?: CSS;
+      variant: InputFieldProps["variant"];
+      size: InputFieldProps["size"];
     } & Omit<ComponentProps<"div">, "prefix">,
     ref: Ref<HTMLDivElement>
   ) => {
@@ -119,7 +157,7 @@ const Container = forwardRef(
     if (!prefix && !suffix) {
       return (
         <div
-          className={containerStyle({ className, css })}
+          className={containerStyle({ className, css, variant, size })}
           {...props}
           ref={ref}
         >
@@ -132,7 +170,7 @@ const Container = forwardRef(
       <ArrowFocus
         render={({ handleKeyDown }) => (
           <div
-            className={containerStyle({ className, css })}
+            className={containerStyle({ className, css, variant, size })}
             {...props}
             onKeyDown={(event) => {
               props.onKeyDown?.(event);
@@ -158,32 +196,27 @@ const Container = forwardRef(
 );
 Container.displayName = "Container";
 
-type InputProps = {
+type InputProps = Omit<
+  ComponentProps<"input">,
+  "onFocus" | "onBlur" | "prefix" | "size"
+> & {
+  onFocus?: FocusEventHandler;
+  onBlur?: FocusEventHandler;
+};
+
+type InputFieldProps = {
+  prefix?: ReactNode;
+  suffix?: ReactNode;
+  containerRef?: Ref<HTMLDivElement>;
+  inputRef?: Ref<HTMLInputElement>;
+  variant?: "chromeless";
+  size?: "1" | "2";
   type?: (typeof inputFieldTypes)[number];
   color?: (typeof inputFieldColors)[number];
   css?: CSS;
-  variant?: "regular" | "mono";
-} & Omit<ComponentProps<"input">, "prefix" | "onFocus" | "onBlur">;
-
-const Input = forwardRef(
-  (
-    { css, className, color, disabled = false, variant, ...props }: InputProps,
-    ref: Ref<HTMLInputElement>
-  ) => {
-    return (
-      <input
-        {...props}
-        spellCheck={false}
-        data-input-field-input // to distinguish from potential other inputs in prefix/suffix
-        data-color={color}
-        disabled={disabled}
-        className={inputStyle({ className, css, variant })}
-        ref={ref}
-      />
-    );
-  }
-);
-Input.displayName = "Input";
+  text?: "regular" | "mono";
+  fieldSizing?: "content" | "fixed";
+};
 
 export const InputField = forwardRef(
   (
@@ -196,15 +229,14 @@ export const InputField = forwardRef(
       inputRef,
       onFocus,
       onBlur,
+      variant,
+      size,
+      color,
+      text,
+      fieldSizing,
+      onKeyDown,
       ...inputProps
-    }: InputProps & {
-      prefix?: ReactNode;
-      suffix?: ReactNode;
-      containerRef?: Ref<HTMLDivElement>;
-      inputRef?: Ref<HTMLInputElement>;
-      onFocus?: FocusEventHandler;
-      onBlur?: FocusEventHandler;
-    },
+    }: InputProps & InputFieldProps,
     ref: Ref<HTMLDivElement>
   ) => {
     // Our input field can contain multiple focused elements,
@@ -213,6 +245,14 @@ export const InputField = forwardRef(
       onFocusWithin: onFocus,
       onBlurWithin: onBlur,
     });
+    const unfocusContainerRef = useRef<HTMLDivElement>(null);
+    const handleKeyDown: KeyboardEventHandler<HTMLInputElement> = (event) => {
+      onKeyDown?.(event);
+      if (event.key === "Escape" && event.defaultPrevented === false) {
+        event.preventDefault();
+        unfocusContainerRef.current?.focus();
+      }
+    };
 
     return (
       <Container
@@ -220,10 +260,28 @@ export const InputField = forwardRef(
         className={className}
         prefix={prefix}
         suffix={suffix}
+        variant={variant}
+        size={size}
         {...focusWithinProps}
         ref={mergeRefs(ref, containerRef ?? null)}
       >
-        <Input {...inputProps} ref={inputRef} />
+        <div
+          // This element is used to move focus to it when user hits Escape.
+          // This way user can unfocus the input and then use any single-key shortcut.
+          tabIndex={-1}
+          ref={unfocusContainerRef}
+          // When managing focus with ArrowFocus, we don't want to focus this element.
+          data-no-arrow-focus
+        />
+        <input
+          {...inputProps}
+          ref={inputRef}
+          spellCheck={false}
+          data-input-field-input // to distinguish from potential other inputs in prefix/suffix
+          data-color={color}
+          className={inputStyle({ className, css, text, fieldSizing })}
+          onKeyDown={handleKeyDown}
+        />
       </Container>
     );
   }

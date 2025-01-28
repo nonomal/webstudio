@@ -1,9 +1,6 @@
-import { nanoid } from "nanoid";
-import { Store, type Change } from "immerhin";
-import { enableMapSet } from "immer";
-import type { WritableAtom } from "nanostores";
+import { Store } from "immerhin";
+import { enableMapSet, setAutoFreeze } from "immer";
 import { useEffect } from "react";
-import { type Publish, subscribe } from "~/shared/pubsub";
 import {
   $project,
   $pages,
@@ -15,61 +12,60 @@ import {
   $styleSources,
   $styleSourceSelections,
   $assets,
-  $selectedPageId,
   $selectedPageHash,
   $selectedInstanceSelector,
   $selectedInstanceBrowserStyle,
   $selectedInstanceUnitSizes,
-  $selectedInstanceIntanceToTag,
   $selectedInstanceRenderState,
   $hoveredInstanceSelector,
-  $isPreviewMode,
-  synchronizedCanvasStores,
-  $synchronizedInstances,
-  $synchronizedBreakpoints,
-  $selectedStyleSourceSelector,
-  synchronizedComponentsMetaStores,
+  $authTokenPermissions,
+  $toastErrors,
+  $selectedStyleSources,
+  $selectedStyleState,
   $dataSourceVariables,
   $dragAndDropState,
   $selectedInstanceStates,
   $resources,
   $resourceValues,
+  $marketplaceProduct,
+  $canvasIframeState,
+  $uploadingFilesDataStore,
+  $memoryProps,
+  $detectedFontsWeights,
+  $builderMode,
+  $selectedBreakpointId,
+  $textEditingInstanceSelector,
+  $textEditorContextMenu,
+  $textEditorContextMenuCommand,
+  $isResizingCanvas,
+  $collaborativeInstanceRect,
+  $collaborativeInstanceSelector,
+  $hoveredInstanceOutline,
+  $selectedInstanceOutline,
+  $blockChildOutline,
+  $textToolbar,
+  $registeredComponentMetas,
+  $registeredComponentPropsMetas,
+  $registeredTemplates,
+  $modifierKeys,
 } from "~/shared/nano-states";
 import { $ephemeralStyles } from "~/canvas/stores";
+import { $awareness, $temporaryInstances } from "../awareness";
+import {
+  ImmerhinSyncObject,
+  NanostoresSyncObject,
+  SyncClient,
+  SyncObjectPool,
+  type SyncEmitter,
+} from "../sync-client";
+import { $canvasScrollbarSize } from "~/builder/shared/nano-states";
 
 enableMapSet();
-
-const appId = nanoid();
-
-type StoreData = {
-  namespace: string;
-  value: unknown;
-};
-
-type SyncEventSource = "canvas" | "builder";
-
-declare module "~/shared/pubsub" {
-  export interface PubsubMap {
-    connect: { sourceAppId: string };
-    disconnect: { sourceAppId: string };
-    sendStoreData: {
-      // distinct source to avoid infinite loop
-      source: SyncEventSource;
-      data: StoreData[];
-    };
-    sendStoreChanges: {
-      // distinct source to avoid infinite loop
-      source: SyncEventSource;
-      namespace: "client" | "server";
-      changes: Change[];
-    };
-  }
-}
+// safari structuredClone fix
+setAutoFreeze(false);
 
 export const clientSyncStore = new Store();
 export const serverSyncStore = new Store();
-const clientStores = new Map<string, WritableAtom<unknown>>();
-const initializedStores = new Set<string>();
 
 export const registerContainers = () => {
   // synchronize patches
@@ -83,279 +79,125 @@ export const registerContainers = () => {
   serverSyncStore.register("dataSources", $dataSources);
   serverSyncStore.register("resources", $resources);
   serverSyncStore.register("assets", $assets);
-  // synchronize whole states
-  clientStores.set("project", $project);
-  clientStores.set("dataSourceVariables", $dataSourceVariables);
-  clientStores.set("resourceValues", $resourceValues);
-  clientStores.set("selectedPageId", $selectedPageId);
-  clientStores.set("selectedPageHash", $selectedPageHash);
-  clientStores.set("selectedInstanceSelector", $selectedInstanceSelector);
-  clientStores.set(
-    "selectedInstanceBrowserStyle",
-    $selectedInstanceBrowserStyle
-  );
-  clientStores.set(
-    "$selectedInstanceIntanceToTag",
-    $selectedInstanceIntanceToTag
-  );
-  clientStores.set("$selectedInstanceUnitSizes", $selectedInstanceUnitSizes);
-  clientStores.set(
-    "$selectedInstanceRenderState",
-    $selectedInstanceRenderState
-  );
-  clientStores.set("hoveredInstanceSelector", $hoveredInstanceSelector);
-  clientStores.set("isPreviewMode", $isPreviewMode);
-  clientStores.set("selectedStyleSourceSelector", $selectedStyleSourceSelector);
-  clientStores.set("dragAndDropState", $dragAndDropState);
-  clientStores.set("ephemeralStyles", $ephemeralStyles);
-  clientStores.set("selectedInstanceStates", $selectedInstanceStates);
-
-  for (const [name, store] of $synchronizedBreakpoints) {
-    clientStores.set(name, store);
-  }
-  for (const [name, store] of $synchronizedInstances) {
-    clientStores.set(name, store);
-  }
-  for (const [name, store] of synchronizedCanvasStores) {
-    clientStores.set(name, store);
-  }
-  for (const [name, store] of synchronizedComponentsMetaStores) {
-    clientStores.set(name, store);
-  }
-
-  // use listen to not invoke initially
-  for (const [name, store] of clientStores) {
-    // here we rely on the fact registerContainers is called before any store.set
-    // is called to find which store is initialized to send its data to the other realm
-    // this can help to find the direction between builder and canvas
-    // so canvas could send initial data to builder without builder overriding it
-    // with default store value
-    const unsubscribe = store.listen(() => {
-      initializedStores.add(name);
-      unsubscribe();
-    });
-  }
+  serverSyncStore.register("marketplaceProduct", $marketplaceProduct);
 };
 
-const syncStoresChanges = (name: SyncEventSource, publish: Publish) => {
-  const unsubscribeRemoteChanges = subscribe(
-    "sendStoreChanges",
-    ({ source, namespace, changes }) => {
-      /// prevent reapplying own changes
-      if (source === name) {
-        return;
-      }
-      if (namespace === "server") {
-        serverSyncStore.createTransactionFromChanges(changes, "remote");
-      }
-      if (namespace === "client") {
-        clientSyncStore.createTransactionFromChanges(changes, "remote");
-      }
-    }
-  );
+export const createObjectPool = () => {
+  return new SyncObjectPool([
+    new ImmerhinSyncObject("server", serverSyncStore),
+    new ImmerhinSyncObject("client", clientSyncStore),
+    new NanostoresSyncObject(
+      "selectedInstanceSelector",
+      $selectedInstanceSelector
+    ),
+    new NanostoresSyncObject("awareness", $awareness),
+    new NanostoresSyncObject("temporaryInstances", $temporaryInstances),
 
-  const unsubscribeStoreChanges = serverSyncStore.subscribe(
-    (_transactionId, changes, source) => {
-      // prevent sending remote patches back
-      if (source === "remote") {
-        return;
-      }
-
-      publish({
-        type: "sendStoreChanges",
-        payload: {
-          source: name,
-          namespace: "server",
-          changes,
-        },
-      });
-    }
-  );
-
-  const unsubscribeClientImmerhinStoreChanges = clientSyncStore.subscribe(
-    (_transactionId, changes, source) => {
-      // prevent sending remote patches back
-      if (source === "remote") {
-        return;
-      }
-
-      publish({
-        type: "sendStoreChanges",
-        payload: {
-          source: name,
-          namespace: "client",
-          changes,
-        },
-      });
-    }
-  );
-
-  return () => {
-    unsubscribeRemoteChanges();
-    unsubscribeStoreChanges();
-    unsubscribeClientImmerhinStoreChanges();
-  };
+    new NanostoresSyncObject("project", $project),
+    new NanostoresSyncObject("dataSourceVariables", $dataSourceVariables),
+    new NanostoresSyncObject("resourceValues", $resourceValues),
+    new NanostoresSyncObject("selectedPageHash", $selectedPageHash),
+    new NanostoresSyncObject(
+      "selectedInstanceBrowserStyle",
+      $selectedInstanceBrowserStyle
+    ),
+    new NanostoresSyncObject(
+      "selectedInstanceUnitSizes",
+      $selectedInstanceUnitSizes
+    ),
+    new NanostoresSyncObject(
+      "selectedInstanceRenderState",
+      $selectedInstanceRenderState
+    ),
+    new NanostoresSyncObject(
+      "hoveredInstanceSelector",
+      $hoveredInstanceSelector
+    ),
+    new NanostoresSyncObject("builderMode", $builderMode),
+    new NanostoresSyncObject("authTokenPermissions", $authTokenPermissions),
+    new NanostoresSyncObject("toastErrors", $toastErrors),
+    new NanostoresSyncObject("selectedStyleSources", $selectedStyleSources),
+    new NanostoresSyncObject("selectedStyleState", $selectedStyleState),
+    new NanostoresSyncObject("dragAndDropState", $dragAndDropState),
+    new NanostoresSyncObject("ephemeralStyles", $ephemeralStyles),
+    new NanostoresSyncObject("selectedInstanceStates", $selectedInstanceStates),
+    new NanostoresSyncObject("canvasIframeState", $canvasIframeState),
+    new NanostoresSyncObject(
+      "uploadingFilesDataStore",
+      $uploadingFilesDataStore
+    ),
+    new NanostoresSyncObject("memoryProps", $memoryProps),
+    new NanostoresSyncObject("detectedFontsWeights", $detectedFontsWeights),
+    new NanostoresSyncObject("selectedBreakpointId", $selectedBreakpointId),
+    new NanostoresSyncObject(
+      "textEditingInstanceSelector",
+      $textEditingInstanceSelector
+    ),
+    new NanostoresSyncObject("textEditorContextMenu", $textEditorContextMenu),
+    new NanostoresSyncObject(
+      "textEditorContextMenuCommand",
+      $textEditorContextMenuCommand
+    ),
+    new NanostoresSyncObject("isResizingCanvas", $isResizingCanvas),
+    new NanostoresSyncObject("textToolbar", $textToolbar),
+    new NanostoresSyncObject(
+      "selectedInstanceOutline",
+      $selectedInstanceOutline
+    ),
+    new NanostoresSyncObject("hoveredInstanceOutline", $hoveredInstanceOutline),
+    new NanostoresSyncObject("blockChildOutline", $blockChildOutline),
+    new NanostoresSyncObject("modifierKeys", $modifierKeys),
+    new NanostoresSyncObject(
+      "collaborativeInstanceSelector",
+      $collaborativeInstanceSelector
+    ),
+    new NanostoresSyncObject(
+      "collaborativeInstanceRect",
+      $collaborativeInstanceRect
+    ),
+    new NanostoresSyncObject(
+      "registeredComponentMetas",
+      $registeredComponentMetas
+    ),
+    new NanostoresSyncObject(
+      "registeredComponentPropsMetas",
+      $registeredComponentPropsMetas
+    ),
+    new NanostoresSyncObject("registeredTemplates", $registeredTemplates),
+    new NanostoresSyncObject("canvasScrollbarWidth", $canvasScrollbarSize),
+  ]);
 };
 
-const syncStoresState = (name: SyncEventSource, publish: Publish) => {
-  const latestData = new Map<string, unknown>();
-
-  const unsubscribeRemoteChanges = subscribe(
-    "sendStoreData",
-    ({ source, data }) => {
-      /// prevent reapplying own changes
-      if (source === name) {
-        return;
-      }
-      for (const { namespace, value } of data) {
-        // apply immerhin stores data
-        const container = serverSyncStore.containers.get(namespace);
-        if (container) {
-          container.set(value);
-        }
-        const clientContainer = clientSyncStore.containers.get(namespace);
-        if (clientContainer) {
-          clientContainer.set(value);
-        }
-        // apply state stores data
-        const $state = clientStores.get(namespace);
-        if ($state) {
-          // should be called before store set
-          // to be accessible in listen callback
-          latestData.set(namespace, value);
-          $state.set(value);
-        }
-      }
-    }
-  );
-
-  const unsubscribes: Array<() => void> = [];
-  for (const [namespace, store] of clientStores) {
-    unsubscribes.push(
-      // use listen to not invoke initially
-      store.listen((value) => {
-        // nanostores cannot identify the source of change
-        // so we check the latest value applied to the store
-        // and do nothing if was set by synchronization logic
-        if (latestData.has(namespace) && latestData.get(namespace) === value) {
-          return;
-        }
-        latestData.set(namespace, value);
-
-        publish({
-          type: "sendStoreData",
-          payload: {
-            source: name,
-            data: [
-              {
-                namespace,
-                value,
-              },
-            ],
-          },
-        });
-      })
-    );
+declare global {
+  interface Window {
+    __webstudioSharedSyncEmitter__: SyncEmitter | undefined;
   }
+}
 
-  return () => {
-    unsubscribeRemoteChanges();
-    for (const unsubscribe of unsubscribes) {
-      unsubscribe();
-    }
-  };
-};
+/**
+ * prevent syncEmitter interception from embedded scripts on canvas
+ * i.e., `globalThis.syncEmitter = () => console.log('INTERCEPTED');`,
+ */
+const sharedSyncEmitter =
+  typeof window === "undefined"
+    ? undefined
+    : window.__webstudioSharedSyncEmitter__;
+if (typeof window !== "undefined") {
+  delete window.__webstudioSharedSyncEmitter__;
+}
 
-export const useCanvasStore = (publish: Publish) => {
+export const useCanvasStore = () => {
   useEffect(() => {
-    // connect to builder to get latest changes
-    publish({
-      type: "connect",
-      payload: { sourceAppId: appId },
+    const canvasClient = new SyncClient({
+      role: "follower",
+      object: createObjectPool(),
+      emitter: sharedSyncEmitter,
     });
 
-    // immerhin data is sent only initially so not part of syncStoresState
-    // expect data to be populated by the time effect is called
-    const data = [];
-    for (const [namespace, store] of clientStores) {
-      if (initializedStores.has(namespace)) {
-        data.push({
-          namespace,
-          value: store.get(),
-        });
-      }
-    }
-    publish({
-      type: "sendStoreData",
-      payload: {
-        source: "canvas",
-        data,
-      },
-    });
-
-    // subscribe stores after connect even so builder is ready to receive
-    // changes from immerhin queue
-    const unsubscribeStoresState = syncStoresState("canvas", publish);
-    const unsubscribeStoresChanges = syncStoresChanges("canvas", publish);
-
+    const controller = new AbortController();
+    canvasClient.connect({ signal: controller.signal });
     return () => {
-      publish({
-        type: "disconnect",
-        payload: { sourceAppId: appId },
-      });
-      unsubscribeStoresState();
-      unsubscribeStoresChanges();
+      controller.abort();
     };
-  }, [publish]);
-};
-
-export const useBuilderStore = (publish: Publish) => {
-  useEffect(() => {
-    let unsubscribeStoresState: undefined | (() => void);
-    let unsubscribeStoresChanges: undefined | (() => void);
-    const unsubscribeConnect = subscribe("connect", () => {
-      // subscribe stores after connection so canvas is ready to receive
-      // changes from immerhin queue
-      // @todo subscribe prematurely and compute initial changes
-      // from current state whenever new app is connected
-      unsubscribeStoresState = syncStoresState("builder", publish);
-      unsubscribeStoresChanges = syncStoresChanges("builder", publish);
-      // immerhin data is sent only initially so not part of syncStoresState
-      // expect data to be populated by the time effect is called
-      const data = [];
-      for (const [namespace, container] of serverSyncStore.containers) {
-        data.push({
-          namespace,
-          value: container.get(),
-        });
-      }
-      for (const [namespace, store] of clientStores) {
-        if (initializedStores.has(namespace)) {
-          data.push({
-            namespace,
-            value: store.get(),
-          });
-        }
-      }
-      publish({
-        type: "sendStoreData",
-        payload: {
-          source: "builder",
-          data,
-        },
-      });
-    });
-
-    const unsubscribeDisconnect = subscribe("disconnect", () => {
-      unsubscribeStoresState?.();
-      unsubscribeStoresChanges?.();
-    });
-
-    return () => {
-      unsubscribeConnect();
-      unsubscribeDisconnect();
-      unsubscribeStoresState?.();
-      unsubscribeStoresChanges?.();
-    };
-  }, [publish]);
+  }, []);
 };

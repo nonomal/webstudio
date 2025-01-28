@@ -14,21 +14,55 @@
  * });
  */
 
+import { clamp } from "@react-aria/utils";
+import { css } from "../../stitches.config";
+
+const scrubUI = css({
+  "*": {
+    userSelect: "none!important",
+    touchAction: "none!important",
+  },
+});
+
+const cursorUI = css({
+  variants: {
+    direction: {
+      horizontal: {
+        cursor: "ew-resize!important",
+        "*": {
+          cursor: "ew-resize!important",
+        },
+      },
+      vertical: {
+        cursor: "ns-resize!important",
+        "*": {
+          cursor: "ns-resize!important",
+        },
+      },
+    },
+  },
+});
+
 export type NumericScrubDirection = "horizontal" | "vertical";
 
 export type NumericScrubValue = number;
 
-export type NumericScrubCallback = (event: {
+export type NumericScrubEvent = {
+  type: "scrubend" | "scrubbing";
   target: HTMLElement | SVGElement;
   value: NumericScrubValue;
   preventDefault: () => void;
-}) => void;
+};
+
+type NumericScrubCallback = (event: NumericScrubEvent) => void;
 
 export type NumericScrubOptions = {
   inverse?: boolean;
+  getAcceleration?: () => number | undefined;
   minValue?: NumericScrubValue;
   maxValue?: NumericScrubValue;
-  getInitialValue: () => number | undefined;
+  distanceThreshold?: number;
+  getInitialValue: () => number;
   onStart?: () => void;
   getValue?: (
     state: NumericScrubState,
@@ -45,8 +79,7 @@ export type NumericScrubOptions = {
 type NumericScrubState = {
   value: number;
   cursor?: SVGElement;
-  direction: string;
-  timerId?: ReturnType<typeof window.setTimeout>;
+  direction: NumericScrubDirection;
   status: "idle" | "scrubbing";
 };
 
@@ -56,17 +89,58 @@ const getValueDefault = (
   {
     minValue = Number.MIN_SAFE_INTEGER,
     maxValue = Number.MAX_SAFE_INTEGER,
+    getAcceleration = () => 1,
   }: NumericScrubOptions
 ) => {
   // toFixed is needed to fix `1.3 - 1 = 0.30000000000000004`
-  const value = Number((state.value + movement).toFixed(2));
-  if (value < minValue) {
-    return minValue;
-  }
-  if (state.value > maxValue) {
-    return maxValue;
-  }
-  return value;
+  const acceleration = getAcceleration() ?? 1;
+  const value = Number((state.value + movement * acceleration).toFixed(2));
+  return clamp(value, minValue, maxValue);
+};
+
+const preventContextMenu = () => {
+  const handler = (event: MouseEvent) => {
+    event.preventDefault();
+  };
+  window.addEventListener("contextmenu", handler);
+  return () => {
+    window.removeEventListener("contextmenu", handler);
+  };
+};
+
+const scrubTimeout = 150;
+
+const addScrubUi = () => {
+  const className = scrubUI();
+  const timerId = setTimeout(() => {
+    // Fixes Safari hovers during scrubbing
+    window.document.documentElement.setAttribute("inert", "true");
+  }, scrubTimeout);
+
+  window.document.documentElement.classList.add(className);
+
+  return () => {
+    clearTimeout(timerId);
+    window.document.documentElement.classList.remove(className);
+    window.document.documentElement.removeAttribute("inert");
+  };
+};
+
+const addCursorUI = (direction: NumericScrubDirection) => {
+  const cursorClassNames = cursorUI({ direction }).toString().split(" ");
+
+  const timerId = setTimeout(() => {
+    for (const cursorClassName of cursorClassNames) {
+      window.document.documentElement.classList.add(cursorClassName);
+    }
+  }, scrubTimeout);
+
+  return () => {
+    for (const cursorClassName of cursorClassNames) {
+      window.document.documentElement.classList.remove(cursorClassName);
+    }
+    clearTimeout(timerId);
+  };
 };
 
 export const numericScrubControl = (
@@ -78,45 +152,52 @@ export const numericScrubControl = (
     onStart,
     getValue = getValueDefault,
     direction = "horizontal",
+    distanceThreshold = 0,
     onValueInput,
     onValueChange,
     onStatusChange,
     shouldHandleEvent,
   } = options;
-  const eventNames = ["pointerup", "pointerdown"] as const;
+
+  const cleanupTasks: Array<() => void> = [];
+  const disposeOnCleanup = (fn: () => () => void) => cleanupTasks.push(fn());
+
   const state: NumericScrubState = {
     // We will read value lazyly in a moment it will be used to avoid having outdated value
     value: -1,
     cursor: undefined,
-    direction: direction,
-    timerId: undefined,
+    direction,
     status: "idle",
   };
 
-  let exitPointerLock: (() => void) | undefined = undefined;
-
-  let originalUserSelect = "";
+  // The appearance of the custom cursor is delayed, so we need to track the mouse position
+  // for its initial placement.
+  const mouseState = {
+    x: 0,
+    y: 0,
+  };
 
   const cleanup = () => {
-    targetNode.removeEventListener("pointermove", handleEvent);
+    for (const task of [...cleanupTasks.reverse()]) {
+      task();
+    }
 
     if (state.status === "scrubbing") {
       state.status = "idle";
       onStatusChange?.("idle");
     }
+  };
 
-    clearTimeout(state.timerId);
+  let disposeCursorUI: () => void | undefined;
 
-    exitPointerLock?.();
-    exitPointerLock = undefined;
-    if (originalUserSelect) {
-      targetNode.ownerDocument.documentElement.style.userSelect =
-        originalUserSelect;
-    } else {
-      targetNode.ownerDocument.documentElement.style.removeProperty(
-        "user-select"
-      );
+  // Called on ESC key press or in cases of third-party pointer lock exit.
+  const handlePointerLockChange = () => {
+    if (document.pointerLockElement !== targetNode) {
+      cleanup();
+      return;
     }
+
+    disposeCursorUI?.();
   };
 
   // Cannot define `event:` as PointerEvent,
@@ -133,15 +214,19 @@ export const numericScrubControl = (
 
     switch (type) {
       case "pointerup": {
-        const shouldComponentUpdate = Boolean(state.cursor);
+        const shouldComponentUpdate = state.status === "scrubbing";
+
         cleanup();
+
         if (shouldComponentUpdate) {
           onValueChange?.({
+            type: "scrubend",
             target: targetNode,
             value: state.value,
             preventDefault: () => event.preventDefault(),
           });
         }
+
         break;
       }
       case "pointerdown": {
@@ -155,41 +240,85 @@ export const numericScrubControl = (
         if (event.pressure === 0 || event.button !== 0) {
           break;
         }
-        const value = getInitialValue();
 
-        // We don't support scrub on non unit values
-        // Its highly unlikely that the value here will be undefined, as useScrub tries to not create scrub on non unit values
-        // but having that we use lazy getInitialValue() and vanilla js events it's possible.
-        if (value === undefined) {
-          return;
-        }
+        mouseState.x = event.clientX;
+        mouseState.y = event.clientY;
 
         onStart?.();
+        state.value = getInitialValue();
 
-        state.value = value;
+        disposeOnCleanup(() =>
+          requestPointerLock(state, mouseState, event, targetNode)
+        );
+        disposeOnCleanup(() => addScrubUi());
 
-        state.timerId = setTimeout(() => {
-          exitPointerLock?.();
+        disposeCursorUI = addCursorUI(options.direction ?? "horizontal");
+        disposeOnCleanup(() => disposeCursorUI);
 
-          exitPointerLock = requestPointerLock(state, event, targetNode);
-        }, 150);
+        disposeOnCleanup(() => {
+          const abortController = new AbortController();
+          const eventOptions = {
+            signal: abortController.signal,
+          };
 
-        state.status = "scrubbing";
-        onStatusChange?.("scrubbing");
+          targetNode.addEventListener("pointermove", handleEvent, eventOptions);
 
-        targetNode.addEventListener("pointermove", handleEvent);
-        originalUserSelect =
-          targetNode.ownerDocument.documentElement.style.userSelect;
-        targetNode.ownerDocument.documentElement.style.userSelect = "none";
+          document.addEventListener(
+            "pointerlockchange",
+            handlePointerLockChange,
+            eventOptions
+          );
+
+          targetNode.addEventListener(
+            "click",
+            (event) => {
+              // Prevent the click event from firing during scrubbing
+              // Resolves issues with margin scrubbing and opening inputs after scrubbing
+              // Fixes unintended click events triggered during canvas resizing
+              if (state.status === "scrubbing") {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+              }
+            },
+            eventOptions
+          );
+
+          return () => {
+            abortController.abort();
+          };
+        });
+
+        // Pointer event will stop firing on touch after ~300ms because browser starts scrolling the page.
+        // restoreUserSelect = setRootStyle(targetNode, "user-select", "none");
+        // In chrome mobile touch simulation, you will get the context menu because tapping and holding
+        // results in a right click.
+        disposeOnCleanup(preventContextMenu);
         break;
       }
       case "pointermove": {
+        mouseState.x = event.clientX;
+        mouseState.y = event.clientY;
+
         const nextValue = getValue(state, movement, options);
         if (nextValue === state.value) {
           break;
         }
         state.value = nextValue;
+
+        if (state.status !== "scrubbing") {
+          const initialValue = getInitialValue();
+          // If the value is not changing enough, we don't want to start scrubbing.
+          if (Math.abs(initialValue - nextValue) < distanceThreshold) {
+            return;
+          }
+          // We need to reset the value to the initial so that the actual value starts from the initial value
+          // when we start calling onValueInput.
+          state.value = initialValue;
+          state.status = "scrubbing";
+          onStatusChange?.("scrubbing");
+        }
         onValueInput?.({
+          type: "scrubbing",
           target: targetNode,
           value: state.value,
           preventDefault: () => event.preventDefault(),
@@ -216,83 +345,149 @@ export const numericScrubControl = (
         }
         break;
       }
+      case "pointercancel": {
+        cleanup();
+        break;
+      }
+      case "lostpointercapture": {
+        if (document.pointerLockElement === null) {
+          cleanup();
+        }
+        break;
+      }
     }
   };
 
+  const abortController = new AbortController();
+  const eventOptions = { signal: abortController.signal };
+
+  const eventNames = [
+    "pointerup",
+    "pointerdown",
+    "pontercancel",
+    "lostpointercapture",
+  ] as const;
   eventNames.forEach((eventName) =>
-    targetNode.addEventListener(eventName, handleEvent)
+    targetNode.addEventListener(eventName, handleEvent, eventOptions)
+  );
+
+  // Prevents dragging of the input content
+  // Dragging breaks the setPointerCapture
+  targetNode.addEventListener(
+    "dragstart",
+    (event) => {
+      event.preventDefault();
+    },
+    eventOptions
   );
 
   return () => {
-    eventNames.forEach((eventName) =>
-      targetNode.removeEventListener(eventName, handleEvent)
-    );
+    abortController.abort();
     cleanup();
   };
 };
 
-const requestPointerLock = (
-  state: NumericScrubState,
-  event: PointerEvent,
-  targetNode: HTMLElement | SVGElement
-) => {
-  // The pointer lock api nukes the cursor on requestng a pointer lock,
-  // creating and managing the visual que of the cursor is thus left to the author
-  // we create and append an svg that serves as the visual que of where the cursor currently is
-  // taking into account horizontal/vertical orientation of the cursor itself, and update its position on move.
-  // we only use pointerLock api on chromium based browsers, because they feature an unobtrusive ux when activating it
-  // other browsers show a warning banner, making the use of it in this scenario subpar: in which case we fallback to using non-pointerLock means:
-  // albeit without an infinite cursor ux.
-  if (shouldUsePointerLock) {
-    targetNode.requestPointerLock();
-    const cursorNode = (targetNode.ownerDocument.querySelector(
-      "#numeric-guesture-control-cursor"
-    ) ||
-      new Range().createContextualFragment(`
-      <svg id="numeric-guesture-control-cursor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="46" height="15">
-       <g transform="translate(2 3)">
-         <path d="M 15 4.5L 15 2L 11.5 5.5L 15 9L 15 6.5L 31 6.5L 31 9L 34.5 5.5L 31 2L 31 4.5Z" fill="#111" fill-rule="evenodd" stroke="#FFF" stroke-width="2"></path>
-          <path d="M 15 4.5L 15 2L 11.5 5.5L 15 9L 15 6.5L 31 6.5L 31 9L 34.5 5.5L 31 2L 31 4.5Z" fill="#111" fill-rule="evenodd"></path>
-        </g>
-      </svg>`).firstElementChild) as SVGElement;
-    cursorNode.style.filter = `drop-shadow(${
-      state.direction === "horizontal" ? "0 1px" : "1px 0"
-    } 1.1px rgba(0,0,0,.4))`;
-    cursorNode.style.position = "fixed";
-    cursorNode.style.zIndex = Number.MAX_SAFE_INTEGER.toString();
-    cursorNode.style.left = `${event.clientX}px`;
-    cursorNode.style.top = `${event.clientY}px`;
-    cursorNode.style.transform = `translate(-50%, -50%) ${
-      state.direction === "horizontal" ? "rotate(0deg)" : "rotate(90deg)"
-    }`;
-    state.cursor = cursorNode;
-    if (state.cursor) {
-      targetNode.ownerDocument.documentElement.append(state.cursor);
-    }
-    return () => {
-      if (state.cursor) {
-        state.cursor.remove();
-        state.cursor = undefined;
-      }
-
-      targetNode.ownerDocument.exitPointerLock();
-    };
-  } else {
-    const { pointerId } = event;
-    targetNode.ownerDocument.documentElement.style.setProperty(
-      "cursor",
-      state.direction === "horizontal" ? "ew-resize" : "ns-resize"
-    );
-    targetNode.setPointerCapture(pointerId);
-
-    return () => {
-      targetNode.ownerDocument.documentElement.style.removeProperty("cursor");
-      targetNode.releasePointerCapture(pointerId);
-    };
+const requestPointerLockSafe = async (targetNode: HTMLElement | SVGElement) => {
+  try {
+    return await targetNode.requestPointerLock({
+      unadjustedMovement: true,
+    });
+  } catch {
+    // Some platforms may not support unadjusted movement.
+    return await targetNode.requestPointerLock();
   }
 };
 
-const shouldUsePointerLock = "chrome" in globalThis;
+const requestPointerLock = (
+  state: NumericScrubState,
+  mouseState: { x: number; y: number },
+  event: PointerEvent,
+  targetNode: HTMLElement | SVGElement
+) => {
+  const cleanupTasks: Array<() => void> = [];
+  const disposeOnCleanup = (fn: () => () => void) => cleanupTasks.push(fn());
+
+  const { pointerId } = event;
+
+  // Fixes an issue where setPointerCapture disrupts the input cursor if the input has a selection.
+  // To reproduce: click into the input and observe that everything is selected.
+  // Then click again and notice the cursor is not placed correctly.
+  window.getSelection()?.removeAllRanges();
+
+  disposeOnCleanup(() => {
+    targetNode.setPointerCapture(pointerId);
+    return () => {
+      targetNode.releasePointerCapture(pointerId);
+    };
+  });
+
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  // Safari supports pointer lock well, but the issue lies with the pointer lock banner.
+  // It shifts the entire page down, which creates a poor user experience.
+  if (!isSafari) {
+    disposeOnCleanup(() => {
+      const timerId = window.setTimeout(() => {
+        requestPointerLockSafe(targetNode)
+          .then(() => {
+            const cursorNode =
+              (targetNode.ownerDocument.querySelector(
+                "#numeric-guesture-control-cursor"
+              ) as SVGElement) ||
+              (new DOMParser().parseFromString(
+                `
+              <svg id="numeric-guesture-control-cursor" version="1.1" xmlns="http://www.w3.org/2000/svg" width="46" height="15">
+               <g transform="translate(2 3)">
+                 <path d="M 15 4.5L 15 2L 11.5 5.5L 15 9L 15 6.5L 31 6.5L 31 9L 34.5 5.5L 31 2L 31 4.5Z" fill="#111" fill-rule="evenodd" stroke="#FFF" stroke-width="2"></path>
+                  <path d="M 15 4.5L 15 2L 11.5 5.5L 15 9L 15 6.5L 31 6.5L 31 9L 34.5 5.5L 31 2L 31 4.5Z" fill="#111" fill-rule="evenodd"></path>
+                </g>
+              </svg>`,
+                "application/xml"
+              ).documentElement as Element as SVGElement);
+
+            cursorNode.style.filter = `drop-shadow(${
+              state.direction === "horizontal" ? "0 1px" : "1px 0"
+            } 1.1px rgba(0,0,0,.4))`;
+            cursorNode.style.position = "fixed";
+            cursorNode.style.zIndex = Number.MAX_SAFE_INTEGER.toString();
+
+            cursorNode.style.left = `${mouseState.x}px`;
+            cursorNode.style.top = `${mouseState.y}px`;
+
+            cursorNode.style.transform = `translate(-50%, -50%) ${
+              state.direction === "horizontal"
+                ? "rotate(0deg)"
+                : "rotate(90deg)"
+            }`;
+            state.cursor = cursorNode;
+            if (state.cursor) {
+              targetNode.ownerDocument.documentElement.appendChild(
+                state.cursor
+              );
+            }
+          })
+          .catch((error) => {
+            console.error("requestPointerLock", error);
+          });
+      }, scrubTimeout);
+
+      return () => {
+        if (state.cursor) {
+          state.cursor.remove();
+          state.cursor = undefined;
+        }
+
+        targetNode.ownerDocument.exitPointerLock();
+        clearTimeout(timerId);
+      };
+    });
+  }
+
+  return () => {
+    for (const task of [...cleanupTasks.reverse()]) {
+      task();
+    }
+  };
+};
 
 // When the value is outside of the range make it come back to the range from the other side
 //   |        | . -> | .      |

@@ -1,8 +1,5 @@
-/* eslint-disable react/display-name */
-// We can't use .displayName until this is merged https://github.com/styleguidist/react-docgen-typescript/pull/449
-
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
-import { getClosestInstance, type Hook } from "@webstudio-is/react-sdk";
+import { getClosestInstance, type Hook } from "@webstudio-is/react-sdk/runtime";
 
 import {
   forwardRef,
@@ -73,7 +70,7 @@ export const hooksTooltip: Hook = {
           `${namespace}:Tooltip`
         );
         if (tooltip) {
-          context.setPropVariable(tooltip.id, "open", false);
+          context.setMemoryProp(tooltip, "open", undefined);
         }
       }
     }
@@ -87,7 +84,7 @@ export const hooksTooltip: Hook = {
           `${namespace}:Tooltip`
         );
         if (tooltip) {
-          context.setPropVariable(tooltip.id, "open", true);
+          context.setMemoryProp(tooltip, "open", true);
         }
       }
     }

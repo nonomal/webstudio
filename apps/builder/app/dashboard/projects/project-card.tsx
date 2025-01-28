@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -13,58 +14,39 @@ import {
   Tooltip,
   rawTheme,
   Link,
+  Box,
 } from "@webstudio-is/design-system";
-import { InfoCircleIcon, MenuIcon } from "@webstudio-is/icons";
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
-import { builderPath, getPublishedUrl } from "~/shared/router-utils";
+import { InfoCircleIcon, EllipsesIcon } from "@webstudio-is/icons";
+import type { DashboardProject } from "@webstudio-is/dashboard";
+import { builderUrl } from "~/shared/router-utils";
 import {
   RenameProjectDialog,
   DeleteProjectDialog,
-  useDuplicate,
+  useCloneProject,
   ShareProjectDialog,
-  DuplicateProjectDialog,
 } from "./project-dialogs";
 import {
   ThumbnailLinkWithAbbr,
   ThumbnailLinkWithImage,
-  ThumbnailWithAbbr,
-  ThumbnailWithImage,
-} from "./thumbnail";
-import { useNavigation } from "@remix-run/react";
-import { Spinner } from "../spinner";
-import type { DashboardProject } from "@webstudio-is/dashboard";
-import { Card, CardContent, CardFooter } from "../card";
-
-const titleStyle = css({
-  userSelect: "auto",
-  ...truncate(),
-});
+} from "../shared/thumbnail";
+import { Spinner } from "../shared/spinner";
+import { Card, CardContent, CardFooter } from "../shared/card";
 
 const infoIconStyle = css({ flexShrink: 0 });
 
-const usePublishedLink = ({ domain }: { domain: string }) => {
-  const [url, setUrl] = useState<URL>();
-
-  useEffect(() => {
-    // It uses `window.location` to detect the default values when running locally localhost,
-    // so it needs an effect to avoid hydration errors.
-    setUrl(new URL(getPublishedUrl(domain)));
-  }, [domain]);
-
-  return { url };
-};
-
 const PublishedLink = ({
   domain,
+  publisherHost,
   tabIndex,
 }: {
   domain: string;
+  publisherHost: string;
   tabIndex: number;
 }) => {
-  const { url } = usePublishedLink({ domain });
+  const publishedOrigin = `https://${domain}.${publisherHost}`;
   return (
     <Link
-      href={url?.href}
+      href={publishedOrigin}
       target="_blank"
       rel="noreferrer"
       tabIndex={tabIndex}
@@ -72,7 +54,7 @@ const PublishedLink = ({
       underline="hover"
       css={truncate()}
     >
-      {url?.host}
+      {new URL(publishedOrigin).host}
     </Link>
   );
 };
@@ -99,11 +81,11 @@ const Menu = ({
           tabIndex={tabIndex}
           css={{ alignSelf: "center" }}
         >
-          <MenuIcon width={15} height={15} />
+          <EllipsesIcon width={15} height={15} />
         </IconButton>
       </DropdownMenuTrigger>
       <DropdownMenuPortal>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="end" css={{ width: theme.spacing[24] }}>
           <DropdownMenuItem onSelect={onDuplicate}>Duplicate</DropdownMenuItem>
           <DropdownMenuItem onSelect={onRename}>Rename</DropdownMenuItem>
           <DropdownMenuItem onSelect={onShare}>Share</DropdownMenuItem>
@@ -114,46 +96,6 @@ const Menu = ({
   );
 };
 
-const useProjectCard = () => {
-  const thumbnailRef = useRef<HTMLAnchorElement & HTMLDivElement>(null);
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    const elements: Array<HTMLElement> = Array.from(
-      event.currentTarget.querySelectorAll(`[tabIndex='-1']`)
-    );
-    const currentIndex = elements.indexOf(
-      document.activeElement as HTMLElement
-    );
-    switch (event.key) {
-      case "Enter": {
-        // Only open project on enter when the project card container was focused,
-        // otherwise we will always open project, even when a menu was pressed.
-        if (event.currentTarget === document.activeElement) {
-          thumbnailRef.current?.click();
-        }
-        break;
-      }
-      case "ArrowUp":
-      case "ArrowRight": {
-        const nextElement = elements.at(currentIndex + 1) ?? elements[0];
-        nextElement?.focus();
-        break;
-      }
-      case "ArrowDown":
-      case "ArrowLeft": {
-        const nextElement = elements.at(currentIndex - 1) ?? elements[0];
-        nextElement?.focus();
-        break;
-      }
-    }
-  };
-
-  return {
-    thumbnailRef,
-    handleKeyDown,
-  };
-};
-
 const formatDate = (date: string) => {
   return new Date(date).toLocaleDateString("en-US", {
     year: "numeric",
@@ -162,52 +104,95 @@ const formatDate = (date: string) => {
   });
 };
 
-type ProjectCardProps = DashboardProject & { hasProPlan: boolean };
+type ProjectCardProps = {
+  project: DashboardProject;
+  hasProPlan: boolean;
+  publisherHost: string;
+};
 
 export const ProjectCard = ({
-  id,
-  title,
-  domain,
-  isPublished,
+  project: {
+    id,
+    title,
+    domain,
+    isPublished,
+    createdAt,
+    latestBuildVirtual,
+    previewImageAsset,
+  },
   hasProPlan,
-  createdAt,
-  latestBuild,
-  previewImageAsset,
+  publisherHost,
+  ...props
 }: ProjectCardProps) => {
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isHidden, setIsHidden] = useState(false);
-  const { thumbnailRef, handleKeyDown } = useProjectCard();
-  const handleDuplicate = useDuplicate(id);
-  const { state, location } = useNavigation();
-  const linkPath = builderPath({ projectId: id });
-  // Transition to the project has started, we may need to show a spinner
-  const isTransitioning = state !== "idle" && linkPath === location.pathname;
+  const handleCloneProject = useCloneProject(id);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  useEffect(() => {
+    const linkPath = builderUrl({ origin: window.origin, projectId: id });
+
+    const handleNavigate = (event: NavigateEvent) => {
+      if (event.destination.url === linkPath) {
+        setIsTransitioning(true);
+      }
+    };
+
+    if (window.navigation === undefined) {
+      return;
+    }
+
+    window.navigation.addEventListener("navigate", handleNavigate);
+
+    return () => {
+      window.navigation.removeEventListener("navigate", handleNavigate);
+    };
+  }, [id]);
+
+  const linkPath = builderUrl({ origin: window.origin, projectId: id });
+
   return (
-    <Card hidden={isHidden} tabIndex={0} onKeyDown={handleKeyDown}>
+    <Card hidden={isHidden} {...props}>
       <CardContent
-        css={{ background: theme.colors.brandBackgroundProjectCardBack }}
+        css={{
+          background: theme.colors.brandBackgroundProjectCardBack,
+          [`&:hover`]: {
+            "--ws-project-card-prefetch-image-background": `url(${linkPath}cgi/empty.gif)`,
+          },
+        }}
       >
+        {/* This div with backgorundImage on card hover is used to prefetch DNS of the project domain on hover. */}
+        <Box
+          css={{
+            backgroundImage: `var(--ws-project-card-prefetch-image-background, none)`,
+            visibility: "hidden",
+            position: "absolute",
+            width: 1,
+            height: 1,
+            left: 0,
+            top: 0,
+            opacity: 0,
+          }}
+        />
+
         {previewImageAsset ? (
-          <ThumbnailLinkWithImage
-            to={linkPath}
-            name={previewImageAsset.name}
-            ref={thumbnailRef}
-          />
+          <ThumbnailLinkWithImage to={linkPath} name={previewImageAsset.name} />
         ) : (
-          <ThumbnailLinkWithAbbr
-            title={title}
-            to={linkPath}
-            ref={thumbnailRef}
-          />
+          <ThumbnailLinkWithAbbr title={title} to={linkPath} />
         )}
         {isTransitioning && <Spinner delay={0} />}
       </CardContent>
       <CardFooter>
         <Flex direction="column" justify="around" grow>
           <Flex gap="1">
-            <Text variant="titles" className={titleStyle()}>
+            <Text
+              variant="titles"
+              userSelect="text"
+              truncate
+              css={{ textTransform: "none" }}
+            >
               {title}
             </Text>
             <Tooltip
@@ -215,10 +200,10 @@ export const ProjectCard = ({
               content={
                 <Text variant="small">
                   Created on {formatDate(createdAt)}
-                  {latestBuild?.publishStatus === "PUBLISHED" && (
+                  {latestBuildVirtual?.publishStatus === "PUBLISHED" && (
                     <>
                       <br />
-                      Published on {formatDate(latestBuild.updatedAt)}
+                      Published on {formatDate(latestBuildVirtual.createdAt)}
                     </>
                   )}
                 </Text>
@@ -232,7 +217,11 @@ export const ProjectCard = ({
             </Tooltip>
           </Flex>
           {isPublished ? (
-            <PublishedLink domain={domain} tabIndex={-1} />
+            <PublishedLink
+              publisherHost={publisherHost}
+              domain={domain}
+              tabIndex={-1}
+            />
           ) : (
             <Text color="subtle">Not Published</Text>
           )}
@@ -248,7 +237,7 @@ export const ProjectCard = ({
           onShare={() => {
             setIsShareDialogOpen(true);
           }}
-          onDuplicate={handleDuplicate}
+          onDuplicate={handleCloneProject}
         />
       </CardFooter>
       <RenameProjectDialog
@@ -269,61 +258,6 @@ export const ProjectCard = ({
         onOpenChange={setIsShareDialogOpen}
         projectId={id}
         hasProPlan={hasProPlan}
-      />
-    </Card>
-  );
-};
-
-export const ProjectTemplateCard = ({
-  id,
-  title,
-  domain,
-  previewImageAsset,
-  isPublished,
-}: Omit<ProjectCardProps, "hasProPlan">) => {
-  const { thumbnailRef, handleKeyDown } = useProjectCard();
-  const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
-
-  return (
-    <Card tabIndex={0} onKeyDown={handleKeyDown}>
-      <CardContent
-        css={{ background: theme.colors.brandBackgroundProjectCardBack }}
-      >
-        {previewImageAsset ? (
-          <ThumbnailWithImage
-            name={previewImageAsset.name}
-            ref={thumbnailRef}
-            onClick={() => {
-              setIsDuplicateDialogOpen(true);
-            }}
-          />
-        ) : (
-          <ThumbnailWithAbbr
-            title={title}
-            ref={thumbnailRef}
-            onClick={() => {
-              setIsDuplicateDialogOpen(true);
-            }}
-          />
-        )}
-      </CardContent>
-      <CardFooter>
-        <Flex direction="column" justify="around">
-          <Text variant="titles" truncate css={{ userSelect: "auto" }}>
-            {title}
-          </Text>
-          {isPublished ? (
-            <PublishedLink domain={domain} tabIndex={-1} />
-          ) : (
-            <Text color="subtle">Not Published</Text>
-          )}
-        </Flex>
-      </CardFooter>
-      <DuplicateProjectDialog
-        isOpen={isDuplicateDialogOpen}
-        onOpenChange={setIsDuplicateDialogOpen}
-        title={title}
-        projectId={id}
       />
     </Card>
   );

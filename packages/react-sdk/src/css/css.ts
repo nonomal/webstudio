@@ -1,31 +1,35 @@
 import {
   createRegularStyleSheet,
-  createAtomicStyleSheet,
+  generateAtomic,
+  type NestingRule,
   type TransformValue,
 } from "@webstudio-is/css-engine";
-import type {
-  Asset,
-  Assets,
-  Breakpoint,
-  Instance,
-  StyleDecl,
-  StyleDeclKey,
-  StyleSourceSelection,
+import {
+  ROOT_INSTANCE_ID,
+  createScope,
+  parseComponentName,
+  descendantComponent,
+  rootComponent,
+  type Assets,
+  type Breakpoints,
+  type Instance,
+  type Instances,
+  type Props,
+  type StyleSourceSelections,
+  type Styles,
+  type WsComponentMeta,
 } from "@webstudio-is/sdk";
-import type { WsComponentMeta } from "../components/component-meta";
-import { idAttribute } from "../props";
 import { addGlobalRules } from "./global-rules";
-import { getPresetStyleRules, getStyleRules } from "./style-rules";
+import { kebabCase } from "change-case";
 
-type Data = {
-  assets: Asset[];
-  breakpoints: [Breakpoint["id"], Breakpoint][];
-  styles: [StyleDeclKey, StyleDecl][];
-  styleSourceSelections: [Instance["id"], StyleSourceSelection][];
+export type CssConfig = {
+  assets: Assets;
+  instances: Instances;
+  props: Props;
+  breakpoints: Breakpoints;
+  styles: Styles;
+  styleSourceSelections: StyleSourceSelections;
   componentMetas: Map<string, WsComponentMeta>;
-};
-
-type CssOptions = {
   assetBaseUrl: string;
   atomic: boolean;
 };
@@ -56,66 +60,145 @@ export const createImageValueTransformer =
     }
   };
 
-export const generateCss = (
-  data: Data,
-  { assetBaseUrl, atomic = false }: CssOptions
-) => {
-  const assets: Assets = new Map(data.assets.map((asset) => [asset.id, asset]));
-  const breakpoints = new Map(data.breakpoints);
-  const styles = new Map(data.styles);
-  const styleSourceSelections = new Map(data.styleSourceSelections);
-  const classesMap = new Map<string, Array<string>>();
+const normalizeClassName = (name: string) => kebabCase(name);
 
-  const regularSheet = createRegularStyleSheet({ name: "ssr-regular" });
-  const atomicSheet = atomic
-    ? createAtomicStyleSheet({ name: "ssr-atomic" })
-    : undefined;
+export const generateCss = ({
+  assets,
+  instances,
+  props,
+  breakpoints,
+  styles,
+  styleSourceSelections,
+  componentMetas,
+  assetBaseUrl,
+  atomic,
+}: CssConfig) => {
+  const globalSheet = createRegularStyleSheet({ name: "ssr" });
+  const sheet = createRegularStyleSheet({ name: "ssr" });
 
-  addGlobalRules(regularSheet, { assets, assetBaseUrl });
+  addGlobalRules(globalSheet, { assets, assetBaseUrl });
+  globalSheet.addMediaRule("presets");
+  const presetClasses = new Map<Instance["component"], string>();
+  const scope = createScope([], normalizeClassName, "-");
+  for (const [component, meta] of componentMetas) {
+    const [_namespace, componentName] = parseComponentName(component);
+    const className = `w-${scope.getName(component, meta.label ?? componentName)}`;
+    const presetStyle = Object.entries(meta.presetStyle ?? {});
+    if (presetStyle.length > 0) {
+      // add preset class only when at least one style is defined
+      presetClasses.set(component, className);
+    }
+    for (const [tag, styles] of presetStyle) {
+      // use :where() to reset specificity of preset selector
+      // and let user styles completely override it
+      // ideally switch to @layer when better supported
+      // render root preset styles without changes
+      const selector =
+        component === rootComponent ? ":root" : `:where(${tag}.${className})`;
+      const rule = globalSheet.addNestingRule(selector);
+      for (const declaration of styles) {
+        rule.setDeclaration({
+          breakpoint: "presets",
+          selector: declaration.state ?? "",
+          property: declaration.property,
+          value: declaration.value,
+        });
+      }
+    }
+  }
 
   for (const breakpoint of breakpoints.values()) {
-    (atomicSheet ?? regularSheet).addMediaRule(breakpoint.id, breakpoint);
+    sheet.addMediaRule(breakpoint.id, breakpoint);
   }
-
-  for (const [component, meta] of data.componentMetas) {
-    const presetStyle = meta.presetStyle;
-    if (presetStyle === undefined) {
-      continue;
-    }
-    const rules = getPresetStyleRules(component, presetStyle);
-    for (const [selector, style] of rules) {
-      regularSheet.addStyleRule({ style }, selector);
-    }
-  }
-
-  const styleRules = getStyleRules(styles, styleSourceSelections);
 
   const imageValueTransformer = createImageValueTransformer(assets, {
     assetBaseUrl,
   });
+  sheet.setTransformer(imageValueTransformer);
 
-  for (const { breakpointId, instanceId, state, style } of styleRules) {
-    if (atomicSheet) {
-      const { classes } = atomicSheet.addStyleRule(
-        { breakpoint: breakpointId, style },
-        state,
-        imageValueTransformer
-      );
-      classesMap.set(instanceId, [
-        ...(classesMap.get(instanceId) ?? []),
-        ...classes,
-      ]);
-      continue;
-    }
-    regularSheet.addStyleRule(
-      { breakpoint: breakpointId, style },
-      `[${idAttribute}="${instanceId}"]${state ?? ""}`,
-      imageValueTransformer
-    );
+  for (const styleDecl of styles.values()) {
+    const rule = sheet.addMixinRule(styleDecl.styleSourceId);
+    rule.setDeclaration({
+      breakpoint: styleDecl.breakpointId,
+      selector: styleDecl.state ?? "",
+      property: styleDecl.property,
+      value: styleDecl.value,
+    });
   }
 
+  const classes = new Map<Instance["id"], string[]>();
+  const parentIdByInstanceId = new Map<Instance["id"], Instance["id"]>();
+  for (const instance of instances.values()) {
+    const presetClass = presetClasses.get(instance.component);
+    if (presetClass) {
+      classes.set(instance.id, [presetClass]);
+    }
+    for (const child of instance.children) {
+      if (child.type === "id") {
+        parentIdByInstanceId.set(child.value, instance.id);
+      }
+    }
+  }
+
+  const descendantSelectorByInstanceId = new Map<Instance["id"], string>();
+  for (const prop of props.values()) {
+    if (prop.name === "selector" && prop.type === "string") {
+      descendantSelectorByInstanceId.set(prop.instanceId, prop.value);
+    }
+  }
+
+  const instanceByRule = new Map<NestingRule, Instance["id"]>();
+  for (const selection of styleSourceSelections.values()) {
+    let { instanceId } = selection;
+    const { values } = selection;
+    // special case for :root styles
+    if (instanceId === ROOT_INSTANCE_ID) {
+      const rule = sheet.addNestingRule(`:root`);
+      rule.applyMixins(values);
+      // avoid storing in instanceByRule to prevent conversion into atomic styles
+      continue;
+    }
+    let descendantSuffix = "";
+    // render selector component as descendant selector
+    const instance = instances.get(instanceId);
+    if (instance === undefined) {
+      continue;
+    }
+    if (instance.component === descendantComponent) {
+      const parentId = parentIdByInstanceId.get(instanceId);
+      const descendantSelector = descendantSelectorByInstanceId.get(instanceId);
+      if (parentId && descendantSelector) {
+        descendantSuffix = descendantSelector;
+        instanceId = parentId;
+      }
+    }
+    const meta = componentMetas.get(instance.component);
+    const [_namespace, shortName] = parseComponentName(instance.component);
+    const baseName = instance.label ?? meta?.label ?? shortName;
+    const className = `w-${scope.getName(instanceId, baseName)}`;
+    if (atomic === false) {
+      let classList = classes.get(instanceId);
+      if (classList === undefined) {
+        classList = [];
+        classes.set(instanceId, classList);
+      }
+      classList.push(className);
+    }
+    const rule = sheet.addNestingRule(`.${className}`, descendantSuffix);
+    rule.applyMixins(values);
+    instanceByRule.set(rule, instanceId);
+  }
+
+  if (atomic) {
+    const { cssText } = generateAtomic(sheet, {
+      getKey: (rule) => instanceByRule.get(rule),
+      transformValue: imageValueTransformer,
+      classes,
+    });
+    return { cssText: `${globalSheet.cssText}\n${cssText}`, classes };
+  }
   return {
-    cssText: regularSheet.cssText + (atomicSheet?.cssText ?? ""),
-    classesMap,
+    cssText: `${globalSheet.cssText}\n${sheet.cssText}`,
+    classes,
   };
 };

@@ -1,21 +1,29 @@
+import { nanoid } from "nanoid";
+import { shallowEqual } from "shallow-equal";
 import type { ExoticComponent } from "react";
-import { atom } from "nanostores";
+import { atom, computed } from "nanostores";
 import {
   type AnyComponent,
-  type WsComponentMeta,
-  type WsComponentPropsMeta,
   type Hook,
   type HookContext,
   namespaceMeta,
   getIndexesWithinAncestors,
-  decodeDataSourceVariable,
+  type InstanceData,
 } from "@webstudio-is/react-sdk";
-import type { Instance } from "@webstudio-is/sdk";
+import type {
+  Instance,
+  WsComponentMeta,
+  WsComponentPropsMeta,
+} from "@webstudio-is/sdk";
 import type { InstanceSelector } from "../tree-utils";
-import { $dataSourceVariables, $dataSources, $props } from "./nano-states";
-import { $instances, $selectedInstanceSelector } from "./instances";
-import { $selectedPage } from "./pages";
-import { shallowEqual } from "shallow-equal";
+import { $memoryProps, $props } from "./misc";
+import { $instances } from "./instances";
+import { $awareness, $selectedPage, getInstanceKey } from "../awareness";
+import {
+  renderTemplate,
+  type GeneratedTemplateMeta,
+  type TemplateMeta,
+} from "@webstudio-is/template";
 
 const createHookContext = (): HookContext => {
   const metas = $registeredComponentMetas.get();
@@ -30,10 +38,10 @@ const createHookContext = (): HookContext => {
   return {
     indexesWithinAncestors,
 
-    getPropValue: (instanceId, propName) => {
+    getPropValue: ({ id }, propName) => {
       const props = $props.get();
       for (const prop of props.values()) {
-        if (prop.instanceId === instanceId && prop.name === propName) {
+        if (prop.instanceId === id && prop.name === propName) {
           if (
             prop.type === "string" ||
             prop.type === "number" ||
@@ -46,49 +54,84 @@ const createHookContext = (): HookContext => {
       }
     },
 
-    setPropVariable: (instanceId, propName, value) => {
-      const dataSourceVariables = new Map($dataSourceVariables.get());
-      const dataSources = new Map($dataSources.get());
-      const props = $props.get();
-      for (const prop of props.values()) {
-        if (
-          prop.instanceId === instanceId &&
-          prop.name === propName &&
-          prop.type === "expression"
-        ) {
-          // extract id without parsing expression
-          const potentialVariableId = decodeDataSourceVariable(prop.value);
-          if (
-            potentialVariableId !== undefined &&
-            dataSources.has(potentialVariableId)
-          ) {
-            const dataSourceId = potentialVariableId;
-            dataSourceVariables.set(dataSourceId, value);
-          }
+    setMemoryProp: (instanceData: InstanceData, propName, value) => {
+      const { instanceKey } = instanceData;
+      const props = new Map($memoryProps.get());
+
+      const newProps = props.get(instanceKey) ?? new Map();
+
+      const propBase = {
+        id: nanoid(),
+        instanceId: instanceData.id,
+        name: propName,
+      };
+
+      if (value !== undefined) {
+        switch (typeof value) {
+          case "string":
+            newProps.set(propName, {
+              ...propBase,
+              type: "string",
+              value,
+            });
+            break;
+          case "number":
+            newProps.set(propName, {
+              ...propBase,
+              type: "number",
+              value,
+            });
+            break;
+          case "boolean":
+            newProps.set(propName, {
+              ...propBase,
+              type: "boolean",
+              value,
+            });
+            break;
+          default:
+            throw new Error(`Unsupported type ${typeof value}`);
         }
+      } else {
+        newProps.delete(propName);
       }
-      $dataSourceVariables.set(dataSourceVariables);
+
+      props.set(instanceKey, newProps);
+
+      $memoryProps.set(props);
     },
   };
 };
 
+const $instanceSelector = computed(
+  $awareness,
+  (awareness) => awareness?.instanceSelector
+);
+
 // subscribe builder events and invoke all component hooks
 export const subscribeComponentHooks = () => {
-  let lastSelectedInstanceSelector: undefined | InstanceSelector = undefined;
-  const unsubscribeSelectedInstanceSelector =
-    $selectedInstanceSelector.subscribe((instanceSelector) => {
+  let lastInstanceSelector: undefined | InstanceSelector = undefined;
+  const unsubscribeSelectedInstanceSelector = $instanceSelector.subscribe(
+    (instanceSelector) => {
       // prevent executing hooks when selected instance is not changed
-      if (shallowEqual(lastSelectedInstanceSelector, instanceSelector)) {
+      if (shallowEqual(lastInstanceSelector, instanceSelector)) {
         return;
       }
       const hooks = $registeredComponentHooks.get();
       const instances = $instances.get();
-      if (lastSelectedInstanceSelector) {
+      if (lastInstanceSelector) {
         for (const hook of hooks) {
           hook.onNavigatorUnselect?.(createHookContext(), {
-            instancePath: lastSelectedInstanceSelector.flatMap((id) => {
+            instancePath: lastInstanceSelector.flatMap((id, index, array) => {
               const instance = instances.get(id);
-              return instance ? [instance] : [];
+              if (instance === undefined) {
+                return [];
+              }
+              return {
+                id: instance.id,
+                instanceKey: getInstanceKey(array.slice(index)),
+                component: instance.component,
+              };
             }),
           });
         }
@@ -97,17 +140,25 @@ export const subscribeComponentHooks = () => {
       if (instanceSelector) {
         for (const hook of hooks) {
           hook.onNavigatorSelect?.(createHookContext(), {
-            instancePath: instanceSelector.flatMap((id) => {
+            instancePath: instanceSelector.flatMap((id, index, array) => {
               const instance = instances.get(id);
-              return instance ? [instance] : [];
+              if (instance === undefined) {
+                return [];
+              }
+              return {
+                id: instance.id,
+                instanceKey: getInstanceKey(array.slice(index)),
+                component: instance.component,
+              };
             }),
           });
         }
       }
 
       // store converts values to readonly
-      lastSelectedInstanceSelector = instanceSelector as InstanceSelector;
-    });
+      lastInstanceSelector = instanceSelector as InstanceSelector;
+    }
+  );
 
   return () => {
     unsubscribeSelectedInstanceSelector();
@@ -122,6 +173,10 @@ export const $registeredComponentMetas = atom(
   new Map<string, WsComponentMeta>()
 );
 
+export const $registeredTemplates = atom(
+  new Map<string, GeneratedTemplateMeta>()
+);
+
 export const $registeredComponentPropsMetas = atom(
   new Map<string, WsComponentPropsMeta>()
 );
@@ -132,6 +187,7 @@ export const registerComponentLibrary = ({
   metas,
   propsMetas,
   hooks,
+  templates,
 }: {
   namespace?: string;
   // simplify adding component libraries
@@ -140,6 +196,7 @@ export const registerComponentLibrary = ({
   metas: Record<Instance["component"], WsComponentMeta>;
   propsMetas: Record<Instance["component"], WsComponentPropsMeta>;
   hooks?: Hook[];
+  templates: Record<Instance["component"], TemplateMeta>;
 }) => {
   const prefix = namespace === undefined ? "" : `${namespace}:`;
 
@@ -161,6 +218,17 @@ export const registerComponentLibrary = ({
     );
   }
   $registeredComponentMetas.set(nextMetas);
+
+  const prevTemplates = $registeredTemplates.get();
+  const nextTemplates = new Map(prevTemplates);
+  for (const [componentName, meta] of Object.entries(templates)) {
+    const { template, ...generatedMeta } = meta;
+    nextTemplates.set(`${prefix}${componentName}`, {
+      ...generatedMeta,
+      template: renderTemplate(template),
+    });
+  }
+  $registeredTemplates.set(nextTemplates);
 
   if (hooks) {
     const prevHooks = $registeredComponentHooks.get();
@@ -186,8 +254,3 @@ export const registerComponentLibrary = ({
   }
   $registeredComponentPropsMetas.set(nextPropsMetas);
 };
-
-export const synchronizedComponentsMetaStores = [
-  ["registeredComponentMetas", $registeredComponentMetas],
-  ["registeredComponentPropsMetas", $registeredComponentPropsMetas],
-] as const;

@@ -1,20 +1,17 @@
-import { createContext, useContext } from "react";
-import type { Page } from "@webstudio-is/sdk";
+import { createContext, useContext, useMemo } from "react";
 import type { ImageLoader } from "@webstudio-is/image";
+import {
+  createJsonStringifyProxy,
+  isPlainObject,
+} from "@webstudio-is/sdk/runtime";
 
 export type Params = {
-  renderer?: "canvas" | "preview";
   /**
-   * Base url ir base path for images with ending slash.
-   * Used for configuring image with different sizes.
-   * Concatinated with "name?width=&quality=&format=".
-   *
-   * For example
-   * /asset/image/ used by default in builder
-   * https://image-transform.wstd.io/cdn-cgi/image/
-   * https://webstudio.is/cdn-cgi/image/
+   * When rendering a published version, there is no renderer defined.
+   * - canvas is the builder canvas in dev mode
+   * - preview is the preview mode in builder
    */
-  imageBaseUrl: string;
+  renderer?: "canvas" | "preview";
   /**
    * Base url or base path for any asset with ending slash.
    * Used to load assets like fonts or images in styles
@@ -32,25 +29,25 @@ export type Params = {
 export const ReactSdkContext = createContext<
   Params & {
     imageLoader: ImageLoader;
-    /**
-     * List of pages paths for link component
-     * to navigate without reloading on published sites
-     * always empty for builder which handle anchor clicks globally
-     */
-    pagesPaths: Set<Page["path"]>;
     // resources need to be any to support accessing unknown fields without extra checks
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resources: Record<string, any>;
   }
 >({
   assetBaseUrl: "/",
-  imageBaseUrl: "/",
   imageLoader: ({ src }) => src,
-  pagesPaths: new Set(),
   resources: {},
 });
 
 export const useResource = (name: string) => {
   const { resources } = useContext(ReactSdkContext);
-  return resources[name];
+  const resource = resources[name];
+
+  const resourceMemozied = useMemo(
+    () =>
+      isPlainObject(resource) ? createJsonStringifyProxy(resource) : resource,
+    [resource]
+  );
+
+  return resourceMemozied;
 };

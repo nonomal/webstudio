@@ -1,69 +1,142 @@
-/* eslint-disable camelcase */
 import {
-  type V2_ServerRuntimeMetaFunction,
+  type ServerRuntimeMetaFunction as MetaFunction,
   type LinksFunction,
   type LinkDescriptor,
-  type ActionArgs,
-  type LoaderArgs,
+  type ActionFunctionArgs,
+  type LoaderFunctionArgs,
+  type HeadersFunction,
   json,
+  redirect,
 } from "@remix-run/server-runtime";
 import { useLoaderData } from "@remix-run/react";
-import type { Page as PageType, ProjectMeta } from "@webstudio-is/sdk";
-import { ReactSdkContext } from "@webstudio-is/react-sdk";
-import { n8nHandler, getFormId } from "@webstudio-is/form-handlers";
 import {
-  fontAssets,
-  pageData,
-  user,
-  projectId,
-  pagesPaths,
-  formsProperties,
+  isLocalResource,
+  loadResource,
+  loadResources,
+  formIdFieldName,
+  formBotFieldName,
+} from "@webstudio-is/sdk/runtime";
+import {
+  ReactSdkContext,
+  PageSettingsMeta,
+  PageSettingsTitle,
+  PageSettingsCanonicalLink,
+} from "@webstudio-is/react-sdk/runtime";
+import {
   Page,
-  imageAssets,
-  getRemixParams,
+  siteName,
+  favIconAsset,
+  pageFontAssets,
+  pageBackgroundImageAssets,
 } from "../__generated__/[script-test]._index";
-import { loadResources } from "../__generated__/[script-test]._index.server";
-import css from "../__generated__/index.css";
-import { assetBaseUrl, imageBaseUrl, imageLoader } from "~/constants.mjs";
+import {
+  getResources,
+  getPageMeta,
+  getRemixParams,
+  projectId,
+  contactEmail,
+} from "../__generated__/[script-test]._index.server";
+import { assetBaseUrl, imageLoader } from "../constants.mjs";
+import css from "../__generated__/index.css?url";
+import { sitemap } from "../__generated__/$resources.sitemap.xml";
 
-export type PageData = {
-  project?: ProjectMeta;
+const customFetch: typeof fetch = (input, init) => {
+  if (typeof input !== "string") {
+    return fetch(input, init);
+  }
+
+  if (isLocalResource(input, "sitemap.xml")) {
+    // @todo: dynamic import sitemap ???
+    const response = new Response(JSON.stringify(sitemap));
+    response.headers.set("content-type", "application/json; charset=utf-8");
+    return Promise.resolve(response);
+  }
+
+  return fetch(input, init);
 };
 
-export const loader = async (arg: LoaderArgs) => {
-  const params = getRemixParams(arg.params);
-  const resources = await loadResources({ params });
-
+export const loader = async (arg: LoaderFunctionArgs) => {
+  const url = new URL(arg.request.url);
   const host =
     arg.request.headers.get("x-forwarded-host") ||
     arg.request.headers.get("host") ||
     "";
-
-  const url = new URL(arg.request.url);
   url.host = host;
   url.protocol = "https";
 
+  const params = getRemixParams(arg.params);
+  const system = {
+    params,
+    search: Object.fromEntries(url.searchParams),
+    origin: url.origin,
+  };
+
+  const resources = await loadResources(
+    customFetch,
+    getResources({ system }).data
+  );
+  const pageMeta = getPageMeta({ system, resources });
+
+  if (pageMeta.redirect) {
+    const status =
+      pageMeta.status === 301 || pageMeta.status === 302
+        ? pageMeta.status
+        : 302;
+    return redirect(pageMeta.redirect, status);
+  }
+
   // typecheck
   arg.context.EXCLUDE_FROM_SEARCH satisfies boolean;
+
+  if (arg.context.EXCLUDE_FROM_SEARCH) {
+    pageMeta.excludePageFromSearch = arg.context.EXCLUDE_FROM_SEARCH;
+  }
 
   return json(
     {
       host,
       url: url.href,
-      excludeFromSearch: arg.context.EXCLUDE_FROM_SEARCH,
-      params,
+      system,
       resources,
+      pageMeta,
     },
     // No way for current information to change, so add cache for 10 minutes
     // In case of CRM Data, this should be set to 0
-    { headers: { "Cache-Control": "public, max-age=600" } }
+    {
+      status: pageMeta.status,
+      headers: {
+        "Cache-Control": "public, max-age=600",
+      },
+    }
   );
 };
 
-export const headers = () => {
+export const headers: HeadersFunction = () => {
   return {
     "Cache-Control": "public, max-age=0, must-revalidate",
   };
+};
+
+export const meta: MetaFunction<typeof loader> = ({ data }) => {
+  const metas: ReturnType<MetaFunction> = [];
+  if (data === undefined) {
+    return metas;
+  }
+
+  const origin = `https://${data.host}`;
+
+  if (siteName) {
+    metas.push({
+      "script:ld+json": {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        name: siteName,
+        url: origin,
+      },
+    });
+  }
+
+  return metas;
 };
 
 export const links: LinksFunction = () => {
@@ -73,102 +146,150 @@ export const links: LinksFunction = () => {
     rel: "stylesheet",
     href: css,
   });
+
+  if (favIconAsset) {
+    result.push({
+      rel: "icon",
+      href: imageLoader({
+        src: `${assetBaseUrl}${favIconAsset.name}`,
+        // width,height must be multiple of 48 https://developers.google.com/search/docs/appearance/favicon-in-search
+        width: 144,
+        height: 144,
+        fit: "pad",
+        quality: 100,
+        format: "auto",
+      }),
+      type: undefined,
+    });
+  }
+
+  for (const asset of pageFontAssets) {
+    result.push({
+      rel: "preload",
+      href: `${assetBaseUrl}${asset.name}`,
+      as: "font",
+      crossOrigin: "anonymous",
+    });
+  }
+
+  for (const backgroundImageAsset of pageBackgroundImageAssets) {
+    result.push({
+      rel: "preload",
+      href: `${assetBaseUrl}${backgroundImageAsset.name}`,
+      as: "image",
+    });
+  }
+
   return result;
 };
 
 const getRequestHost = (request: Request): string =>
   request.headers.get("x-forwarded-host") || request.headers.get("host") || "";
 
-const getMethod = (value: string | undefined) => {
-  if (value === undefined) {
-    return "post";
-  }
-
-  switch (value.toLowerCase()) {
-    case "get":
-      return "get";
-    default:
-      return "post";
-  }
-};
-
-export const action = async ({ request, context }: ActionArgs) => {
-  const formData = await request.formData();
-
-  const formId = getFormId(formData);
-  if (formId === undefined) {
-    // We're throwing rather than returning { success: false }
-    // because this isn't supposed to happen normally: bug or malicious user
-    throw json("Form not found", { status: 404 });
-  }
-
-  const formProperties = formsProperties.get(formId);
-
-  // form properties are not defined when defaults are used
-  const { action, method } = formProperties ?? {};
-
-  const email = user?.email;
-
-  if (email == null) {
-    return { success: false };
-  }
-
-  // wrapped in try/catch just in cases new URL() throws
-  // (should not happen)
-  let pageUrl: URL;
+export const action = async ({
+  request,
+  context,
+}: ActionFunctionArgs): Promise<
+  { success: true } | { success: false; errors: string[] }
+> => {
   try {
-    pageUrl = new URL(request.url);
-    pageUrl.host = getRequestHost(request);
-  } catch {
-    return { success: false };
-  }
+    const url = new URL(request.url);
+    url.host = getRequestHost(request);
 
-  if (action !== undefined) {
-    try {
-      // Test that action is full URL
-      new URL(action);
-    } catch {
-      return json(
-        {
-          success: false,
-          error: "Invalid action URL, must be valid http/https protocol",
-        },
-        { status: 200 }
-      );
+    const formData = await request.formData();
+
+    const system = {
+      params: {},
+      search: {},
+      origin: url.origin,
+    };
+
+    const resourceName = formData.get(formIdFieldName);
+    let resource =
+      typeof resourceName === "string"
+        ? getResources({ system }).action.get(resourceName)
+        : undefined;
+
+    const formBotValue = formData.get(formBotFieldName);
+
+    if (formBotValue == null || typeof formBotValue !== "string") {
+      throw new Error("Form bot field not found");
     }
+
+    const submitTime = parseInt(formBotValue, 16);
+    // Assumes that the difference between the server time and the form submission time,
+    // including any client-server time drift, is within a 5-minute range.
+    // Note: submitTime might be NaN because formBotValue can be any string used for logging purposes.
+    // Example: `formBotValue: jsdom`, or `formBotValue: headless-env`
+    if (
+      Number.isNaN(submitTime) ||
+      Math.abs(Date.now() - submitTime) > 1000 * 60 * 5
+    ) {
+      throw new Error(`Form bot value invalid ${formBotValue}`);
+    }
+
+    formData.delete(formIdFieldName);
+    formData.delete(formBotFieldName);
+
+    if (resource) {
+      resource.headers.push({
+        name: "Content-Type",
+        value: "application/json",
+      });
+      resource.body = Object.fromEntries(formData);
+    } else {
+      if (contactEmail === undefined) {
+        throw new Error("Contact email not found");
+      }
+
+      resource = context.getDefaultActionResource?.({
+        url,
+        projectId,
+        contactEmail,
+        formData,
+      });
+    }
+
+    if (resource === undefined) {
+      throw Error("Resource not found");
+    }
+    const { ok, statusText } = await loadResource(fetch, resource);
+    if (ok) {
+      return { success: true };
+    }
+    return { success: false, errors: [statusText] };
+  } catch (error) {
+    console.error(error);
+
+    return {
+      success: false,
+      errors: [error instanceof Error ? error.message : "Unknown error"],
+    };
   }
-
-  const formInfo = {
-    formData,
-    projectId,
-    action: action ?? null,
-    method: getMethod(method),
-    pageUrl: pageUrl.toString(),
-    toEmail: email,
-    fromEmail: pageUrl.hostname + "@webstudio.email",
-  } as const;
-
-  const result = await n8nHandler({
-    formInfo,
-    hookUrl: context.N8N_FORM_EMAIL_HOOK,
-  });
-
-  return result;
 };
 
 const Outlet = () => {
-  const { params, resources } = useLoaderData<typeof loader>();
+  const { system, resources, url, pageMeta, host } =
+    useLoaderData<typeof loader>();
   return (
     <ReactSdkContext.Provider
       value={{
         imageLoader,
         assetBaseUrl,
-        imageBaseUrl,
-        pagesPaths,
         resources,
       }}
     >
-      <Page params={params} />
+      {/* Use the URL as the key to force scripts in HTML Embed to reload on dynamic pages */}
+      <Page key={url} system={system} />
+      <PageSettingsMeta
+        url={url}
+        pageMeta={pageMeta}
+        host={host}
+        siteName={siteName}
+        imageLoader={imageLoader}
+      />
+      <PageSettingsTitle>{pageMeta.title}</PageSettingsTitle>
+      <PageSettingsCanonicalLink href={url} />
     </ReactSdkContext.Provider>
   );
 };

@@ -5,14 +5,14 @@ import {
   Box,
   Flex,
   Grid,
-  DeprecatedText2,
+  Text,
   Button,
   Tooltip,
 } from "@webstudio-is/design-system";
 import {
   CloudIcon,
   AspectRatioIcon,
-  SizeIcon,
+  DimensionsIcon,
   TrashIcon,
 } from "@webstudio-is/icons";
 import type { Asset } from "@webstudio-is/sdk";
@@ -36,38 +36,36 @@ export const ImageInfo = ({ asset, onDelete }: ImageInfoProps) => {
 
   return (
     <>
-      <Box css={{ p: `${theme.spacing[5]} ${theme.spacing[9]}` }}>
+      <Box css={{ padding: theme.panel.padding }}>
         <Grid columns={2} align="center" gap={2}>
           <Box css={{ width: 100 }}>
-            <Filename variant="label">{name}</Filename>
+            <Filename variant="labelsSentenceCase">{name}</Filename>
           </Box>
           <Flex align="center" css={{ gap: theme.spacing[3] }}>
             <CloudIcon />
-            <DeprecatedText2 variant="label">
-              {prettyBytes(size)}
-            </DeprecatedText2>
+            <Text variant="labelsSentenceCase">{prettyBytes(size)}</Text>
           </Flex>
         </Grid>
       </Box>
       {"width" in meta && "height" in meta ? (
-        <Box css={{ p: `${theme.spacing[5]} ${theme.spacing[9]}` }}>
+        <Box css={{ padding: theme.panel.padding }}>
           <Grid columns={2} gap={2} align="center">
-            <Flex align="center" css={{ gap: theme.spacing[3] }}>
-              <SizeIcon />
-              <DeprecatedText2 variant="label">
+            <Flex align="center" gap={1}>
+              <DimensionsIcon />
+              <Text variant="labelsSentenceCase">
                 {meta.width} x {meta.height}
-              </DeprecatedText2>
+              </Text>
             </Flex>{" "}
-            <Flex align="center" css={{ gap: theme.spacing[3] }}>
+            <Flex align="center" gap={1}>
               <AspectRatioIcon />
-              <DeprecatedText2 variant="label">
+              <Text variant="labelsSentenceCase">
                 {getFormattedAspectRatio(meta)}
-              </DeprecatedText2>
+              </Text>
             </Flex>
           </Grid>
         </Box>
       ) : null}
-      <Box css={{ p: `${theme.spacing[5]} ${theme.spacing[9]}` }}>
+      <Box css={{ padding: theme.panel.padding }}>
         <Tooltip side="bottom" content={tooltipContent}>
           <Button
             color="destructive"

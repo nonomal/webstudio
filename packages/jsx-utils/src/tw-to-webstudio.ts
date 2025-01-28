@@ -1,9 +1,9 @@
-import type { WsEmbedTemplate } from "@webstudio-is/react-sdk";
-import { traverseTemplateAsync } from "./traverse-template";
+import type { WsEmbedTemplate } from "@webstudio-is/sdk";
 import { parseTailwindToWebstudio } from "@webstudio-is/css-data";
+import { traverseTemplateAsync } from "./traverse-template";
 
 export const tailwindToWebstudio = async (template: WsEmbedTemplate) => {
-  return traverseTemplateAsync(template, async (node, parent) => {
+  return traverseTemplateAsync(template, async (node) => {
     if (node.type === "instance" && node.props && node.props.length > 0) {
       const classNameProp = node.props.find(
         (prop) => prop.name === "className"

@@ -1,16 +1,14 @@
-/* eslint-disable react/display-name */
 import * as NavigationMenuPrimitive from "@radix-ui/react-navigation-menu";
 import {
   getClosestInstance,
   getIndexWithinAncestorFromComponentProps,
   ReactSdkContext,
   type Hook,
-} from "@webstudio-is/react-sdk";
+} from "@webstudio-is/react-sdk/runtime";
 import {
   Children,
   forwardRef,
   type ComponentPropsWithoutRef,
-  type ReactNode,
   useContext,
 } from "react";
 
@@ -53,7 +51,7 @@ export const NavigationMenuItem = forwardRef<
 
 export const NavigationMenuLink = forwardRef<
   HTMLAnchorElement,
-  { children: ReactNode }
+  ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Link>
 >(({ children, ...props }, ref) => {
   const firstChild = Children.toArray(children)[0];
 
@@ -66,7 +64,7 @@ export const NavigationMenuLink = forwardRef<
 
 export const NavigationMenuTrigger = forwardRef<
   HTMLButtonElement,
-  { children: ReactNode }
+  ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Trigger>
 >(({ children, ...props }, ref) => {
   const firstChild = Children.toArray(children)[0];
 
@@ -91,9 +89,8 @@ export const hooksNavigationMenu: Hook = {
           instance,
           `${namespace}:NavigationMenu`
         );
-
         if (menu) {
-          context.setPropVariable(menu.id, "value", "");
+          context.setMemoryProp(menu, "value", undefined);
         }
       }
     }
@@ -106,23 +103,19 @@ export const hooksNavigationMenu: Hook = {
           instance,
           `${namespace}:NavigationMenu`
         );
-
         const menuItem = getClosestInstance(
           event.instancePath,
           instance,
           `${namespace}:NavigationMenuItem`
         );
-
         if (menuItem === undefined || menu === undefined) {
           return;
         }
-
         const contentValue =
-          context.getPropValue(menuItem.id, "value") ??
+          context.getPropValue(menuItem, "value") ??
           context.indexesWithinAncestors.get(menuItem.id)?.toString();
-
         if (contentValue) {
-          context.setPropVariable(menu.id, "value", contentValue);
+          context.setMemoryProp(menu, "value", contentValue);
         }
       }
     }

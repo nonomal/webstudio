@@ -1,25 +1,27 @@
-import { serverSyncStore } from "~/shared/sync";
+import { nanoid } from "nanoid";
+import { getStyleDeclKey, Instance, type StyleSource } from "@webstudio-is/sdk";
 import { generateDataFromEmbedTemplate } from "@webstudio-is/react-sdk";
-import { copywriter, type operations } from "@webstudio-is/ai";
+import type { copywriter, operations } from "@webstudio-is/ai";
+import { serverSyncStore } from "~/shared/sync";
 import { isBaseBreakpoint } from "~/shared/breakpoints";
 import {
   deleteInstanceMutable,
-  insertTemplateData,
+  insertWebstudioFragmentAt,
   updateWebstudioData,
+  type Insertable,
 } from "~/shared/instance-utils";
 import {
   $breakpoints,
   $instances,
   $registeredComponentMetas,
   $selectedInstanceSelector,
-  $selectedInstance,
   $styleSourceSelections,
   $styleSources,
   $styles,
 } from "~/shared/nano-states";
-import type { DroppableTarget, InstanceSelector } from "~/shared/tree-utils";
-import { getStyleDeclKey, Instance, type StyleSource } from "@webstudio-is/sdk";
-import { nanoid } from "nanoid";
+import type { InstanceSelector } from "~/shared/tree-utils";
+import { $selectedInstance } from "~/shared/awareness";
+import { isInstanceDetachable } from "~/shared/matcher";
 
 export const applyOperations = (operations: operations.WsOperations) => {
   for (const operation of operations) {
@@ -35,7 +37,6 @@ export const applyOperations = (operations: operations.WsOperations) => {
         break;
       default:
         if (process.env.NODE_ENV === "development") {
-          // eslint-disable-next-line no-console
           console.warn(`Not supported operation: ${operation}`);
         }
     }
@@ -45,18 +46,8 @@ export const applyOperations = (operations: operations.WsOperations) => {
 const insertTemplateByOp = (
   operation: operations.generateInsertTemplateWsOperation
 ) => {
-  const breakpoints = $breakpoints.get();
-  const breakpointValues = Array.from(breakpoints.values());
-  const baseBreakpoint = breakpointValues.find(isBaseBreakpoint);
-  if (baseBreakpoint === undefined) {
-    return false;
-  }
   const metas = $registeredComponentMetas.get();
-  const templateData = generateDataFromEmbedTemplate(
-    operation.template,
-    metas,
-    baseBreakpoint.id
-  );
+  const templateData = generateDataFromEmbedTemplate(operation.template, metas);
 
   // @todo Find a way to avoid the workaround below, peharps improving the prompt.
   // Occasionally the LLM picks a component name or the entire data-ws-id attribute as the insertion point.
@@ -87,12 +78,11 @@ const insertTemplateByOp = (
       return;
     }
 
-    const dropTarget: DroppableTarget = {
+    const dropTarget: Insertable = {
       parentSelector: instanceSelector,
       position: operation.addAtIndex + 1,
     };
-
-    insertTemplateData(templateData, dropTarget);
+    insertWebstudioFragmentAt(templateData, dropTarget);
     return rootInstanceIds;
   }
 };
@@ -102,7 +92,21 @@ const deleteInstanceByOp = (
 ) => {
   const instanceSelector = computeSelectorForInstanceId(operation.wsId);
   if (instanceSelector) {
+    // @todo tell user they can't delete root
+    if (instanceSelector.length === 1) {
+      return;
+    }
+    const metas = $registeredComponentMetas.get();
     updateWebstudioData((data) => {
+      if (
+        isInstanceDetachable({
+          metas,
+          instances: data.instances,
+          instanceSelector,
+        }) === false
+      ) {
+        return;
+      }
       deleteInstanceMutable(data, instanceSelector);
     });
   }

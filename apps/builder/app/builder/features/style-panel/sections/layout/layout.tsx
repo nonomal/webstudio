@@ -1,12 +1,14 @@
-import { useState, type ReactNode } from "react";
+import { useState, type JSX, type ReactNode } from "react";
 import {
+  theme,
   Box,
   EnhancedTooltip,
   Flex,
   Grid,
   SmallToggleButton,
-  ToggleButton,
+  Tooltip,
 } from "@webstudio-is/design-system";
+import { propertyDescriptions } from "@webstudio-is/css-data";
 import type { StyleProperty, StyleValue } from "@webstudio-is/css-engine";
 import { toValue } from "@webstudio-is/css-engine";
 import {
@@ -20,22 +22,40 @@ import {
   ArrowLeftIcon,
   ArrowDownIcon,
   ArrowUpIcon,
+  AlignCenterHorizontalIcon,
+  AlignHorizontalJustifyCenterIcon,
+  AlignContentCenterIcon,
+  AlignStartHorizontalIcon,
+  AlignEndHorizontalIcon,
+  AlignBaselineIcon,
+  StretchVerticalIcon,
+  AlignHorizontalJustifyStartIcon,
+  AlignHorizontalJustifyEndIcon,
+  AlignHorizontalSpaceBetweenIcon,
+  AlignHorizontalSpaceAroundIcon,
+  AlignContentStartIcon,
+  AlignContentEndIcon,
+  AlignContentSpaceAroundIcon,
+  AlignContentSpaceBetweenIcon,
+  AlignContentStretchIcon,
 } from "@webstudio-is/icons";
-import type { RenderCategoryProps } from "../../style-sections";
 import { FlexGrid } from "./shared/flex-grid";
 import { MenuControl, SelectControl } from "../../controls";
-import { PropertyName, PropertyTooltip } from "../../shared/property-name";
 import { styleConfigByName } from "../../shared/configs";
-import type { CreateBatchUpdate } from "../../shared/use-style-data";
-import { getStyleSource, type StyleInfo } from "../../shared/style-info";
-import { CollapsibleSection } from "../../shared/collapsible-section";
+import { createBatchUpdate, deleteProperty } from "../../shared/use-style-data";
+import { StyleSection } from "../../shared/style-section";
 import {
   type IntermediateStyleValue,
   CssValueInput,
 } from "../../shared/css-value-input";
-import { theme } from "@webstudio-is/design-system";
-import { isFeatureEnabled } from "@webstudio-is/feature-flags";
-import { TooltipContent } from "../../../style-panel/shared/property-name";
+import { ToggleControl } from "../../controls/toggle/toggle-control";
+import { PropertyInfo, PropertyLabel } from "../../property-label";
+import {
+  useComputedStyles,
+  useComputedStyleDecl,
+  $availableUnitVariables,
+} from "../../shared/model";
+import type { ComputedStyleDecl } from "~/shared/style-object-model";
 
 const GapLinked = ({
   isLinked,
@@ -54,10 +74,55 @@ const GapLinked = ({
   </EnhancedTooltip>
 );
 
+const GapTooltip = ({
+  label,
+  styleDecl,
+  onReset,
+  children,
+}: {
+  label: string;
+  styleDecl: ComputedStyleDecl;
+  onReset: () => void;
+  children: ReactNode;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const description = propertyDescriptions[styleDecl.property];
+  return (
+    <Tooltip
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      // prevent closing tooltip on content click
+      onPointerDown={(event) => event.preventDefault()}
+      triggerProps={{
+        onClick: (event) => {
+          if (event.altKey) {
+            event.preventDefault();
+            onReset();
+            return;
+          }
+        },
+      }}
+      content={
+        <PropertyInfo
+          title={label}
+          description={description}
+          styles={[styleDecl]}
+          onReset={() => {
+            onReset();
+            setIsOpen(false);
+          }}
+        />
+      }
+    >
+      {children}
+    </Tooltip>
+  );
+};
+
 const GapInput = ({
   icon,
-  style,
   property,
+  styleDecl,
   intermediateValue,
   onIntermediateChange,
   onPreviewChange,
@@ -65,8 +130,8 @@ const GapInput = ({
   onReset,
 }: {
   icon: JSX.Element;
-  style: StyleInfo;
   property: StyleProperty;
+  styleDecl: ComputedStyleDecl;
   intermediateValue?: StyleValue | IntermediateStyleValue;
   onIntermediateChange: (value?: StyleValue | IntermediateStyleValue) => void;
   onPreviewChange: (value?: StyleValue) => void;
@@ -78,28 +143,22 @@ const GapInput = ({
   return (
     <Box>
       <CssValueInput
-        styleSource={getStyleSource(style[property])}
+        styleSource={styleDecl.source.name}
         icon={
-          <EnhancedTooltip
-            content={
-              <TooltipContent
-                title={label}
-                style={style}
-                properties={[property]}
-                onReset={onReset}
-              />
-            }
-          >
+          <GapTooltip label={label} styleDecl={styleDecl} onReset={onReset}>
             {icon}
-          </EnhancedTooltip>
+          </GapTooltip>
         }
         property={property}
-        value={style[property]?.value}
+        value={styleDecl.cascadedValue}
         intermediateValue={intermediateValue}
-        keywords={items.map((item) => ({
-          type: "keyword",
-          value: item.name,
-        }))}
+        getOptions={() => [
+          ...items.map((item) => ({
+            type: "keyword" as const,
+            value: item.name,
+          })),
+          ...$availableUnitVariables.get(),
+        ]}
         onChange={(styleValue) => {
           onIntermediateChange(styleValue);
           if (styleValue === undefined) {
@@ -124,25 +183,20 @@ const GapInput = ({
         onAbort={() => {
           onPreviewChange();
         }}
+        onReset={() => {
+          onIntermediateChange(undefined);
+          onReset();
+        }}
       />
     </Box>
   );
 };
 
-const FlexGap = ({
-  style,
-  createBatchUpdate,
-  deleteProperty,
-}: {
-  style: StyleInfo;
-  createBatchUpdate: CreateBatchUpdate;
-  deleteProperty: RenderCategoryProps["deleteProperty"];
-}) => {
-  const batchUpdate = createBatchUpdate();
-
-  const [isLinked, setIsLinked] = useState(() => {
-    return toValue(style.columnGap?.value) === toValue(style.rowGap?.value);
-  });
+const FlexGap = () => {
+  const [columnGap, rowGap] = useComputedStyles(["columnGap", "rowGap"]);
+  const [isLinked, setIsLinked] = useState(
+    () => toValue(columnGap.cascadedValue) === toValue(rowGap.cascadedValue)
+  );
 
   const [intermediateColumnGap, setIntermediateColumnGap] = useState<
     StyleValue | IntermediateStyleValue
@@ -160,7 +214,6 @@ const FlexGap = ({
           "columnGap linked rowGap"
         `,
         alignItems: "center",
-        height: theme.spacing[13],
       }}
     >
       <Box css={{ gridArea: "columnGap" }}>
@@ -178,8 +231,8 @@ const FlexGap = ({
               }}
             />
           }
-          style={style}
           property="columnGap"
+          styleDecl={columnGap}
           intermediateValue={intermediateColumnGap}
           onIntermediateChange={(value) => {
             setIntermediateColumnGap(value);
@@ -188,32 +241,35 @@ const FlexGap = ({
             }
           }}
           onReset={() => {
-            batchUpdate.deleteProperty("columnGap");
+            const batch = createBatchUpdate();
+            batch.deleteProperty("columnGap");
             if (isLinked) {
-              batchUpdate.deleteProperty("rowGap");
+              batch.deleteProperty("rowGap");
             }
-            batchUpdate.publish();
+            batch.publish();
           }}
           onPreviewChange={(value) => {
+            const batch = createBatchUpdate();
             if (value === undefined) {
-              batchUpdate.deleteProperty("columnGap");
+              batch.deleteProperty("columnGap");
               if (isLinked) {
-                batchUpdate.deleteProperty("rowGap");
+                batch.deleteProperty("rowGap");
               }
             } else {
-              batchUpdate.setProperty("columnGap")(value);
+              batch.setProperty("columnGap")(value);
               if (isLinked) {
-                batchUpdate.setProperty("rowGap")(value);
+                batch.setProperty("rowGap")(value);
               }
             }
-            batchUpdate.publish({ isEphemeral: true });
+            batch.publish({ isEphemeral: true });
           }}
           onChange={(value) => {
-            batchUpdate.setProperty("columnGap")(value);
+            const batch = createBatchUpdate();
+            batch.setProperty("columnGap")(value);
             if (isLinked) {
-              batchUpdate.setProperty("rowGap")(value);
+              batch.setProperty("rowGap")(value);
             }
-            batchUpdate.publish();
+            batch.publish();
           }}
         />
       </Box>
@@ -223,9 +279,23 @@ const FlexGap = ({
           isLinked={isLinked}
           onChange={(isLinked) => {
             setIsLinked(isLinked);
-            if (isLinked && style.columnGap?.value) {
-              batchUpdate.setProperty("rowGap")(style.columnGap.value);
-              batchUpdate.publish();
+            if (isLinked === false) {
+              return;
+            }
+            const isColumnGapDefined =
+              columnGap.source.name === "local" ||
+              columnGap.source.name === "overwritten";
+            const isRowGapDefined =
+              rowGap.source.name === "local" ||
+              rowGap.source.name === "overwritten";
+            if (isColumnGapDefined) {
+              const batch = createBatchUpdate();
+              batch.setProperty("rowGap")(columnGap.cascadedValue);
+              batch.publish();
+            } else if (isRowGapDefined) {
+              const batch = createBatchUpdate();
+              batch.setProperty("columnGap")(rowGap.cascadedValue);
+              batch.publish();
             }
           }}
         />
@@ -246,8 +316,8 @@ const FlexGap = ({
               }}
             />
           }
-          style={style}
           property="rowGap"
+          styleDecl={rowGap}
           intermediateValue={intermediateRowGap}
           onIntermediateChange={(value) => {
             setIntermediateRowGap(value);
@@ -256,32 +326,35 @@ const FlexGap = ({
             }
           }}
           onReset={() => {
-            batchUpdate.deleteProperty("rowGap");
+            const batch = createBatchUpdate();
+            batch.deleteProperty("rowGap");
             if (isLinked) {
-              batchUpdate.deleteProperty("columnGap");
+              batch.deleteProperty("columnGap");
             }
-            batchUpdate.publish();
+            batch.publish();
           }}
           onPreviewChange={(value) => {
+            const batch = createBatchUpdate();
             if (value === undefined) {
-              batchUpdate.deleteProperty("rowGap");
+              batch.deleteProperty("rowGap");
               if (isLinked) {
-                batchUpdate.deleteProperty("columnGap");
+                batch.deleteProperty("columnGap");
               }
             } else {
-              batchUpdate.setProperty("rowGap")(value);
+              batch.setProperty("rowGap")(value);
               if (isLinked) {
-                batchUpdate.setProperty("columnGap")(value);
+                batch.setProperty("columnGap")(value);
               }
             }
-            batchUpdate.publish({ isEphemeral: true });
+            batch.publish({ isEphemeral: true });
           }}
           onChange={(value) => {
-            batchUpdate.setProperty("rowGap")(value);
+            const batch = createBatchUpdate();
+            batch.setProperty("rowGap")(value);
             if (isLinked) {
-              batchUpdate.setProperty("columnGap")(value);
+              batch.setProperty("columnGap")(value);
             }
-            batchUpdate.publish();
+            batch.publish();
           }}
         />
       </Box>
@@ -289,159 +362,136 @@ const FlexGap = ({
   );
 };
 
-const mapNormalTo = (
-  style: StyleInfo,
-  property: StyleProperty,
-  newValue: string
-): StyleInfo => {
-  const styleInfoValue = style[property]?.value;
-  if (styleInfoValue?.type === "keyword" && styleInfoValue.value === "normal") {
-    return {
-      ...style,
-      [property]: {
-        ...style[property],
-        value: { type: "keyword", value: newValue },
-      },
-    };
-  }
-  return style;
-};
-
-const Toggle = ({
-  property,
-  iconOn,
-  iconOff,
-  valueOn,
-  valueOff,
-  currentStyle,
-  setProperty,
-  deleteProperty,
-}: {
-  property: StyleProperty;
-  iconOn: ReactNode;
-  iconOff: ReactNode;
-  valueOn: string;
-  valueOff: string;
-  currentStyle: RenderCategoryProps["currentStyle"];
-  setProperty: RenderCategoryProps["setProperty"];
-  deleteProperty: RenderCategoryProps["deleteProperty"];
-}) => {
-  const { label } = styleConfigByName(property);
-  const styleValue = currentStyle[property]?.value;
-  const isPressed =
-    styleValue?.type === "keyword" && styleValue?.value === valueOn;
-
-  return (
-    <PropertyTooltip
-      title={label}
-      properties={[property]}
-      style={currentStyle}
-      onReset={() => deleteProperty(property)}
-    >
-      <ToggleButton
-        pressed={isPressed}
-        onPressedChange={(isPressed) => {
-          setProperty(property)({
-            type: "keyword",
-            value: isPressed ? valueOn : valueOff,
-          });
-        }}
-        variant={getStyleSource(currentStyle[property])}
-      >
-        {isPressed ? iconOn : iconOff}
-      </ToggleButton>
-    </PropertyTooltip>
-  );
-};
-
-const LayoutSectionFlex = ({
-  currentStyle,
-  setProperty,
-  deleteProperty,
-  createBatchUpdate,
-}: {
-  currentStyle: RenderCategoryProps["currentStyle"];
-  setProperty: RenderCategoryProps["setProperty"];
-  deleteProperty: RenderCategoryProps["deleteProperty"];
-  createBatchUpdate: RenderCategoryProps["createBatchUpdate"];
-}) => {
-  const batchUpdate = createBatchUpdate();
-
-  const flexWrapValue = currentStyle.flexWrap?.value;
-
-  // From design: Notice that the align-content icon button is not visible by default.
-  // This property only applies when flex-wrap is set to "wrap".
-  const showAlignContent =
-    flexWrapValue?.type === "keyword" &&
-    (flexWrapValue.value === "wrap" || flexWrapValue.value === "wrap-reverse");
+const LayoutSectionFlex = () => {
+  const flexWrap = useComputedStyleDecl("flexWrap");
+  const flexWrapValue = toValue(flexWrap.cascadedValue);
 
   return (
     <Flex css={{ flexDirection: "column", gap: theme.spacing[5] }}>
       <Flex css={{ gap: theme.spacing[7] }} align="stretch">
-        <FlexGrid currentStyle={currentStyle} batchUpdate={batchUpdate} />
+        <FlexGrid />
         <Flex direction="column" justify="between">
           <Flex css={{ gap: theme.spacing[7] }}>
             <MenuControl
               property="flexDirection"
-              icons={{
-                row: ArrowRightIcon,
-                "row-reverse": ArrowLeftIcon,
-                column: ArrowDownIcon,
-                "column-reverse": ArrowUpIcon,
-              }}
-              currentStyle={currentStyle}
-              setProperty={setProperty}
-              deleteProperty={deleteProperty}
+              items={[
+                { name: "row", label: "Row", icon: ArrowRightIcon },
+                {
+                  name: "row-reverse",
+                  label: "Row Reverse",
+                  icon: ArrowLeftIcon,
+                },
+                { name: "column", label: "Column", icon: ArrowDownIcon },
+                {
+                  name: "column-reverse",
+                  label: "Column Reverse",
+                  icon: ArrowUpIcon,
+                },
+              ]}
             />
-            <Toggle
+            <ToggleControl
               property="flexWrap"
-              iconOn={<WrapIcon />}
-              iconOff={<NoWrapIcon />}
-              valueOn="wrap"
-              valueOff="nowrap"
-              currentStyle={currentStyle}
-              setProperty={setProperty}
-              deleteProperty={deleteProperty}
+              items={[
+                { name: "nowrap", label: "No Wrap", icon: NoWrapIcon },
+                { name: "wrap", label: "Wrap", icon: WrapIcon },
+              ]}
             />
           </Flex>
           <Flex css={{ gap: theme.spacing[7] }}>
             <MenuControl
               property="alignItems"
-              currentStyle={mapNormalTo(currentStyle, "alignItems", "stretch")}
-              setProperty={setProperty}
-              deleteProperty={deleteProperty}
+              items={[
+                {
+                  name: "stretch",
+                  label: "Stretch",
+                  icon: StretchVerticalIcon,
+                },
+                {
+                  name: "baseline",
+                  label: "Baseline",
+                  icon: AlignBaselineIcon,
+                },
+                {
+                  name: "center",
+                  label: "Center",
+                  icon: AlignCenterHorizontalIcon,
+                },
+                {
+                  name: "start",
+                  label: "Start",
+                  icon: AlignStartHorizontalIcon,
+                },
+                { name: "end", label: "End", icon: AlignEndHorizontalIcon },
+              ]}
             />
             <MenuControl
               property="justifyContent"
-              currentStyle={mapNormalTo(
-                currentStyle,
-                "justifyContent",
-                "start"
-              )}
-              setProperty={setProperty}
-              deleteProperty={deleteProperty}
+              items={[
+                {
+                  name: "space-between",
+                  label: "Space Between",
+                  icon: AlignHorizontalSpaceBetweenIcon,
+                },
+                {
+                  name: "space-around",
+                  label: "Space Around",
+                  icon: AlignHorizontalSpaceAroundIcon,
+                },
+                {
+                  name: "center",
+                  label: "Center",
+                  icon: AlignHorizontalJustifyCenterIcon,
+                },
+                {
+                  name: "start",
+                  label: "Start",
+                  icon: AlignHorizontalJustifyStartIcon,
+                },
+                {
+                  name: "end",
+                  label: "End",
+                  icon: AlignHorizontalJustifyEndIcon,
+                },
+              ]}
             />
-            {showAlignContent && (
+            {(flexWrapValue === "wrap" || flexWrapValue === "wrap-reverse") && (
               <MenuControl
                 property="alignContent"
-                currentStyle={mapNormalTo(
-                  currentStyle,
-                  "alignContent",
-                  "stretch"
-                )}
-                setProperty={setProperty}
-                deleteProperty={deleteProperty}
+                items={[
+                  {
+                    name: "space-between",
+                    label: "Space Between",
+                    icon: AlignContentSpaceBetweenIcon,
+                  },
+                  {
+                    name: "space-around",
+                    label: "Space Around",
+                    icon: AlignContentSpaceAroundIcon,
+                  },
+                  {
+                    name: "stretch",
+                    label: "Stretch",
+                    icon: AlignContentStretchIcon,
+                  },
+                  {
+                    name: "center",
+                    label: "Center",
+                    icon: AlignContentCenterIcon,
+                  },
+                  {
+                    name: "start",
+                    label: "Start",
+                    icon: AlignContentStartIcon,
+                  },
+                  { name: "end", label: "End", icon: AlignContentEndIcon },
+                ]}
               />
             )}
           </Flex>
         </Flex>
       </Flex>
 
-      <FlexGap
-        style={currentStyle}
-        createBatchUpdate={createBatchUpdate}
-        deleteProperty={deleteProperty}
-      />
+      <FlexGap />
     </Flex>
   );
 };
@@ -454,17 +504,8 @@ const orderedDisplayValues = [
   "inline",
   "none",
 ];
-if (isFeatureEnabled("displayContents")) {
-  orderedDisplayValues.push("contents");
-}
 
-const compareDisplayValues = (a: { name: string }, b: { name: string }) => {
-  const aIndex = orderedDisplayValues.indexOf(a.name);
-  const bIndex = orderedDisplayValues.indexOf(b.name);
-  return aIndex - bIndex;
-};
-
-const properties: StyleProperty[] = [
+export const properties = [
   "display",
   "flexDirection",
   "flexWrap",
@@ -473,58 +514,34 @@ const properties: StyleProperty[] = [
   "alignContent",
   "rowGap",
   "columnGap",
-];
+] satisfies Array<StyleProperty>;
 
-export const LayoutSection = ({
-  currentStyle,
-  setProperty,
-  deleteProperty,
-  createBatchUpdate,
-}: RenderCategoryProps) => {
-  const displayValue = toValue(currentStyle.display?.value);
-
-  const { label, items } = styleConfigByName("display");
-
+export const Section = () => {
+  const display = useComputedStyleDecl("display");
+  const displayValue = toValue(display.cascadedValue);
   return (
-    <CollapsibleSection
-      label="Layout"
-      currentStyle={currentStyle}
-      properties={properties}
-    >
+    <StyleSection label="Layout" properties={properties}>
       <Flex direction="column" gap="2">
         <Grid
           css={{
             gridTemplateColumns: `1fr ${theme.spacing[24]}`,
-            height: theme.spacing[13],
             alignItems: "center",
           }}
         >
-          <PropertyName
-            style={currentStyle}
+          <PropertyLabel
+            label="Display"
+            description={propertyDescriptions.display}
             properties={["display"]}
-            label={label}
-            onReset={() => deleteProperty("display")}
           />
           <SelectControl
             property="display"
-            currentStyle={currentStyle}
-            setProperty={setProperty}
-            deleteProperty={deleteProperty}
-            items={items
-              .filter((item) => orderedDisplayValues.includes(item.name))
-              .sort(compareDisplayValues)}
+            items={orderedDisplayValues.map((name) => ({ name, label: name }))}
           />
         </Grid>
-
         {(displayValue === "flex" || displayValue === "inline-flex") && (
-          <LayoutSectionFlex
-            currentStyle={currentStyle}
-            setProperty={setProperty}
-            deleteProperty={deleteProperty}
-            createBatchUpdate={createBatchUpdate}
-          />
+          <LayoutSectionFlex />
         )}
       </Flex>
-    </CollapsibleSection>
+    </StyleSection>
   );
 };

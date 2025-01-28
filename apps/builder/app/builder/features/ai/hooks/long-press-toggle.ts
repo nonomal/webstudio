@@ -1,5 +1,5 @@
 import { type SyntheticEvent, type KeyboardEvent, useRef } from "react";
-import { useEffectEvent } from "./effect-event";
+import { useEffectEvent } from "~/shared/hook-utils/effect-event";
 
 type UseClickAndHoldProps = {
   onStart: () => void;
@@ -15,7 +15,7 @@ type UseClickAndHoldProps = {
  * - `onCancel`: Pointer up outside target during long press.
  */
 export const useLongPressToggle = (props: UseClickAndHoldProps) => {
-  const currentTarget = useRef<Element>();
+  const currentTarget = useRef<undefined | Element>(undefined);
   const pointerDownTimeRef = useRef(0);
   const stateRef = useRef<"idle" | "active">("idle");
   const keyMapRef = useRef(new Set<string>());

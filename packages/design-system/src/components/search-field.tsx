@@ -5,25 +5,25 @@ import {
   useRef,
   useState,
   useEffect,
+  type ChangeEventHandler,
+  type KeyboardEventHandler,
+  type FormEventHandler,
 } from "react";
-import {
-  CrossCircledFilledIcon,
-  MagnifyingGlassIcon,
-} from "@webstudio-is/icons";
+import { XCircledFilledIcon, SearchIcon } from "@webstudio-is/icons";
 import { styled } from "../stitches.config";
 import { theme } from "../stitches.config";
 import { InputField } from "./input-field";
-import { IconButton } from "./icon-button";
+import { SmallIconButton } from "./small-icon-button";
+import { Flex } from "./flex";
 
-const SearchIcon = styled(MagnifyingGlassIcon, {
+const SearchIconStyled = styled(SearchIcon, {
   // need to center icon vertically
   display: "block",
-  color: theme.colors.hint,
+  color: theme.colors.foregroundSubtle,
   padding: theme.spacing[3],
 });
 
-const AbortButton = styled(IconButton, {
-  marginRight: theme.spacing[3],
+const AbortButton = styled(SmallIconButton, {
   variants: {
     hidden: {
       false: { visibility: "hidden" },
@@ -34,11 +34,11 @@ const AbortButton = styled(IconButton, {
 
 const SearchFieldBase: ForwardRefRenderFunction<
   HTMLInputElement,
-  ComponentProps<typeof InputField> & { onCancel?: () => void }
+  ComponentProps<typeof InputField> & { onAbort?: () => void }
 > = (props, ref) => {
   const {
     onChange,
-    onCancel,
+    onAbort,
     value: propsValue = "",
     onKeyDown,
     ...rest
@@ -48,6 +48,10 @@ const SearchFieldBase: ForwardRefRenderFunction<
   useEffect(() => {
     setValue(String(propsValue));
   }, [propsValue]);
+  const handleCancel = () => {
+    setValue("");
+    onAbort?.();
+  };
   return (
     <InputField
       {...rest}
@@ -58,30 +62,29 @@ const SearchFieldBase: ForwardRefRenderFunction<
       type="text"
       value={value}
       inputRef={inputRef}
-      prefix={<SearchIcon />}
+      prefix={<SearchIconStyled />}
       suffix={
-        <AbortButton
-          hidden={value.length > 0 ? "true" : "false"}
-          aria-label="Reset search"
-          title="Reset search"
-          tabIndex={-1}
-          onClick={() => {
-            setValue("");
-            onCancel?.();
-          }}
-        >
-          <CrossCircledFilledIcon />
-        </AbortButton>
+        <Flex align="center" css={{ padding: theme.spacing[2] }}>
+          <AbortButton
+            hidden={value.length > 0 ? "true" : "false"}
+            aria-label="Reset search"
+            title="Reset search"
+            tabIndex={-1}
+            onClick={() => {
+              handleCancel();
+            }}
+            icon={<XCircledFilledIcon />}
+          />
+        </Flex>
       }
       onChange={(event) => {
         setValue(event.target.value);
         onChange?.(event);
       }}
       onKeyDown={(event) => {
-        // Make sure we clear the search on esc and preserve the default browser behavior
         if (event.key === "Escape" && value.length !== 0) {
-          event.stopPropagation();
-          return;
+          event.preventDefault();
+          handleCancel();
         }
         onKeyDown?.(event);
       }}
@@ -90,3 +93,46 @@ const SearchFieldBase: ForwardRefRenderFunction<
 };
 
 export const SearchField = forwardRef(SearchFieldBase);
+
+type UseSearchFieldKeys = {
+  onMove: (event: { direction: "next" | "previous" | "current" }) => void;
+  onChange?: FormEventHandler<HTMLInputElement>;
+  onAbort?: () => void;
+};
+
+export const useSearchFieldKeys = ({
+  onMove,
+  onChange,
+  onAbort,
+}: UseSearchFieldKeys) => {
+  const [search, setSearch] = useState("");
+  const handleKeyDown: KeyboardEventHandler = ({ code }) => {
+    const keyMap = {
+      ArrowUp: "previous",
+      ArrowDown: "next",
+      Enter: "current",
+    } as const;
+    const direction = keyMap[code as keyof typeof keyMap];
+    if (direction !== undefined) {
+      onMove({ direction });
+    }
+  };
+
+  const handleChange: ChangeEventHandler<HTMLInputElement> = (event) => {
+    const { value } = event.currentTarget;
+    setSearch(value.trim());
+    onChange?.(event);
+  };
+
+  const handleCancel = () => {
+    setSearch("");
+    onAbort?.();
+  };
+
+  return {
+    value: search,
+    onAbort: handleCancel,
+    onChange: handleChange,
+    onKeyDown: handleKeyDown,
+  };
+};

@@ -1,17 +1,26 @@
 import {
   type ForwardRefExoticComponent,
-  type ComponentPropsWithRef,
+  type ComponentProps,
+  type RefAttributes,
+  type ElementRef,
+  forwardRef,
 } from "react";
 import { Root, Item, Indicator } from "@radix-ui/react-radio-group";
 
-export const RadioGroup: ForwardRefExoticComponent<
-  ComponentPropsWithRef<typeof Root>
-> = Root;
+const defaultTag = "div";
+
+export const RadioGroup = forwardRef<
+  ElementRef<typeof defaultTag>,
+  ComponentProps<typeof Root> & RefAttributes<typeof defaultTag>
+  // Make sure children are not passed down to an input, because this will result in error.
+>(({ value, defaultValue, ...props }, ref) => (
+  <Root {...props} defaultValue={value ?? defaultValue} ref={ref} />
+));
 
 export const RadioGroupItem: ForwardRefExoticComponent<
-  ComponentPropsWithRef<typeof Item>
+  ComponentProps<typeof Item> & RefAttributes<HTMLButtonElement>
 > = Item;
 
 export const RadioGroupIndicator: ForwardRefExoticComponent<
-  ComponentPropsWithRef<typeof Indicator>
+  ComponentProps<typeof Indicator> & RefAttributes<HTMLSpanElement>
 > = Indicator;

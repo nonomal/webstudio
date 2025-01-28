@@ -1,68 +1,61 @@
 {
   "name": "@webstudio-is/react-sdk",
-  "version": "0.129.0",
+  "version": "0.0.0-webstudio-version",
   "description": "Webstudio JavaScript / TypeScript API",
   "author": "Webstudio <github@webstudio.is>",
   "homepage": "https://webstudio.is",
   "type": "module",
   "scripts": {
-    "dev": "rm -rf lib && esbuild 'src/**/*.ts' 'src/**/*.tsx' --outdir=lib --watch",
-    "build": "rm -rf lib && esbuild src/index.ts ./src/css/normalize.ts --outdir=lib --bundle --format=esm --packages=external",
+    "build": "rm -rf lib && esbuild src/index.ts src/runtime.ts --outdir=lib --bundle --format=esm --packages=external",
     "dts": "tsc --project tsconfig.dts.json",
     "typecheck": "tsc",
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest --passWithNoTests",
-    "checks": "pnpm typecheck && pnpm test"
+    "test": "vitest run"
   },
   "devDependencies": {
-    "@jest/globals": "^29.7.0",
-    "@remix-run/react": "^1.19.2",
-    "@types/react": "^18.2.21",
-    "@types/react-dom": "^18.2.7",
-    "@webstudio-is/jest-config": "workspace:*",
+    "@types/react": "^18.2.70",
+    "@types/react-dom": "^18.2.25",
+    "@webstudio-is/template": "workspace:*",
     "@webstudio-is/tsconfig": "workspace:*",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "react": "18.3.0-canary-14898b6a9-20240318",
+    "react-dom": "18.3.0-canary-14898b6a9-20240318",
     "strip-indent": "^4.0.0",
-    "type-fest": "^4.3.1",
-    "typescript": "5.2.2",
-    "zod": "^3.21.4"
+    "type-fest": "^4.32.0",
+    "vitest": "^3.0.2",
+    "zod": "^3.22.4"
   },
   "peerDependencies": {
-    "@remix-run/react": "^1.19.1",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "react": "18.3.0-canary-14898b6a9-20240318",
+    "react-dom": "18.3.0-canary-14898b6a9-20240318",
     "zod": "^3.19.1"
   },
   "dependencies": {
-    "@jsep-plugin/assignment": "^1.2.1",
-    "@jsep-plugin/object": "^1.2.1",
     "@webstudio-is/css-engine": "workspace:*",
     "@webstudio-is/fonts": "workspace:*",
     "@webstudio-is/icons": "workspace:^",
     "@webstudio-is/image": "workspace:*",
     "@webstudio-is/sdk": "workspace:*",
-    "change-case": "^5.0.2",
-    "html-tags": "^3.3.1",
-    "jsep": "^1.3.8",
-    "nanoid": "^5.0.1",
-    "title-case": "^4.1.0"
+    "change-case": "^5.4.4",
+    "html-tags": "^4.0.0",
+    "nanoid": "^5.0.9"
   },
   "exports": {
     ".": {
       "webstudio": "./src/index.ts",
       "types": "./lib/types/index.d.ts",
-      "import": "./lib/index.js",
-      "require": "./lib/index.js"
+      "import": "./lib/index.js"
     },
-    "./css-normalize": {
-      "webstudio": "./src/css/normalize.ts",
-      "types": "./lib/types/css/normalize.d.ts",
-      "import": "./lib/css/normalize.js",
-      "require": "./lib/css/normalize.js"
+    "./runtime": {
+      "webstudio": "./src/runtime.ts",
+      "types": "./lib/types/runtime.d.ts",
+      "import": "./lib/runtime.js"
+    },
+    "./placeholder": {
+      "types": "./placeholder.d.ts"
     }
   },
   "files": [
     "lib/*",
+    "./placeholder.d.ts",
     "!*.{test,stories}.*"
   ],
   "license": "AGPL-3.0-or-later",

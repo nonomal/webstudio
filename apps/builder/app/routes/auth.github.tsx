@@ -1,16 +1,27 @@
-import { type ActionArgs, redirect } from "@remix-run/node";
+import { type ActionFunctionArgs } from "@remix-run/server-runtime";
 import { authenticator } from "~/services/auth.server";
-import { loginPath } from "~/shared/router-utils";
-import { sentryException } from "~/shared/sentry";
+import { dashboardPath, isDashboard, loginPath } from "~/shared/router-utils";
 import { AUTH_PROVIDERS } from "~/shared/session";
-import { returnToPath } from "~/services/cookie.server";
+import { clearReturnToCookie, returnToPath } from "~/services/cookie.server";
+import { preventCrossOriginCookie } from "~/services/no-cross-origin-cookie";
+import { redirect, setNoStoreToRedirect } from "~/services/no-store-redirect";
 
 export default function GH() {
   return null;
 }
 
-export const action = async ({ request }: ActionArgs) => {
-  const returnTo = await returnToPath(request);
+export const action = async ({ request }: ActionFunctionArgs) => {
+  if (false === isDashboard(request)) {
+    throw new Response("Not Found", {
+      status: 404,
+    });
+  }
+
+  preventCrossOriginCookie(request);
+  // CSRF token checks are not necessary for dashboard-only pages.
+  // All POST requests from the builder or canvas app are safeguarded by preventCrossOriginCookie
+
+  const returnTo = (await returnToPath(request)) ?? dashboardPath();
 
   try {
     return await authenticator.authenticate("github", request, {
@@ -20,22 +31,24 @@ export const action = async ({ request }: ActionArgs) => {
   } catch (error) {
     // all redirects are basically errors and in that case we don't want to catch it
     if (error instanceof Response) {
-      return error;
+      return setNoStoreToRedirect(await clearReturnToCookie(request, error));
     }
-    if (error instanceof Error) {
-      sentryException({
-        error,
-        extras: {
-          loginMethod: AUTH_PROVIDERS.LOGIN_GITHUB,
-        },
-      });
-      return redirect(
-        loginPath({
-          error: AUTH_PROVIDERS.LOGIN_GITHUB,
-          message: error?.message,
-          returnTo,
-        })
-      );
-    }
+
+    const message = error instanceof Error ? error?.message : "unknown error";
+
+    console.error({
+      error,
+      extras: {
+        loginMethod: AUTH_PROVIDERS.LOGIN_GITHUB,
+      },
+    });
+
+    return redirect(
+      loginPath({
+        error: AUTH_PROVIDERS.LOGIN_GITHUB,
+        message: message,
+        returnTo,
+      })
+    );
   }
 };

@@ -1,4 +1,4 @@
-import { describe, test, expect } from "@jest/globals";
+import { describe, test, expect } from "vitest";
 import { toValue } from "./to-value";
 
 describe("Convert WS CSS Values to native CSS strings", () => {
@@ -23,7 +23,7 @@ describe("Convert WS CSS Values to native CSS strings", () => {
   });
 
   test("var", () => {
-    const value = toValue({ type: "var", value: "namespace", fallbacks: [] });
+    const value = toValue({ type: "var", value: "namespace" });
     expect(value).toBe("var(--namespace)");
   });
 
@@ -31,27 +31,59 @@ describe("Convert WS CSS Values to native CSS strings", () => {
     const value = toValue({
       type: "var",
       value: "namespace",
-      fallbacks: [
-        {
-          type: "keyword",
-          value: "normal",
-        },
-        {
-          type: "unit",
-          value: 10,
-          unit: "px",
-        },
-      ],
+      fallback: {
+        type: "unparsed",
+        value: "normal, 10px",
+      },
     });
     expect(value).toBe("var(--namespace, normal, 10px)");
   });
 
-  test("fontFamily", () => {
-    const value = toValue({
-      type: "fontFamily",
-      value: ["Courier New"],
-    });
-    expect(value).toBe("Courier New, monospace");
+  test("fontFamily is known stack name", () => {
+    expect(
+      toValue({
+        type: "fontFamily",
+        value: ["Humanist"],
+      })
+    ).toBe(
+      'Seravek, "Gill Sans Nova", Ubuntu, Calibri, "DejaVu Sans", source-sans-pro, sans-serif'
+    );
+  });
+
+  test("fontFamily is a custom stack", () => {
+    expect(
+      toValue({
+        type: "fontFamily",
+        value: ["DejaVu Sans Mono", "monospace"],
+      })
+    ).toBe('"DejaVu Sans Mono", monospace');
+  });
+
+  test("fontFamily is unknown family name", () => {
+    expect(
+      toValue({
+        type: "fontFamily",
+        value: ["something-random"],
+      })
+    ).toBe("something-random, sans-serif");
+  });
+
+  test("fontFamily is empty", () => {
+    expect(
+      toValue({
+        type: "fontFamily",
+        value: [],
+      })
+    ).toBe("sans-serif");
+  });
+
+  test("fontFamily has duplicates", () => {
+    expect(
+      toValue({
+        type: "fontFamily",
+        value: ["a", "a", "b"],
+      })
+    ).toBe("a, b");
   });
 
   test("Transform font family value to override default fallback", () => {
@@ -64,12 +96,12 @@ describe("Convert WS CSS Values to native CSS strings", () => {
         if (styleValue.type === "fontFamily") {
           return {
             type: "fontFamily",
-            value: [styleValue.value[0]],
+            value: ["A B"],
           };
         }
       }
     );
-    expect(value).toBe("Courier New");
+    expect(value).toBe('"A B"');
   });
 
   test("array", () => {
@@ -132,6 +164,34 @@ describe("Convert WS CSS Values to native CSS strings", () => {
     expect(value).toBe("10px 20px 30px 40px");
   });
 
+  test("function", () => {
+    const translate3D = toValue({
+      type: "function",
+      name: "translate3d",
+      args: {
+        type: "keyword",
+        value: "42px, -62px, -135px",
+      },
+    });
+
+    const dropShadowValue = toValue({
+      type: "function",
+      name: "drop-shadow",
+      args: {
+        type: "tuple",
+        value: [
+          { type: "unit", value: 10, unit: "px" },
+          { type: "unit", value: 10, unit: "px" },
+          { type: "unit", value: 10, unit: "px" },
+          { type: "keyword", value: "red" },
+        ],
+      },
+    });
+
+    expect(translate3D).toBe("translate3d(42px, -62px, -135px)");
+    expect(dropShadowValue).toBe("drop-shadow(10px 10px 10px red)");
+  });
+
   test("sanitize url", () => {
     const assets = new Map<string, { path: string }>([
       ["1234567890", { path: `fo"o\\o.png` }],
@@ -166,5 +226,12 @@ describe("Convert WS CSS Values to native CSS strings", () => {
     );
 
     expect(value).toMatchInlineSnapshot(`"url("fo\\"o\\\\o.png")"`);
+  });
+
+  test("guaranteed-invalid", () => {
+    const value = toValue({
+      type: "guaranteedInvalid",
+    });
+    expect(value).toBe("");
   });
 });

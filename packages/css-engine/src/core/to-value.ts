@@ -5,21 +5,28 @@ import type { StyleValue } from "../schema";
 export type TransformValue = (styleValue: StyleValue) => undefined | StyleValue;
 
 const fallbackTransform: TransformValue = (styleValue) => {
-  if (styleValue.type === "fontFamily") {
-    const firstFontFamily = styleValue.value[0];
-
-    const fallbacks = SYSTEM_FONTS.get(firstFontFamily ?? "Arial");
-    const fontFamily: string[] = [...styleValue.value];
-    if (Array.isArray(fallbacks)) {
-      fontFamily.push(...fallbacks);
-    } else {
-      fontFamily.push(DEFAULT_FONT_FALLBACK);
-    }
-    return {
-      type: "fontFamily",
-      value: fontFamily,
-    };
+  if (styleValue.type !== "fontFamily") {
+    return;
   }
+
+  // By default we assume its a custom font stack.
+  let { value } = styleValue;
+
+  // Shouldn't be possible, but just in case.
+  if (value.length === 0) {
+    value = [DEFAULT_FONT_FALLBACK];
+  }
+
+  // User provided a single name. It could be a specific font name or a stack name.
+  if (value.length === 1) {
+    const stack = SYSTEM_FONTS.get(value[0])?.stack;
+    value = stack ?? [value[0], DEFAULT_FONT_FALLBACK];
+  }
+
+  return {
+    type: "fontFamily",
+    value: Array.from(new Set(value)),
+  };
 };
 
 // Use JSON.stringify to escape double quotes and backslashes in strings as it automatically replaces " with \" and \ with \\.
@@ -39,19 +46,33 @@ export const toValue = (
     return value.value + (value.unit === "number" ? "" : value.unit);
   }
   if (value.type === "fontFamily") {
-    return value.value.join(", ");
+    const families = [];
+    for (const family of value.value) {
+      families.push(family.includes(" ") ? `"${family}"` : family);
+    }
+    return families.join(", ");
   }
   if (value.type === "var") {
-    const fallbacks = [];
-    for (const fallback of value.fallbacks) {
-      fallbacks.push(toValue(fallback, transformValue));
+    if (value.hidden) {
+      return "";
     }
-    const fallbacksString =
-      fallbacks.length > 0 ? `, ${fallbacks.join(", ")}` : "";
+    let fallbacksString = "";
+    if (value.fallback) {
+      fallbacksString = `, ${toValue(value.fallback, transformValue)}`;
+    }
     return `var(--${value.value}${fallbacksString})`;
   }
 
   if (value.type === "keyword") {
+    // The hidden property is used to hide values in the builder
+    // But we can't use none here like its done for image.
+    // As none is not valid in all cases.
+    // Eg: backface-visibility
+    // https://developer.mozilla.org/en-US/docs/Web/CSS/backface-visibility#syntax
+    if (value.hidden === true) {
+      return "";
+    }
+
     return value.value;
   }
 
@@ -80,7 +101,7 @@ export const toValue = (
   }
 
   if (value.type === "unparsed") {
-    if (value.hidden) {
+    if (value.hidden === true) {
       // We assume that property is background-image and use this to hide background layers
       // In the future we might want to have a more generic way to hide values
       // i.e. have knowledge about property-name, as none is property specific
@@ -92,20 +113,37 @@ export const toValue = (
 
   if (value.type === "layers") {
     const valueString = value.value
-      .filter(
-        (layer) =>
-          "hidden" in layer === false ||
-          ("hidden" in layer && layer.hidden === false)
-      )
-      .map((layer) => {
-        return toValue(layer, transformValue);
-      })
+      .filter((layer) => layer.hidden !== true)
+      .map((layer) => toValue(layer, transformValue))
       .join(", ");
     return valueString === "" ? "none" : valueString;
   }
 
   if (value.type === "tuple") {
-    return value.value.map((value) => toValue(value, transformValue)).join(" ");
+    // Properties ike translate and scale are handled as tuples directly.
+    // When the layer is hidden, the value goes as none.
+    if (value.hidden === true) {
+      return "none";
+    }
+
+    return value.value
+      .filter((value) => value.hidden !== true)
+      .map((value) => toValue(value, transformValue))
+      .join(" ");
+  }
+
+  if (value.type === "function") {
+    // Right now, we are using function-value only for filter and backdrop-filter functions
+    if (value.hidden === true) {
+      return "";
+    }
+
+    return `${value.name}(${toValue(value.args, transformValue)})`;
+  }
+
+  // https://www.w3.org/TR/css-variables-1/#guaranteed-invalid
+  if (value.type === "guaranteedInvalid") {
+    return "";
   }
 
   return captureError(new Error("Unknown value type"), value);

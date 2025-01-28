@@ -13,18 +13,16 @@
     "!*.{test,stories}.*"
   ],
   "scripts": {
-    "typecheck": "tsc",
-    "checks": "pnpm typecheck"
+    "typecheck": "tsc"
   },
   "license": "AGPL-3.0-or-later",
   "dependencies": {
     "@webstudio-is/react-sdk": "workspace:^",
     "@webstudio-is/sdk": "workspace:^",
-    "@webstudio-is/sdk-components-react": "workspace:^",
-    "change-case": "^5.0.2"
+    "@webstudio-is/template": "workspace:^",
+    "change-case": "^5.4.4"
   },
   "devDependencies": {
-    "@types/node": "^18.17.1",
     "@webstudio-is/tsconfig": "workspace:^"
   }
 }

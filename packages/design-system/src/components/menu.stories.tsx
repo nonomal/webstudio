@@ -18,7 +18,7 @@ import {
 } from "./dropdown-menu";
 import {
   useCombobox,
-  Combobox,
+  ComboboxRoot,
   ComboboxContent,
   ComboboxAnchor,
   ComboboxListbox,
@@ -33,18 +33,18 @@ import {
   SelectSeparator,
   SelectGroup,
 } from "./select";
-import { MenuCheckedAndSetIcon, MenuSetDotIcon } from "./menu";
-import { DeprecatedTextField } from "./__DEPRECATED__/text-field";
+import { MenuCheckedAndSetIcon, MenuCheckedIcon, MenuSetDotIcon } from "./menu";
 import { Button } from "./button";
 import {
   ChevronDownIcon,
   TrashIcon,
-  MenuIcon,
+  EllipsesIcon,
   DotIcon,
 } from "@webstudio-is/icons";
 import { useState } from "react";
-import { DeprecatedIconButton } from "./__DEPRECATED__/icon-button";
 import { StorySection } from "./storybook";
+import { InputField } from "./input-field";
+import { NestedInputButton } from "./nested-input-button";
 
 const DropdownDemo = ({ withIndicator }: { withIndicator: boolean }) => {
   const [isApple, setIsApple] = useState(true);
@@ -55,7 +55,7 @@ const DropdownDemo = ({ withIndicator }: { withIndicator: boolean }) => {
   return (
     <DropdownMenu defaultOpen>
       <DropdownMenuTrigger asChild>
-        <Button prefix={<MenuIcon />} />
+        <Button prefix={<EllipsesIcon />} />
       </DropdownMenuTrigger>
       <DropdownMenuContent width="regular">
         <DropdownMenuLabel>Not choosable</DropdownMenuLabel>
@@ -124,14 +124,17 @@ const DropdownDemo = ({ withIndicator }: { withIndicator: boolean }) => {
               value={radioValue}
               onValueChange={setRadioValue}
             >
-              <DropdownMenuRadioItem value="apple">Apple</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="orange">
+              <DropdownMenuRadioItem icon={<MenuCheckedIcon />} value="apple">
+                Apple
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem icon={<MenuCheckedIcon />} value="orange">
                 Orange
               </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
           </>
         )}
-
+        <DropdownMenuSeparator />
+        <DropdownMenuItem hint>Hint</DropdownMenuItem>
         <DropdownMenuArrow />
       </DropdownMenuContent>
     </DropdownMenu>
@@ -145,6 +148,7 @@ const ComboboxDemo = () => {
   const [selectedItem, onItemSelect] = useState<Fruit>();
 
   const {
+    isOpen,
     items,
     getInputProps,
     getComboboxProps,
@@ -152,7 +156,7 @@ const ComboboxDemo = () => {
     getMenuProps,
     getItemProps,
   } = useCombobox<Fruit>({
-    items: fruits,
+    getItems: () => fruits,
     itemToString: (item) => item ?? "",
     value: null,
     selectedItem,
@@ -175,16 +179,16 @@ const ComboboxDemo = () => {
   const longItems = items.filter((item) => item === "Banana");
 
   return (
-    <Combobox>
+    <ComboboxRoot open={isOpen}>
       <div {...getComboboxProps()}>
         <ComboboxAnchor>
-          <DeprecatedTextField
+          <InputField
             {...getInputProps()}
             placeholder="Enter: Apple"
             suffix={
-              <DeprecatedIconButton {...getToggleButtonProps()}>
+              <NestedInputButton {...getToggleButtonProps()}>
                 <ChevronDownIcon />
-              </DeprecatedIconButton>
+              </NestedInputButton>
             }
           />
         </ComboboxAnchor>
@@ -208,7 +212,7 @@ const ComboboxDemo = () => {
           </ComboboxListbox>
         </ComboboxContent>
       </div>
-    </Combobox>
+    </ComboboxRoot>
   );
 };
 

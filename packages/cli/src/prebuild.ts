@@ -1,5 +1,5 @@
-import { basename, dirname, join, normalize } from "node:path";
-import { createWriteStream } from "node:fs";
+import { basename, dirname, join, normalize, relative } from "node:path";
+import { createWriteStream, existsSync } from "node:fs";
 import {
   rm,
   access,
@@ -10,25 +10,19 @@ import {
   readdir,
 } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
-import { cwd } from "node:process";
+import { cwd, exit } from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import pLimit from "p-limit";
-import ora from "ora";
+import { log, spinner } from "@clack/prompts";
 import merge from "deepmerge";
 import {
   generateCss,
-  generateUtilsExport,
   generateWebstudioComponent,
   getIndexesWithinAncestors,
-  namespaceMeta,
   type Params,
-  type WsComponentMeta,
   normalizeProps,
   generateRemixRoute,
   generateRemixParams,
-  generateResourcesLoader,
-  collectionComponent,
-  generatePageMeta,
 } from "@webstudio-is/react-sdk";
 import type {
   Instance,
@@ -40,27 +34,33 @@ import type {
   FontAsset,
   ImageAsset,
   Resource,
+  WsComponentMeta,
 } from "@webstudio-is/sdk";
 import {
   createScope,
   findTreeInstanceIds,
   getPagePath,
   parseComponentName,
+  generateResources,
+  generatePageMeta,
+  getStaticSiteMapXml,
+  replaceFormActionsWithResources,
+  isCoreComponent,
+  coreMetas,
 } from "@webstudio-is/sdk";
 import type { Data } from "@webstudio-is/http-client";
-import { createImageLoader } from "@webstudio-is/image";
-import * as baseComponentMetas from "@webstudio-is/sdk-components-react/metas";
-import * as remixComponentMetas from "@webstudio-is/sdk-components-react-remix/metas";
-import * as radixComponentMetas from "@webstudio-is/sdk-components-react-radix/metas";
+import { wsImageLoader } from "@webstudio-is/image";
 import { LOCAL_DATA_FILE } from "./config";
 import {
-  ensureFileInPath,
-  ensureFolderExists,
+  createFileIfNotExists,
+  createFolderIfNotExists,
   loadJSONFile,
-  isFileExists,
 } from "./fs-utils";
-import type * as sharedConstants from "~/constants.mjs";
-import type { PageData } from "../templates/defaults/__templates__/route-template";
+import type * as sharedConstants from "../templates/defaults/app/constants.mjs";
+import { htmlToJsx } from "./html-to-jsx";
+import { createFramework as createRemixFramework } from "./framework-remix";
+import { createFramework as createReactRouterFramework } from "./framework-react-router";
+import { createFramework as createVikeSsgFramework } from "./framework-vike-ssg";
 
 const limit = pLimit(10);
 
@@ -97,7 +97,7 @@ export const downloadAsset = async (
   try {
     await access(assetPath);
   } catch {
-    await ensureFolderExists(dirname(assetPath));
+    await createFolderIfNotExists(dirname(assetPath));
 
     try {
       const response = await fetch(url);
@@ -123,7 +123,7 @@ export const downloadAsset = async (
   }
 };
 
-const mergeJsonFiles = async (sourcePath: string, destinationPath: string) => {
+const mergeJsonInto = async (sourcePath: string, destinationPath: string) => {
   const sourceJson = await readFile(sourcePath, "utf8");
   const destinationJson = await readFile(destinationPath, "utf8").catch(
     (error) => {
@@ -139,7 +139,9 @@ const mergeJsonFiles = async (sourcePath: string, destinationPath: string) => {
     }
   );
   const content = JSON.stringify(
-    merge(JSON.parse(sourceJson), JSON.parse(destinationJson)),
+    merge(JSON.parse(destinationJson), JSON.parse(sourceJson), {
+      arrayMerge: (_target, source) => source,
+    }),
     null,
     "  "
   );
@@ -180,29 +182,42 @@ const getTemplatePath = async (template: string) => {
   return templatePath;
 };
 
-const copyTemplates = async (template: string = "defaults") => {
+const copyTemplates = async (template: string) => {
   const templatePath = await getTemplatePath(template);
 
   await cp(templatePath, cwd(), {
     recursive: true,
     filter: (source) => {
-      return basename(source) !== "package.json";
+      const name = basename(source);
+      return name !== "package.json" && name !== "tsconfig.json";
     },
   });
 
-  if ((await isFileExists(join(templatePath, "package.json"))) === true) {
-    await mergeJsonFiles(
+  if (existsSync(join(templatePath, "package.json"))) {
+    await mergeJsonInto(
       join(templatePath, "package.json"),
       join(cwd(), "package.json")
     );
   }
+  if (existsSync(join(templatePath, "tsconfig.json"))) {
+    await mergeJsonInto(
+      join(templatePath, "tsconfig.json"),
+      join(cwd(), "tsconfig.json")
+    );
+  }
 };
 
+const importFrom = (importee: string, importer: string) => {
+  return relative(dirname(importer), importee).replaceAll("\\", "/");
+};
+
+const npmrc = `force=true
+loglevel=error
+audit=false
+fund=false
+`;
+
 export const prebuild = async (options: {
-  /**
-   * Use preview (opensource) version of the project
-   **/
-  preview: boolean;
   /**
    * Do we need download assets
    **/
@@ -210,28 +225,30 @@ export const prebuild = async (options: {
   /**
    * Template to use for the build in addition to defaults template
    **/
-  template?: string;
+  template: string[];
 }) => {
-  if (options.template === undefined) {
-    throw new Error(
-      `\n Template is not provided \n Please check webstudio --help for more details`
+  if (options.template.length === 0) {
+    log.error(
+      `Template is not provided\nPlease check webstudio --help for more details`
     );
+    exit(1);
   }
 
-  if (
-    options.template !== "vanilla" &&
-    (await isCliTemplate(options.template)) === false &&
-    options.template.startsWith(".") === false
-  ) {
-    throw Error(
-      `\n Template ${options.template} is not available \n Please check webstudio --help for more details`
-    );
+  for (const template of options.template) {
+    // Template is local user template
+    if (template.startsWith(".") || template.startsWith("/")) {
+      continue;
+    }
+
+    if ((await isCliTemplate(template)) === false) {
+      log.error(
+        `Template ${options.template} is not available\nPlease check webstudio --help for more details`
+      );
+      exit(1);
+    }
   }
 
-  const spinner = ora("Scaffolding the project files");
-  spinner.start();
-
-  spinner.text = "Generating files";
+  log.step("Scaffolding the project files");
 
   const appRoot = "app";
 
@@ -241,10 +258,20 @@ export const prebuild = async (options: {
   const routesDir = join(appRoot, "routes");
   await rm(routesDir, { recursive: true, force: true });
 
-  await copyTemplates();
+  // force npm to install with not matching peer dependencies
+  await writeFile(join(cwd(), ".npmrc"), npmrc);
 
-  if (options.template !== "vanilla") {
-    await copyTemplates(options.template);
+  for (const template of options.template) {
+    await copyTemplates(template);
+  }
+
+  let framework;
+  if (options.template.includes("ssg")) {
+    framework = await createVikeSsgFramework();
+  } else if (options.template.includes("react-router-docker")) {
+    framework = await createReactRouterFramework();
+  } else {
+    framework = await createRemixFramework();
   }
 
   const constants: typeof sharedConstants = await import(
@@ -263,37 +290,23 @@ export const prebuild = async (options: {
     );
   }
 
-  const domain = siteData.build.deployment?.projectDomain;
-  if (domain === undefined) {
-    throw new Error(`Project domain is missing from the project data`);
+  // collect all possible component metas
+  const metas = new Map<string, WsComponentMeta>();
+  const componentSources = new Map<string, string>();
+  for (const entry of framework.components) {
+    for (const [componentName, meta] of Object.entries(entry.metas)) {
+      metas.set(componentName, meta);
+      componentSources.set(componentName, entry.source);
+    }
   }
 
-  const radixComponentNamespacedMetas = Object.entries(
-    radixComponentMetas
-  ).reduce(
-    (r, [name, meta]) => {
-      const namespace = "@webstudio-is/sdk-components-react-radix";
-      r[`${namespace}:${name}`] = namespaceMeta(
-        meta,
-        namespace,
-        new Set(Object.keys(radixComponentMetas))
-      );
-      return r;
-    },
-    {} as Record<string, WsComponentMeta>
+  const projectMetas = new Map<Instance["component"], WsComponentMeta>(
+    Object.entries(coreMetas)
   );
-
-  const metas = new Map(
-    Object.entries({
-      ...baseComponentMetas,
-      ...radixComponentNamespacedMetas,
-      ...remixComponentMetas,
-    })
-  );
-
-  const projectMetas = new Map<Instance["component"], WsComponentMeta>();
   const componentsByPage: ComponentsByPage = {};
   const siteDataByPage: SiteDataByPage = {};
+  const fontAssetsByPage: Record<Page["id"], FontAsset[]> = {};
+  const backgroundImageAssetsByPage: Record<Page["id"], ImageAsset[]> = {};
 
   for (const page of Object.values(siteData.pages)) {
     const instanceMap = new Map(siteData.build.instances);
@@ -310,7 +323,9 @@ export const prebuild = async (options: {
       props: siteData.build.props.map(([_id, prop]) => prop),
       assetBaseUrl,
       assets: new Map(siteData.assets.map((asset) => [asset.id, asset])),
+      uploadingImageAssets: [],
       pages: siteData.build.pages,
+      source: "prebuild",
     });
 
     const props: [Prop["id"], Prop][] = [];
@@ -354,7 +369,7 @@ export const prebuild = async (options: {
 
     componentsByPage[page.id] = new Set();
     for (const [_instanceId, instance] of instances) {
-      if (instance.component === collectionComponent) {
+      if (isCoreComponent(instance.component)) {
         continue;
       }
       componentsByPage[page.id].add(instance.component);
@@ -363,35 +378,83 @@ export const prebuild = async (options: {
         projectMetas.set(instance.component, meta);
       }
     }
+
+    // Extract background SVGs and Font assets
+    const styleSourceSelections = siteData.build?.styleSourceSelections ?? [];
+    const pageStyleSourceIds = new Set(
+      styleSourceSelections
+        .filter(([, { instanceId }]) => pageInstanceSet.has(instanceId))
+        .map(([, { values }]) => values)
+        .flat()
+    );
+
+    const pageStyles = siteData.build?.styles?.filter(([, { styleSourceId }]) =>
+      pageStyleSourceIds.has(styleSourceId)
+    );
+
+    // Extract fonts
+    const pageFontFamilySet = new Set(
+      pageStyles
+        .filter(([, { property }]) => property === "fontFamily")
+        .map(([, { value }]) =>
+          value.type === "fontFamily" ? value.value : undefined
+        )
+        .flat()
+        .filter(<T>(value: T): value is NonNullable<T> => value !== undefined)
+    );
+
+    const pageFontAssets = siteData.assets
+      .filter((asset): asset is FontAsset => asset.type === "font")
+      .filter((fontAsset) => pageFontFamilySet.has(fontAsset.meta.family));
+
+    fontAssetsByPage[page.id] = pageFontAssets;
+
+    // Extract background images
+    // backgroundImage => "value.type=="layers" => value.type == "image" => .value (assetId)
+    const backgroundImageAssetIdSet = new Set(
+      pageStyles
+        .filter(([, { property }]) => property === "backgroundImage")
+        .map(([, { value }]) =>
+          value.type === "layers"
+            ? value.value.map((layer) =>
+                layer.type === "image"
+                  ? layer.value.type === "asset"
+                    ? layer.value.value
+                    : undefined
+                  : undefined
+              )
+            : undefined
+        )
+        .flat()
+        .filter(<T>(value: T): value is NonNullable<T> => value !== undefined)
+    );
+
+    const backgroundImageAssets = siteData.assets
+      .filter((asset): asset is ImageAsset => asset.type === "image")
+      .filter((imageAsset) => backgroundImageAssetIdSet.has(imageAsset.id));
+
+    backgroundImageAssetsByPage[page.id] = backgroundImageAssets;
   }
 
   const assetsToDownload: Promise<void>[] = [];
-  const fontAssets: FontAsset[] = [];
-
-  const imageAssets: ImageAsset[] = [];
-  for (const asset of siteData.assets) {
-    if (asset.type === "image") {
-      imageAssets.push(asset);
-    }
-  }
-
-  const appDomain = options.preview ? "wstd.work" : "wstd.io";
-  const assetBuildUrl = `https://${domain}.${appDomain}/cgi/asset/`;
-
-  const imageLoader = createImageLoader({
-    imageBaseUrl: assetBuildUrl,
-  });
 
   if (options.assets === true) {
+    const assetOrigin = siteData.origin;
+
     for (const asset of siteData.assets) {
       if (asset.type === "image") {
-        const imageSrc = imageLoader({
+        const imagePath = wsImageLoader({
           src: asset.name,
           format: "raw",
         });
-
         assetsToDownload.push(
-          limit(() => downloadAsset(imageSrc, asset.name, assetBaseUrl))
+          limit(() =>
+            downloadAsset(
+              `${assetOrigin}${imagePath}`,
+              asset.name,
+              assetBaseUrl
+            )
+          )
         );
       }
 
@@ -399,45 +462,32 @@ export const prebuild = async (options: {
         assetsToDownload.push(
           limit(() =>
             downloadAsset(
-              `${assetBuildUrl}${asset.name}`,
+              `${assetOrigin}/cgi/asset/${asset.name}`,
               asset.name,
               assetBaseUrl
             )
           )
         );
-        fontAssets.push(asset);
       }
     }
   }
 
-  spinner.text = "Generating css file";
+  const assets = new Map(siteData.assets.map((asset) => [asset.id, asset]));
 
-  const { cssText, classesMap } = generateCss(
-    {
-      assets: siteData.assets,
-      breakpoints: siteData.build?.breakpoints,
-      styles: siteData.build?.styles,
-      styleSourceSelections: siteData.build?.styleSourceSelections,
-      // pass only used metas to not generate unused preset styles
-      componentMetas: projectMetas,
-    },
-    {
-      assetBaseUrl,
-      atomic: siteData.build.pages.settings?.atomicStyles ?? true,
-    }
-  );
+  const { cssText, classes } = generateCss({
+    instances: new Map(siteData.build.instances),
+    props: new Map(siteData.build.props),
+    assets,
+    breakpoints: new Map(siteData.build?.breakpoints),
+    styles: new Map(siteData.build?.styles),
+    styleSourceSelections: new Map(siteData.build?.styleSourceSelections),
+    // pass only used metas to not generate unused preset styles
+    componentMetas: projectMetas,
+    assetBaseUrl,
+    atomic: siteData.build.pages.compiler?.atomicStyles ?? true,
+  });
 
-  await ensureFileInPath(join(generatedDir, "index.css"), cssText);
-
-  spinner.text = "Generating routes and pages";
-
-  const routeTemplatePath = normalize(
-    join(cwd(), "__templates__", "route-template.tsx")
-  );
-
-  const routeFileTemplate = await readFile(routeTemplatePath, "utf8");
-
-  await rm(dirname(routeTemplatePath), { recursive: true });
+  await createFileIfNotExists(join(generatedDir, "index.css"), cssText);
 
   for (const [pageId, pageComponents] of Object.entries(componentsByPage)) {
     const scope = createScope([
@@ -445,101 +495,111 @@ export const prebuild = async (options: {
       "useState",
       "Fragment",
       "useResource",
-      "PageMeta",
-      "createPageMeta",
-      "PageData",
-      "Asset",
-      "fontAssets",
-      "pageData",
-      "user",
-      "projectId",
-      "formsProperties",
+      "useVariableState",
       "Page",
       "_props",
     ]);
+
     const namespaces = new Map<
       string,
       Set<[shortName: string, componentName: string]>
     >();
-    const BASE_NAMESPACE = "@webstudio-is/sdk-components-react";
-    const REMIX_NAMESPACE = "@webstudio-is/sdk-components-react-remix";
-
     for (const component of pageComponents) {
-      const parsed = parseComponentName(component);
-      let [namespace] = parsed;
-      const [_namespace, shortName] = parsed;
-
+      const namespace = componentSources.get(component);
       if (namespace === undefined) {
-        // use base as fallback namespace and consider remix overrides
-        if (shortName in remixComponentMetas) {
-          namespace = REMIX_NAMESPACE;
-        } else {
-          namespace = BASE_NAMESPACE;
-        }
+        continue;
       }
-
       if (namespaces.has(namespace) === false) {
         namespaces.set(
           namespace,
           new Set<[shortName: string, componentName: string]>()
         );
       }
+      const [_namespace, shortName] = parseComponentName(component);
       namespaces.get(namespace)?.add([shortName, component]);
     }
 
     let componentImports = "";
-    for (const [namespace, componentsSet] of namespaces.entries()) {
-      const specifiers = Array.from(componentsSet)
-        .map(
-          ([shortName, component]) =>
-            `${shortName} as ${scope.getName(component, shortName)}`
-        )
-        .join(", ");
-      componentImports += `import { ${specifiers} } from "${namespace}";\n`;
-    }
+    let xmlPresentationComponents = "";
 
     const pageData = siteDataByPage[pageId];
-    // serialize data only used in runtime
-    const renderedPageData: PageData = {
-      project: siteData.build.pages.meta,
-    };
+    const documentType = pageData.page.meta.documentType ?? "html";
+
+    for (const [namespace, componentsSet] of namespaces.entries()) {
+      switch (documentType) {
+        case "html":
+          {
+            const specifiers = Array.from(componentsSet)
+              .map(
+                ([shortName, component]) =>
+                  `${shortName} as ${scope.getName(component, shortName)}`
+              )
+              .join(", ");
+            componentImports += `import { ${specifiers} } from "${namespace}";\n`;
+          }
+          break;
+
+        case "xml":
+          {
+            // In case of xml it's the only component we are supporting
+            componentImports = `import { XmlNode, XmlTime } from "@webstudio-is/sdk-components-react";\n`;
+
+            xmlPresentationComponents += Array.from(componentsSet)
+              .map(([shortName, component]) =>
+                scope.getName(component, shortName)
+              )
+              .filter(
+                (scopedName) =>
+                  scopedName !== "XmlNode" && scopedName !== "XmlTime"
+              )
+              .map((scopedName) =>
+                scopedName === "Body"
+                  ? // Using <svg> prevents React from hoisting elements like <title>, <meta>, and <link>
+                    // out of their intended scope during rendering.
+                    // More details: https://github.com/facebook/react/blob/7c8e5e7ab8bb63de911637892392c5efd8ce1d0f/packages/react-dom-bindings/src/client/ReactFiberConfigDOM.js#L3083
+                    `const ${scopedName} = (props: any) => <svg>{props.children}</svg>;`
+                  : // Do not render all other components
+                    `const ${scopedName} = (props: any) => null;`
+              )
+              .join("\n");
+          }
+          break;
+        default: {
+          documentType satisfies never;
+        }
+      }
+    }
+
+    const pageFontAssets = fontAssetsByPage[pageId];
+    const pageBackgroundImageAssets = backgroundImageAssetsByPage[pageId];
 
     const rootInstanceId = pageData.page.rootInstanceId;
     const instances = new Map(pageData.build.instances);
     const props = new Map(pageData.build.props);
     const dataSources = new Map(pageData.build.dataSources);
     const resources = new Map(pageData.build.resources);
-    const utilsExport = generateUtilsExport({
-      pages: siteData.build.pages,
+    replaceFormActionsWithResources({
+      instances,
+      resources,
       props,
     });
-    // generate new Page Params variable if does not exist
-    // to allow always passing it from route template
-    const pathVariableId = pageData.page.pathVariableId ?? "pathVariableId";
-    if (pageData.page.pathVariableId === undefined) {
-      dataSources.set(pathVariableId, {
-        id: pathVariableId,
-        name: "Page Params",
-        type: "parameter",
-      });
-    }
     const pageComponent = generateWebstudioComponent({
       scope,
       name: "Page",
-      rootInstanceId: pageData.page.rootInstanceId,
+      rootInstanceId,
       parameters: [
         {
-          id: `params`,
+          id: `system`,
           instanceId: "",
-          name: "params",
+          name: "system",
           type: "parameter",
-          value: pathVariableId,
+          value: pageData.page.systemDataSourceId ?? "",
         },
       ],
       instances,
       props,
       dataSources,
-      classesMap,
+      classesMap: classes,
       indexesWithinAncestors: getIndexesWithinAncestors(
         projectMetas,
         instances,
@@ -547,93 +607,182 @@ export const prebuild = async (options: {
       ),
     });
 
+    const projectMeta = siteData.build.pages.meta;
+    const contactEmail: undefined | string =
+      // fallback to user email when contact email is empty string
+      projectMeta?.contactEmail || siteData.user?.email || undefined;
+    const favIconAsset = assets.get(projectMeta?.faviconAssetId ?? "");
+
+    const pagePath = getPagePath(pageData.page.id, siteData.build.pages);
+
+    // MARK: - TODO: XML GENERATION
     const pageExports = `/* eslint-disable */
-/* This is a auto generated file for building the project */ \n
-import { Fragment, useState } from "react";
-import type { Asset, ImageAsset, ProjectMeta } from "@webstudio-is/sdk";
-import { useResource } from "@webstudio-is/react-sdk";
-import type { PageMeta } from "@webstudio-is/react-sdk";
-${componentImports}
-import type { PageData } from "~/routes/_index";
-export const fontAssets: Asset[] = ${JSON.stringify(fontAssets)}
-export const imageAssets: ImageAsset[] = ${JSON.stringify(imageAssets)}
-export const pageData: PageData = ${JSON.stringify(renderedPageData)};
-export const user: { email: string | null } | undefined = ${JSON.stringify(
-      siteData.user
-    )};
-export const projectId = "${siteData.build.projectId}";
+      /* This is a auto generated file for building the project */ \n
 
-${generatePageMeta({ page: pageData.page, dataSources })}
+      import { Fragment, useState } from "react";
+      import type { FontAsset, ImageAsset } from "@webstudio-is/sdk";
+      import { useResource, useVariableState } from "@webstudio-is/react-sdk/runtime";
+      ${componentImports}
 
-${pageComponent}
+      export const siteName = ${JSON.stringify(projectMeta?.siteName)};
 
-export { Page }
+      export const favIconAsset: ImageAsset | undefined =
+        ${JSON.stringify(favIconAsset)};
 
-${generateRemixParams(pageData.page.path)}
+      // Font assets on current page (can be preloaded)
+      export const pageFontAssets: FontAsset[] =
+        ${JSON.stringify(pageFontAssets)}
 
-${utilsExport}
-`;
+      export const pageBackgroundImageAssets: ImageAsset[] =
+        ${JSON.stringify(pageBackgroundImageAssets)}
 
-    /*
-      The _index is mandatory.
-      Let's say there is a route /test.one.tsx and then there is a /test.tsx route.
-      Remix doesn't pick the /test.tsx by default unless we mention the _index at the end.
+      ${
+        pagePath === "/"
+          ? `
+            ${
+              projectMeta?.code
+                ? `
+            const Script = ({children, ...props}: Record<string, string | boolean>) => {
+              if (children == null) {
+                return <script {...props} />;
+              }
 
-      Or else it picks the first route that matches the /test as a layout and not a independent route.
-      So, we need to mark the pages as _index at the end. So deep nested routes works as expected.
+              return <script {...props} dangerouslySetInnerHTML={{__html: children}} />;
+            };
+            const Style = ({children, ...props}: Record<string, string | boolean>) => {
+              if (children == null) {
+                return <style {...props} />;
+              }
 
-      Details:
-      https://remix.run/docs/en/main/file-conventions/route-files-v2#nested-urls-without-layout-nesting
-    */
+              return <style {...props} dangerouslySetInnerHTML={{__html: children}} />;
+            };
+            `
+                : ""
+            }
 
-    const path = getPagePath(pageData.page.id, siteData.build.pages);
-    const remixRoute = generateRemixRoute(path);
-    const fileName = `${remixRoute}.tsx`;
+            export const CustomCode = () => {
+              return (<>${projectMeta?.code ? htmlToJsx(projectMeta.code) : ""}</>);
+            }
+          `
+          : ""
+      }
 
-    const routeFileContent = routeFileTemplate
-      .replace(
-        /".*\/__generated__\/_index"/,
-        `"../__generated__/${remixRoute}"`
-      )
-      .replace(
-        /".*\/__generated__\/_index.server"/,
-        `"../__generated__/${remixRoute}.server"`
-      );
+      ${xmlPresentationComponents}
 
-    await ensureFileInPath(join(routesDir, fileName), routeFileContent);
-    await ensureFileInPath(join(generatedDir, fileName), pageExports);
+      ${pageComponent}
 
-    await ensureFileInPath(
-      join(generatedDir, `${remixRoute}.server.tsx`),
-      generateResourcesLoader({
+      export { Page }
+    `;
+
+    const serverExports = `/* eslint-disable */
+      /* This is a auto generated file for building the project */ \n
+
+      import type { PageMeta } from "@webstudio-is/sdk";
+      ${generateResources({
         scope,
         page: pageData.page,
         dataSources,
+        props,
         resources,
-      })
-    );
+      })}
+
+      ${generatePageMeta({
+        globalScope: scope,
+        page: pageData.page,
+        dataSources,
+        assets,
+      })}
+
+      ${generateRemixParams(pageData.page.path)}
+
+      export const projectId = "${siteData.build.projectId}";
+
+      export const contactEmail = ${JSON.stringify(contactEmail)};
+    `;
+
+    const generatedBasename = generateRemixRoute(pagePath);
+
+    const clientFile = join(generatedDir, `${generatedBasename}.tsx`);
+    await createFileIfNotExists(clientFile, pageExports);
+
+    const serverFile = join(generatedDir, `${generatedBasename}.server.tsx`);
+    await createFileIfNotExists(serverFile, serverExports);
+
+    const getTemplates =
+      documentType === "html" ? framework.html : framework.xml;
+    for (const { file, template } of getTemplates({ pagePath })) {
+      const content = template
+        .replaceAll("__CONSTANTS__", importFrom("./app/constants.mjs", file))
+        .replaceAll(
+          "__SITEMAP__",
+          importFrom(`./app/__generated__/$resources.sitemap.xml`, file)
+        )
+        .replaceAll(
+          "__CLIENT__",
+          importFrom(`./app/__generated__/${generatedBasename}`, file)
+        )
+        .replaceAll(
+          "__SERVER__",
+          importFrom(`./app/__generated__/${generatedBasename}.server`, file)
+        )
+        .replaceAll(
+          "__CSS__",
+          importFrom(`./app/__generated__/index.css`, file)
+        );
+      await createFileIfNotExists(file, content);
+    }
   }
 
-  await writeFile(
-    join(generatedDir, "[sitemap.xml].ts"),
+  // MARK: - Default sitemap.xml
+  for (const { file, template } of framework.defaultSitemap()) {
+    const content = template.replaceAll(
+      "__SITEMAP__",
+      importFrom(`./app/__generated__/$resources.sitemap.xml`, file)
+    );
+    await createFileIfNotExists(file, content);
+  }
+
+  await createFileIfNotExists(
+    join(generatedDir, "$resources.sitemap.xml.ts"),
     `
       export const sitemap = ${JSON.stringify(
-        {
-          pages: siteData.pages
-            .filter((page) => page.meta.excludePageFromSearch !== true)
-            .map((page) => ({
-              path: page.path,
-              lastModified: siteData.build.updatedAt,
-            })),
-        },
+        getStaticSiteMapXml(siteData.build.pages, siteData.build.updatedAt),
         null,
         2
       )};
     `
   );
 
-  spinner.text = "Downloading fonts and images";
-  await Promise.all(assetsToDownload);
+  const redirects = siteData.build.pages?.redirects;
+  if (redirects !== undefined && redirects.length > 0) {
+    for (const redirect of redirects) {
+      const generatedBasename = generateRemixRoute(redirect.old);
+      await createFileIfNotExists(
+        join(generatedDir, `${generatedBasename}.ts`),
+        `
+        export const url = "${redirect.new}";
+        export const status = ${redirect.status ?? 301};
+        `
+      );
 
-  spinner.succeed("Build finished");
+      for (const { file, template } of framework.redirect({
+        pagePath: redirect.old,
+      })) {
+        const content = template.replaceAll(
+          "__REDIRECT__",
+          importFrom(`./app/__generated__/${generatedBasename}`, file)
+        );
+        await createFileIfNotExists(file, content);
+      }
+    }
+  }
+
+  if (assetsToDownload.length > 0) {
+    const downloading = spinner();
+    downloading.start("Downloading fonts and images");
+    await Promise.all(assetsToDownload);
+    downloading.stop("Downloaded fonts and images");
+  }
+
+  log.step("Build finished");
 };

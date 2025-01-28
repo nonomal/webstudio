@@ -1,8 +1,26 @@
+import { forwardRef } from "react";
 import { styled, theme } from "../stitches.config";
 import { textVariants } from "./text";
+import { ExternalLinkIcon } from "@webstudio-is/icons";
+
+export const IconLink = forwardRef<
+  HTMLAnchorElement,
+  React.ComponentProps<typeof Link> & { size?: number | string }
+>(({ size, ...props }, ref) => (
+  <Link {...props} ref={ref}>
+    <ExternalLinkIcon size={size} />
+  </Link>
+));
 
 export const Link = styled("a", {
   cursor: "pointer",
+  "&[aria-disabled=true]": {
+    cursor: "default",
+    color: theme.colors.foregroundDisabled,
+    "&:hover, &:visited": {
+      color: theme.colors.foregroundDisabled,
+    },
+  },
   variants: {
     variant: {
       inherit: {

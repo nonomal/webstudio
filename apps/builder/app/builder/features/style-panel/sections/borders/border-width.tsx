@@ -6,9 +6,14 @@ import {
   BorderWidthBottomIcon,
   BorderWidthLeftIcon,
 } from "@webstudio-is/icons";
-
-import type { RenderCategoryProps } from "../../style-sections";
 import { BorderProperty } from "./border-property";
+
+export const properties = [
+  "borderTopWidth",
+  "borderRightWidth",
+  "borderBottomWidth",
+  "borderLeftWidth",
+] satisfies Array<StyleProperty>;
 
 const borderPropertyOptions = {
   borderTopWidth: {
@@ -25,18 +30,9 @@ const borderPropertyOptions = {
   },
 } as const satisfies Partial<{ [property in StyleProperty]: unknown }>;
 
-export const BorderWidth = (
-  props: Pick<
-    RenderCategoryProps,
-    "currentStyle" | "setProperty" | "deleteProperty" | "createBatchUpdate"
-  >
-) => {
+export const BorderWidth = () => {
   return (
     <BorderProperty
-      currentStyle={props.currentStyle}
-      setProperty={props.setProperty}
-      deleteProperty={props.deleteProperty}
-      createBatchUpdate={props.createBatchUpdate}
       label="Width"
       description="Sets the width of the border"
       borderPropertyOptions={borderPropertyOptions}

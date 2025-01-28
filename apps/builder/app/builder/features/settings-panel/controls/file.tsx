@@ -7,13 +7,13 @@ import {
 } from "~/builder/shared/binding-popover";
 import {
   type ControlProps,
-  getLabel,
   VerticalLayout,
   useLocalValue,
   Label,
   updateExpressionValue,
   $selectedInstanceScope,
   useBindingState,
+  humanizeAttribute,
 } from "../shared";
 import { SelectAsset } from "./select-asset";
 
@@ -72,7 +72,7 @@ export const FileControl = ({
     }
   );
 
-  const label = getLabel(meta, propName);
+  const label = humanizeAttribute(meta.label || propName);
   const { scope, aliases } = useStore($selectedInstanceScope);
   const expression =
     prop?.type === "expression" ? prop.value : JSON.stringify(computedValue);

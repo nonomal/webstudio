@@ -10,48 +10,36 @@ import {
   Flex,
   NestedInputButton,
   Separator,
+  toast,
 } from "@webstudio-is/design-system";
-import type { DomainRouter } from "@webstudio-is/domain/index.server";
 import type { Project } from "@webstudio-is/project";
-import { createTrpcFetchProxy } from "~/shared/remix/trpc-remix-proxy";
-import { builderDomainsPath } from "~/shared/router-utils";
 import {
   AlertIcon,
   CheckCircleIcon,
   ExternalLinkIcon,
   CopyIcon,
 } from "@webstudio-is/icons";
-import type { DomainStatus } from "@webstudio-is/prisma-client";
 import { CollapsibleDomainSection } from "./collapsible-domain-section";
-import env from "~/shared/env";
-import { useCallback, useEffect, useState } from "react";
-import type { PublishStatus } from "@webstudio-is/prisma-client";
-// eslint-disable-next-line import/no-internal-modules
-import formatDistance from "date-fns/formatDistance";
+import {
+  startTransition,
+  useEffect,
+  useOptimistic,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { Entri } from "./entri";
+import { nativeClient } from "~/shared/trpc/trpc-client";
+import { useStore } from "@nanostores/react";
+import { $publisherHost } from "~/shared/nano-states";
+import { extractCname } from "./cname";
+import { useEffectEvent } from "~/shared/hook-utils/effect-event";
+import DomainCheckbox from "./domain-checkbox";
+import { CopyToClipboard } from "~/builder/shared/copy-to-clipboard";
+import { RelativeTime } from "~/builder/shared/relative-time";
 
-const trpc = createTrpcFetchProxy<DomainRouter>(builderDomainsPath);
-
-export type Domain = {
-  projectId: Project["id"];
-  domain: {
-    domain: string;
-    error: string | null;
-    status: DomainStatus;
-    updatedAt: string;
-  };
-  txtRecord: string;
-  cname: string;
-  verified: boolean;
-  latestBuid: null | {
-    projectId: string;
-    buildId: string;
-    isLatestBuild: boolean;
-    publishStatus: PublishStatus;
-    updatedAt: string;
-    domainId: string;
-  };
-};
+export type Domain = Project["domainsVirtual"][number];
+type DomainStatus = Project["domainsVirtual"][number]["status"];
 
 const InputEllipsis = styled(InputField, {
   "&>input": {
@@ -59,43 +47,24 @@ const InputEllipsis = styled(InputField, {
   },
 });
 
-const CopyToClipboard = (props: { text: string }) => {
-  return (
-    <Tooltip content={"Copy to clipboard"}>
-      <NestedInputButton
-        onClick={() => {
-          navigator.clipboard.writeText(props.text);
-        }}
-      >
-        <CopyIcon />
-      </NestedInputButton>
-    </Tooltip>
-  );
-};
-
-const getCname = (domain: string) => {
-  const domainArray = domain.split(".");
-  const cnameArray = domainArray.slice(0, -2);
-  if (cnameArray.length === 0) {
-    return "@";
-  }
-  return cnameArray.join(".");
-};
-
 export const getStatus = (projectDomain: Domain) =>
   projectDomain.verified
-    ? (`VERIFIED_${projectDomain.domain.status}` as const)
+    ? (`VERIFIED_${projectDomain.status}` as const)
     : `UNVERIFIED`;
 
-export const PENDING_TIMEOUT = 60 * 3 * 1000;
+export const PENDING_TIMEOUT =
+  process.env.NODE_ENV === "production" ? 60 * 3 * 1000 : 35000;
 
 export const getPublishStatusAndText = ({
-  updatedAt,
+  createdAt,
   publishStatus,
-}: Pick<NonNullable<Domain["latestBuid"]>, "updatedAt" | "publishStatus">) => {
+}: Pick<
+  NonNullable<Domain["latestBuildVirtual"]>,
+  "createdAt" | "publishStatus"
+>) => {
   let status = publishStatus;
 
-  const delta = Date.now() - new Date(updatedAt).getTime();
+  const delta = Date.now() - new Date(createdAt).getTime();
   // Assume build failed after 3 minutes
 
   if (publishStatus === "PENDING" && delta > PENDING_TIMEOUT) {
@@ -106,16 +75,15 @@ export const getPublishStatusAndText = ({
     status === "PUBLISHED"
       ? "Published"
       : status === "FAILED"
-      ? "Publish failed"
-      : "Publishing started";
+        ? "Publish failed"
+        : "Publishing started";
 
-  const statusText = `${textStart} ${formatDistance(
-    new Date(updatedAt),
-    new Date(),
-    {
-      addSuffix: true,
-    }
-  )}`;
+  const statusText = (
+    <>
+      {textStart}
+      <RelativeTime time={new Date(createdAt)} />
+    </>
+  );
 
   return { statusText, status };
 };
@@ -127,7 +95,7 @@ const getStatusText = (props: {
   const status = getStatus(props.projectDomain);
 
   let isVerifiedActive = false;
-  let text = "Something went wrong";
+  let text: ReactNode = "Something went wrong";
 
   switch (status) {
     case "UNVERIFIED":
@@ -144,9 +112,9 @@ const getStatusText = (props: {
       isVerifiedActive = true;
       text = "Status: Active, not published";
 
-      if (props.projectDomain.latestBuid !== null) {
+      if (props.projectDomain.latestBuildVirtual !== null) {
         const publishText = getPublishStatusAndText(
-          props.projectDomain.latestBuid
+          props.projectDomain.latestBuildVirtual
         );
 
         text = publishText.statusText;
@@ -154,11 +122,11 @@ const getStatusText = (props: {
       }
       break;
     case "VERIFIED_ERROR":
-      text = props.projectDomain.domain.error ?? text;
+      text = props.projectDomain.error ?? text;
       break;
 
     default:
-      ((value: never) => {
+      ((_value: never) => {
         /* exhaustive check */
       })(status);
       break;
@@ -178,17 +146,17 @@ const StatusIcon = (props: { projectDomain: Domain; isLoading: boolean }) => {
   return (
     <Tooltip content={text}>
       <Flex
-        align={"center"}
-        justify={"center"}
+        align="center"
+        justify="center"
         css={{
           cursor: "pointer",
-          width: theme.spacing[12],
-          height: theme.spacing[12],
+          width: theme.sizes.controlHeight,
+          height: theme.sizes.controlHeight,
           color: props.isLoading
             ? theme.colors.foregroundDisabled
             : isVerifiedActive
-            ? theme.colors.foregroundSuccessText
-            : theme.colors.foregroundDestructive,
+              ? theme.colors.foregroundSuccessText
+              : theme.colors.foregroundDestructive,
         }}
       >
         <Icon />
@@ -200,162 +168,121 @@ const StatusIcon = (props: { projectDomain: Domain; isLoading: boolean }) => {
 const DomainItem = (props: {
   initiallyOpen: boolean;
   projectDomain: Domain;
-  refreshDomainResult: (
-    input: { projectId: Project["id"] },
-    onSuccess?: () => void
-  ) => void;
-  domainState: "idle" | "submitting";
-  isPublishing: boolean;
+  refresh: () => Promise<void>;
+  project: Project;
 }) => {
-  const {
-    send: verify,
-    state: verifyState,
-    data: verifyData,
-    error: verifySystemError,
-  } = trpc.verify.useMutation();
+  const timeSinceLastUpdateMs =
+    Date.now() - new Date(props.projectDomain.updatedAt).getTime();
 
-  const {
-    send: remove,
-    state: removeState,
-    data: removeData,
-    error: removeSystemError,
-  } = trpc.remove.useMutation();
-
-  const {
-    send: updateStatus,
-    state: updateStatusState,
-    data: updateStatusData,
-    error: updateStatusError,
-  } = trpc.updateStatus.useMutation();
-
-  const [isStatusLoading, setIsStatusLoading] = useState(true);
-
-  const isRemoveInProgress =
-    removeState !== "idle" || props.domainState !== "idle";
-
-  const isCheckStateInProgress =
-    verifyState !== "idle" ||
-    updateStatusState !== "idle" ||
-    props.domainState !== "idle";
+  const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
   const status = props.projectDomain.verified
-    ? (`VERIFIED_${props.projectDomain.domain.status}` as `VERIFIED_${DomainStatus}`)
+    ? (`VERIFIED_${props.projectDomain.status}` as `VERIFIED_${DomainStatus}`)
     : `UNVERIFIED`;
 
-  const { initiallyOpen } = props;
+  const [isStatusLoading, setIsStatusLoading] = useState(
+    props.initiallyOpen ||
+      status === "VERIFIED_ACTIVE" ||
+      timeSinceLastUpdateMs > DAY_IN_MS
+      ? false
+      : true
+  );
 
-  const domain = props.projectDomain.domain.domain;
-  const domainStatus = props.projectDomain.domain.status;
-  const domainError = props.projectDomain.domain.error;
-  const domainUpdatedAt = props.projectDomain.domain.updatedAt;
+  const [isCheckStateInProgress, setIsCheckStateInProgress] =
+    useOptimistic(false);
 
-  const projectId = props.projectDomain.projectId;
-  // const domain
+  const [isRemoveInProgress, setIsRemoveInProgress] = useOptimistic(false);
 
-  const refreshDomainResult = props.refreshDomainResult;
+  const handleRemoveDomain = async () => {
+    setIsRemoveInProgress(true);
+    const result = await nativeClient.domain.remove.mutate({
+      projectId: props.projectDomain.projectId,
+      domainId: props.projectDomain.domainId,
+    });
 
-  // @todo this should gone https://github.com/webstudio-is/webstudio/issues/1723
-  const handleVerify = useCallback(() => {
-    verify(
-      {
-        domain,
-        projectId,
-      },
-      (verifyResponse) => {
-        setIsStatusLoading(false);
+    if (result.success === false) {
+      toast.error(result.error);
+      return;
+    }
 
-        if (verifyResponse.success) {
-          refreshDomainResult({
-            projectId,
-          });
-        }
-      }
-    );
-  }, [domain, projectId, refreshDomainResult, verify]);
+    await props.refresh();
+  };
 
-  // @todo this should gone https://github.com/webstudio-is/webstudio/issues/1723
-  const handleUpdateStatus = useCallback(() => {
-    updateStatus(
-      {
-        domain,
-        projectId,
-      },
-      (data) => {
-        setIsStatusLoading(false);
+  const [verifyError, setVerifyError] = useState<string | undefined>(undefined);
 
-        if (data.success) {
-          if (
-            domainStatus !== data.domain.status ||
-            domainError !== data.domain.error
-          ) {
-            refreshDomainResult({
-              projectId,
-            });
-          }
-        }
-      }
-    );
-  }, [
-    domain,
-    domainError,
-    domainStatus,
-    projectId,
-    refreshDomainResult,
-    updateStatus,
-  ]);
+  const handleVerify = useEffectEvent(async () => {
+    setVerifyError(undefined);
+    setIsCheckStateInProgress(true);
 
-  // @todo this should gone https://github.com/webstudio-is/webstudio/issues/1723
+    const verifyResult = await nativeClient.domain.verify.mutate({
+      projectId: props.projectDomain.projectId,
+      domainId: props.projectDomain.domainId,
+    });
+
+    if (verifyResult.success === false) {
+      setVerifyError(verifyResult.error);
+      return;
+    }
+
+    await props.refresh();
+  });
+
+  const [updateStatusError, setUpdateStatusError] = useState<
+    string | undefined
+  >(undefined);
+
+  const handleUpdateStatus = useEffectEvent(async () => {
+    setUpdateStatusError(undefined);
+    setIsCheckStateInProgress(true);
+
+    const updateStatusResult = await nativeClient.domain.updateStatus.mutate({
+      projectId: props.projectDomain.projectId,
+      domain: props.projectDomain.domain,
+    });
+
+    setIsStatusLoading(false);
+
+    if (updateStatusResult.success === false) {
+      setUpdateStatusError(updateStatusResult.error);
+      return;
+    }
+
+    await props.refresh();
+  });
+
+  const onceRef = useRef(false);
   useEffect(() => {
-    if (initiallyOpen) {
-      setIsStatusLoading(false);
+    if (onceRef.current) {
       return;
     }
+    onceRef.current = true;
 
-    if (status === "VERIFIED_ACTIVE") {
-      setIsStatusLoading(false);
-      return;
-    }
-
-    const timeSinceLastUpdateMs =
-      Date.now() - new Date(domainUpdatedAt).getTime();
-
-    const DAY_IN_MS = 24 * 60 * 60 * 1000;
-    // Do not check status if it updated more than one day ago
-    if (timeSinceLastUpdateMs > DAY_IN_MS) {
-      setIsStatusLoading(false);
+    if (isStatusLoading === false) {
       return;
     }
 
     if (status === "UNVERIFIED") {
-      handleVerify();
+      startTransition(async () => {
+        await handleVerify();
+        await handleUpdateStatus();
+      });
       return;
     }
+    startTransition(async () => {
+      await handleUpdateStatus();
+    });
+  }, [status, handleVerify, handleUpdateStatus, isStatusLoading]);
 
-    handleUpdateStatus();
-
-    // Update status automatically
-  }, [
-    status,
-    initiallyOpen,
-    handleVerify,
-    handleUpdateStatus,
-    domainUpdatedAt,
-  ]);
-
-  const cnameEntryName = getCname(props.projectDomain.domain.domain);
-  const cnameEntryValue = `${props.projectDomain.cname}.customers.${
-    env.PUBLISHER_HOST ?? "wstd.work"
-  }`;
+  const publisherHost = useStore($publisherHost);
+  const cnameEntryName = extractCname(props.projectDomain.domain);
+  const cnameEntryValue = `${props.projectDomain.cname}.customers.${publisherHost}`;
 
   const txtEntryName =
     cnameEntryName === "@"
-      ? "__webstudio_is"
-      : `__webstudio_is.${cnameEntryName}`;
+      ? "_webstudio_is"
+      : `_webstudio_is.${cnameEntryName}`;
 
-  const { isVerifiedActive, text } = getStatusText({
-    projectDomain: props.projectDomain,
-    isLoading: false,
-  });
+  const domainStatus = getStatus(props.projectDomain);
 
   const cnameRecord = {
     type: "CNAME",
@@ -367,16 +294,33 @@ const DomainItem = (props: {
   const txtRecord = {
     type: "TXT",
     host: txtEntryName,
-    value: props.projectDomain.txtRecord,
+    value: props.projectDomain.expectedTxtRecord,
     ttl: 300,
   } as const;
 
   const dnsRecords = [cnameRecord, txtRecord];
 
+  const { isVerifiedActive, text } = getStatusText({
+    projectDomain: props.projectDomain,
+    isLoading: false,
+  });
+
   return (
     <CollapsibleDomainSection
+      prefix={
+        <DomainCheckbox
+          buildId={props.projectDomain.latestBuildVirtual?.buildId}
+          defaultChecked={
+            props.projectDomain.latestBuildVirtual?.buildId != null &&
+            props.projectDomain.latestBuildVirtual?.buildId ===
+              props.project.latestBuildVirtual?.buildId
+          }
+          domain={props.projectDomain.domain}
+          disabled={domainStatus !== "VERIFIED_ACTIVE"}
+        />
+      }
       initiallyOpen={props.initiallyOpen}
-      title={props.projectDomain.domain.domain}
+      title={props.projectDomain.domain}
       suffix={
         <Grid flow="column">
           <StatusIcon
@@ -384,14 +328,12 @@ const DomainItem = (props: {
             projectDomain={props.projectDomain}
           />
 
-          <Tooltip content={`Proceed to ${props.projectDomain.domain.domain}`}>
+          <Tooltip content={`Proceed to ${props.projectDomain.domain}`}>
             <IconButton
               tabIndex={-1}
               disabled={status !== "VERIFIED_ACTIVE"}
               onClick={(event) => {
-                const url = new URL(
-                  `https://${props.projectDomain.domain.domain}`
-                );
+                const url = new URL(`https://${props.projectDomain.domain}`);
                 window.open(url.href, "_blank");
                 event.preventDefault();
               }}
@@ -404,14 +346,11 @@ const DomainItem = (props: {
     >
       {status === "UNVERIFIED" && (
         <>
-          {verifySystemError !== undefined && (
-            <Text color="destructive">{verifySystemError}</Text>
-          )}
           <Button
-            disabled={props.isPublishing || isCheckStateInProgress}
+            formAction={handleVerify}
+            state={isCheckStateInProgress ? "pending" : undefined}
             color="primary"
             css={{ width: "100%", flexShrink: 0, mt: theme.spacing[3] }}
-            onClick={handleVerify}
           >
             Check status
           </Button>
@@ -420,48 +359,25 @@ const DomainItem = (props: {
 
       {status !== "UNVERIFIED" && (
         <>
-          {updateStatusData?.success === false && (
-            <Text color="destructive">{updateStatusData.error}</Text>
-          )}
-          {updateStatusError !== undefined && (
+          {updateStatusError && (
             <Text color="destructive">{updateStatusError}</Text>
           )}
           <Button
-            disabled={props.isPublishing || isCheckStateInProgress}
+            formAction={handleUpdateStatus}
+            state={isCheckStateInProgress ? "pending" : undefined}
             color="primary"
             css={{ width: "100%", flexShrink: 0, mt: theme.spacing[3] }}
-            onClick={handleUpdateStatus}
           >
             Check status
           </Button>
         </>
       )}
 
-      {removeData?.success === false && (
-        <Text color="destructive">{removeData.error}</Text>
-      )}
-
-      {removeSystemError !== undefined && (
-        <Text color="destructive">{removeSystemError}</Text>
-      )}
-
       <Button
-        disabled={props.isPublishing || isRemoveInProgress}
+        formAction={handleRemoveDomain}
+        state={isRemoveInProgress ? "pending" : undefined}
         color="neutral"
         css={{ width: "100%", flexShrink: 0 }}
-        onClick={() => {
-          remove(
-            {
-              domain: props.projectDomain.domain.domain,
-              projectId: props.projectDomain.projectId,
-            },
-            () => {
-              props.refreshDomainResult({
-                projectId: props.projectDomain.projectId,
-              });
-            }
-          );
-        }}
       >
         Remove domain
       </Button>
@@ -470,11 +386,11 @@ const DomainItem = (props: {
         <Grid gap={1}>
           {status === "UNVERIFIED" && (
             <>
-              {verifyData?.success === false ? (
+              {verifyError ? (
                 <Text color="destructive">
                   Status: Failed to verify
                   <br />
-                  {verifyData.error}
+                  {verifyError}
                 </Text>
               ) : (
                 <>
@@ -526,24 +442,48 @@ const DomainItem = (props: {
           <InputEllipsis
             readOnly
             value={cnameRecord.host}
-            suffix={<CopyToClipboard text={cnameRecord.host} />}
+            suffix={
+              <CopyToClipboard text={cnameRecord.host}>
+                <NestedInputButton type="button">
+                  <CopyIcon />
+                </NestedInputButton>
+              </CopyToClipboard>
+            }
           />
           <InputEllipsis
             readOnly
             value={cnameRecord.value}
-            suffix={<CopyToClipboard text={cnameRecord.value} />}
+            suffix={
+              <CopyToClipboard text={cnameRecord.value}>
+                <NestedInputButton type="button">
+                  <CopyIcon />
+                </NestedInputButton>
+              </CopyToClipboard>
+            }
           />
 
           <InputEllipsis readOnly value="TXT" />
           <InputEllipsis
             readOnly
             value={txtRecord.host}
-            suffix={<CopyToClipboard text={txtRecord.host} />}
+            suffix={
+              <CopyToClipboard text={txtRecord.host}>
+                <NestedInputButton type="button">
+                  <CopyIcon />
+                </NestedInputButton>
+              </CopyToClipboard>
+            }
           />
           <InputEllipsis
             readOnly
             value={txtRecord.value}
-            suffix={<CopyToClipboard text={txtRecord.value} />}
+            suffix={
+              <CopyToClipboard text={txtRecord.value}>
+                <NestedInputButton type="button">
+                  <CopyIcon />
+                </NestedInputButton>
+              </CopyToClipboard>
+            }
           />
         </Grid>
 
@@ -561,18 +501,21 @@ const DomainItem = (props: {
 
         <Entri
           dnsRecords={dnsRecords}
-          domain={props.projectDomain.domain.domain}
+          domain={props.projectDomain.domain}
           onClose={() => {
             // Sometimes Entri modal dialog hangs even if it's successful,
             // until they fix that, we'll just refresh the status here on every onClose event
             if (status === "UNVERIFIED") {
-              handleVerify();
+              startTransition(async () => {
+                await handleVerify();
+                await handleUpdateStatus();
+              });
               return;
             }
-
-            handleUpdateStatus();
+            startTransition(async () => {
+              await handleUpdateStatus();
+            });
           }}
-          isPublishing={props.isPublishing}
         />
       </Grid>
     </CollapsibleDomainSection>
@@ -582,31 +525,25 @@ const DomainItem = (props: {
 type DomainsProps = {
   newDomains: Set<string>;
   domains: Domain[];
-  refreshDomainResult: (
-    input: { projectId: Project["id"] },
-    onSuccess?: () => void
-  ) => void;
-  domainState: "idle" | "submitting";
-  isPublishing: boolean;
+  refresh: () => Promise<void>;
+  project: Project;
 };
 
 export const Domains = ({
   newDomains,
   domains,
-  refreshDomainResult,
-  domainState,
-  isPublishing,
+  refresh,
+  project,
 }: DomainsProps) => {
   return (
     <>
       {domains.map((projectDomain) => (
         <DomainItem
-          key={projectDomain.domain.domain}
+          key={projectDomain.domain}
           projectDomain={projectDomain}
-          initiallyOpen={newDomains.has(projectDomain.domain.domain)}
-          refreshDomainResult={refreshDomainResult}
-          domainState={domainState}
-          isPublishing={isPublishing}
+          initiallyOpen={newDomains.has(projectDomain.domain)}
+          refresh={refresh}
+          project={project}
         />
       ))}
     </>

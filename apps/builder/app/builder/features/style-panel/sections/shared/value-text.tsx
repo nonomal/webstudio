@@ -3,7 +3,6 @@ import type { StyleValue } from "@webstudio-is/css-engine";
 import { useMemo, type ComponentProps } from "react";
 import { theme } from "@webstudio-is/design-system";
 import { toValue } from "@webstudio-is/css-engine";
-import { toPascalCase } from "../../shared/keyword-utils";
 
 const Container = styled("button", {
   // fit-content is not needed for the "button" element,
@@ -13,7 +12,7 @@ const Container = styled("button", {
   flexWrap: "wrap",
   alignItems: "baseline",
   justifyContent: "center",
-  border: "1px solid transparent",
+  border: "none",
   borderRadius: theme.borderRadius[3],
   padding: `${theme.spacing[2]}`,
 
@@ -30,40 +29,44 @@ const Container = styled("button", {
       local: {
         color: theme.colors.foregroundLocalMain,
         backgroundColor: theme.colors.backgroundLocalMain,
-        borderColor: theme.colors.borderLocalMain,
       },
       overwritten: {
         color: theme.colors.foregroundOverwrittenMain,
         backgroundColor: theme.colors.backgroundOverwrittenMain,
-        borderColor: theme.colors.borderOverwrittenMain,
       },
       preset: {
         color: theme.colors.foregroundMain,
         backgroundColor: theme.colors.backgroundPresetMain,
-        borderColor: theme.colors.borderMain,
       },
       remote: {
         color: theme.colors.foregroundRemoteMain,
         backgroundColor: theme.colors.backgroundRemoteMain,
-        borderColor: theme.colors.borderRemoteMain,
       },
     },
   },
   compoundVariants: [
-    { source: "default", css: { color: theme.colors.slate12 } },
+    { source: "default", css: { color: theme.colors.foregroundTextSubtle } },
   ],
 });
 
 export const ValueText = ({
   value,
   source,
+  truncate = false,
   ...rest
-}: { value: StyleValue } & Omit<ComponentProps<typeof Container>, "value">) => {
+}: { value: StyleValue; truncate?: boolean } & Omit<
+  ComponentProps<typeof Container>,
+  "value"
+>) => {
   const children = useMemo(() => {
     if (value.type === "unit") {
       // we want to show "0" rather than "0px" for default values for cleaner UI
       if (source === "default" && value.unit === "px" && value.value === 0) {
-        return <Text variant="spaceSectionValueText">{value.value}</Text>;
+        return (
+          <Text truncate={truncate} variant="spaceSectionValueText">
+            {value.value}
+          </Text>
+        );
       }
 
       /**
@@ -73,7 +76,7 @@ export const ValueText = ({
 
       return (
         <>
-          <Text variant="spaceSectionValueText">
+          <Text truncate={truncate} variant="spaceSectionValueText">
             {value.value}
             <Text
               variant="spaceSectionValueText"
@@ -90,15 +93,19 @@ export const ValueText = ({
     }
 
     if (value.type === "var") {
-      return <Text variant="spaceSectionValueText">--{value.value}</Text>;
+      return (
+        <Text truncate={truncate} variant="spaceSectionValueText">
+          --{value.value}
+        </Text>
+      );
     }
 
     return (
-      <Text css={{}} variant="spaceSectionValueText">
-        {toPascalCase(toValue(value))}
+      <Text truncate={truncate} variant="spaceSectionValueText">
+        {toValue(value)}
       </Text>
     );
-  }, [value, source]);
+  }, [value, source, truncate]);
 
   return (
     <Container source={source} {...rest} tabIndex={-1}>
